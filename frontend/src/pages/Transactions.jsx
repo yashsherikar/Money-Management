@@ -4,6 +4,7 @@ import { categoryIcon } from '../utils/categoryIcon.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
+const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
 
 export default function Transactions() {
   const { t } = useLanguage()
@@ -85,16 +86,36 @@ export default function Transactions() {
           <option value="">{t('Account...')}</option>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="">{t('No category')}</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}{!c.essential ? ` ${t('(non-essential)')}` : ''}</option>)}
-        </select>
-        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
+        {form.type === 'INCOME' ? (
+          <select
+            value={categories.find((c) => String(c.id) === form.categoryId && INCOME_SOURCES.includes(c.name))?.name || 'Other'}
+            onChange={(e) => {
+              const match = categories.find((c) => c.name === e.target.value)
+              setForm({ ...form, categoryId: match ? String(match.id) : '' })
+            }}
+            className="px-3 py-2 border border-slate-300 rounded-md"
+          >
+            {INCOME_SOURCES.map((name) => <option key={name} value={name}>{t(name)}</option>)}
+            <option value="Other">{t('Other')}</option>
+          </select>
+        ) : (
+          <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
+            <option value="">{t('No category')}</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}{!c.essential ? ` ${t('(non-essential)')}` : ''}</option>)}
+          </select>
+        )}
+        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, categoryId: '' })} className="px-3 py-2 border border-slate-300 rounded-md">
           <option value="EXPENSE">{t('Expense')}</option>
           <option value="INCOME">{t('Income')}</option>
         </select>
         <input type="number" step="0.01" min="0.01" required placeholder={t('Amount')} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <input placeholder={t('Description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+        <input
+          placeholder={t('Description')}
+          required={form.type === 'INCOME' && !form.categoryId}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          className="px-3 py-2 border border-slate-300 rounded-md"
+        />
         <input type="date" required value={form.txnDate} onChange={(e) => setForm({ ...form, txnDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
         <div className="md:col-span-3 flex gap-2">
           <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">
