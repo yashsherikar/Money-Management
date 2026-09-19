@@ -25,3 +25,7 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:604800000}
   cors:
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173}
+
+wishroom:
+  api:
+    base-url: ${WISHROOM_API_URL:https://bucketlist-4nwg.onrender.com}

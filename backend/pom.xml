@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.frugality</groupId>
+    <groupId>com.moneymanager</groupId>
     <artifactId>moneymanager</artifactId>
     <version>0.1.0</version>
     <name>moneymanager</name>
