@@ -1,0 +1,150 @@
+2026-09-19T15:26:08.378566582Z #18 sending cache export
+2026-09-19T15:26:15.936605684Z #18 sending cache export 7.6s done
+2026-09-19T15:26:15.936621949Z #18 DONE 12.4s
+2026-09-19T15:26:17.053701045Z ==> Deploying...
+2026-09-19T15:26:17.175185375Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-09-19T15:26:37.057634838Z 
+2026-09-19T15:26:37.057690789Z   .   ____          _            __ _ _
+2026-09-19T15:26:37.057700909Z  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+2026-09-19T15:26:37.057704189Z ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+2026-09-19T15:26:37.057707149Z  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+2026-09-19T15:26:37.0577106Z   '  |____| .__|_| |_|_| |_\__, | / / / /
+2026-09-19T15:26:37.0577134Z  =========|_|==============|___/=/_/_/_/
+2026-09-19T15:26:37.05771641Z 
+2026-09-19T15:26:37.058230691Z  :: Spring Boot ::                (v3.3.4)
+2026-09-19T15:26:37.058237081Z 
+2026-09-19T15:26:38.358307236Z 2026-09-19T15:26:38.355Z  INFO 1 --- [moneymanager] [           main] c.f.m.MoneyManagerApplication            : Starting MoneyManagerApplication v0.1.0 using Java 17.0.20 with PID 1 (/app/app.jar started by root in /app)
+2026-09-19T15:26:38.360582288Z 2026-09-19T15:26:38.359Z  INFO 1 --- [moneymanager] [           main] c.f.m.MoneyManagerApplication            : No active profile set, falling back to 1 default profile: "default"
+2026-09-19T15:26:53.855384954Z 2026-09-19T15:26:53.854Z  INFO 1 --- [moneymanager] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-19T15:26:55.756013731Z 2026-09-19T15:26:55.755Z  INFO 1 --- [moneymanager] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 1797 ms. Found 17 JPA repository interfaces.
+2026-09-19T15:27:08.457673759Z 2026-09-19T15:27:08.457Z  INFO 1 --- [moneymanager] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 10000 (http)
+2026-09-19T15:27:08.756073994Z 2026-09-19T15:27:08.755Z  INFO 1 --- [moneymanager] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-19T15:27:08.756726048Z 2026-09-19T15:27:08.756Z  INFO 1 --- [moneymanager] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.30]
+2026-09-19T15:27:10.554253294Z 2026-09-19T15:27:10.460Z  INFO 1 --- [moneymanager] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-19T15:27:10.5558854Z 2026-09-19T15:27:10.555Z  INFO 1 --- [moneymanager] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 31100 ms
+2026-09-19T15:27:11.057001285Z 2026-09-19T15:27:11.056Z ERROR 1 --- [moneymanager] [           main] o.s.b.web.embedded.tomcat.TomcatStarter  : Error starting Tomcat context. Exception: org.springframework.beans.factory.UnsatisfiedDependencyException. Message: Error creating bean with name 'jwtAuthFilter' defined in URL [jar:nested:/app/app.jar/!BOOT-INF/classes/!/com/frugality/moneymanager/security/JwtAuthFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'jwtService' defined in URL [jar:nested:/app/app.jar/!BOOT-INF/classes/!/com/frugality/moneymanager/security/JwtService.class]: Failed to instantiate [com.frugality.moneymanager.security.JwtService]: Constructor threw exception
+2026-09-19T15:27:11.558624882Z 2026-09-19T15:27:11.556Z  INFO 1 --- [moneymanager] [           main] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2026-09-19T15:27:11.756945254Z 2026-09-19T15:27:11.756Z  WARN 1 --- [moneymanager] [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Unable to start web server
+2026-09-19T15:27:11.957099967Z 2026-09-19T15:27:11.956Z  INFO 1 --- [moneymanager] [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+2026-09-19T15:27:11.957121198Z 
+2026-09-19T15:27:11.957125858Z Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-19T15:27:12.256714429Z 2026-09-19T15:27:12.160Z ERROR 1 --- [moneymanager] [           main] o.s.boot.SpringApplication               : Application run failed
+2026-09-19T15:27:12.25674486Z 
+2026-09-19T15:27:12.25674936Z org.springframework.context.ApplicationContextException: Unable to start web server
+2026-09-19T15:27:12.2567572Z 	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:165) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.25676115Z 	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:619) ~[spring-context-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.25676429Z 	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.25676808Z 	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.25677144Z 	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.25677549Z 	at org.springframework.boot.SpringApplication.run(SpringApplication.java:335) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.25677753Z 	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1363) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.25677944Z 	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1352) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256781371Z 	at com.frugality.moneymanager.MoneyManagerApplication.main(MoneyManagerApplication.java:11) ~[!/:0.1.0]
+2026-09-19T15:27:12.256783711Z 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[na:na]
+2026-09-19T15:27:12.256785691Z 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.256787591Z 	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.256790181Z 	at java.base/java.lang.reflect.Method.invoke(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.256792051Z 	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:102) ~[app.jar:0.1.0]
+2026-09-19T15:27:12.256793931Z 	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:64) ~[app.jar:0.1.0]
+2026-09-19T15:27:12.256795851Z 	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:40) ~[app.jar:0.1.0]
+2026-09-19T15:27:12.256797821Z Caused by: org.springframework.boot.web.server.WebServerException: Unable to start embedded Tomcat
+2026-09-19T15:27:12.256799841Z 	at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.initialize(TomcatWebServer.java:147) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256801731Z 	at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.<init>(TomcatWebServer.java:107) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256803651Z 	at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getTomcatWebServer(TomcatServletWebServerFactory.java:516) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256805581Z 	at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getWebServer(TomcatServletWebServerFactory.java:222) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256808181Z 	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.createWebServer(ServletWebServerApplicationContext.java:188) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256810121Z 	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:162) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256822871Z 	... 15 common frames omitted
+2026-09-19T15:27:12.256827092Z Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'jwtAuthFilter' defined in URL [jar:nested:/app/app.jar/!BOOT-INF/classes/!/com/frugality/moneymanager/security/JwtAuthFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'jwtService' defined in URL [jar:nested:/app/app.jar/!BOOT-INF/classes/!/com/frugality/moneymanager/security/JwtService.class]: Failed to instantiate [com.frugality.moneymanager.security.JwtService]: Constructor threw exception
+2026-09-19T15:27:12.256829181Z 	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:795) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256831101Z 	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256842162Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256845612Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256848792Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256852062Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256855652Z 	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256858632Z 	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256862032Z 	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256865172Z 	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:205) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256868122Z 	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.getOrderedBeansOfType(ServletContextInitializerBeans.java:211) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256870062Z 	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAsRegistrationBean(ServletContextInitializerBeans.java:174) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256871922Z 	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAsRegistrationBean(ServletContextInitializerBeans.java:169) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256873793Z 	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAdaptableBeans(ServletContextInitializerBeans.java:154) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256875673Z 	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.<init>(ServletContextInitializerBeans.java:87) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256878083Z 	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.getServletContextInitializerBeans(ServletWebServerApplicationContext.java:266) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256883963Z 	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.selfInitialize(ServletWebServerApplicationContext.java:240) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256885993Z 	at org.springframework.boot.web.embedded.tomcat.TomcatStarter.onStartup(TomcatStarter.java:52) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256887973Z 	at org.apache.catalina.core.StandardContext.startInternal(StandardContext.java:4412) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256889933Z 	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256891783Z 	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1203) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256894543Z 	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1193) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256897673Z 	at java.base/java.util.concurrent.FutureTask.run(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.256901033Z 	at org.apache.tomcat.util.threads.InlineExecutorService.execute(InlineExecutorService.java:75) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256904213Z 	at java.base/java.util.concurrent.AbstractExecutorService.submit(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.256907083Z 	at org.apache.catalina.core.ContainerBase.startInternal(ContainerBase.java:749) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256910043Z 	at org.apache.catalina.core.StandardHost.startInternal(StandardHost.java:772) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256912883Z 	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256915803Z 	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1203) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256918603Z 	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1193) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256921434Z 	at java.base/java.util.concurrent.FutureTask.run(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.256932204Z 	at org.apache.tomcat.util.threads.InlineExecutorService.execute(InlineExecutorService.java:75) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256935344Z 	at java.base/java.util.concurrent.AbstractExecutorService.submit(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.256938184Z 	at org.apache.catalina.core.ContainerBase.startInternal(ContainerBase.java:749) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256941104Z 	at org.apache.catalina.core.StandardEngine.startInternal(StandardEngine.java:203) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256944024Z 	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256947284Z 	at org.apache.catalina.core.StandardService.startInternal(StandardService.java:415) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256950104Z 	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256953024Z 	at org.apache.catalina.core.StandardServer.startInternal(StandardServer.java:870) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256955994Z 	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256958855Z 	at org.apache.catalina.startup.Tomcat.start(Tomcat.java:437) ~[tomcat-embed-core-10.1.30.jar!/:na]
+2026-09-19T15:27:12.256961695Z 	at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.initialize(TomcatWebServer.java:128) ~[spring-boot-3.3.4.jar!/:3.3.4]
+2026-09-19T15:27:12.256964424Z 	... 20 common frames omitted
+2026-09-19T15:27:12.256972985Z Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'jwtService' defined in URL [jar:nested:/app/app.jar/!BOOT-INF/classes/!/com/frugality/moneymanager/security/JwtService.class]: Failed to instantiate [com.frugality.moneymanager.security.JwtService]: Constructor threw exception
+2026-09-19T15:27:12.256975915Z 	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:318) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256979135Z 	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:306) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256982115Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256984915Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256987565Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256990385Z 	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256993625Z 	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.256996745Z 	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257009965Z 	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257013586Z 	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257016786Z 	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257019876Z 	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257022266Z 	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257024246Z 	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:904) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257026316Z 	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:782) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257028266Z 	... 61 common frames omitted
+2026-09-19T15:27:12.257043096Z Caused by: org.springframework.beans.BeanInstantiationException: Failed to instantiate [com.frugality.moneymanager.security.JwtService]: Constructor threw exception
+2026-09-19T15:27:12.257046726Z 	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:221) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257049846Z 	at org.springframework.beans.factory.support.SimpleInstantiationStrategy.instantiate(SimpleInstantiationStrategy.java:117) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257052797Z 	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:315) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257061807Z 	... 75 common frames omitted
+2026-09-19T15:27:12.257067877Z Caused by: io.jsonwebtoken.security.WeakKeyException: The specified key byte array is 0 bits which is not secure enough for any JWT HMAC-SHA algorithm.  The JWT JWA Specification (RFC 7518, Section 3.2) states that keys used with HMAC-SHA algorithms MUST have a size >= 256 bits (the key size must be greater than or equal to the hash output size).  Consider using the Jwts.SIG.HS256.key() builder (or HS384.key() or HS512.key()) to create a key guaranteed to be secure enough for your preferred HMAC-SHA algorithm.  See https://tools.ietf.org/html/rfc7518#section-3.2 for more information.
+2026-09-19T15:27:12.257070027Z 	at io.jsonwebtoken.security.Keys.hmacShaKeyFor(Keys.java:83) ~[jjwt-api-0.12.6.jar!/:0.12.6]
+2026-09-19T15:27:12.257072017Z 	at com.frugality.moneymanager.security.JwtService.<init>(JwtService.java:21) ~[!/:0.1.0]
+2026-09-19T15:27:12.257073967Z 	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method) ~[na:na]
+2026-09-19T15:27:12.257075907Z 	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.257077757Z 	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.257079607Z 	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.257081607Z 	at java.base/java.lang.reflect.Constructor.newInstance(Unknown Source) ~[na:na]
+2026-09-19T15:27:12.257083457Z 	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:208) ~[spring-beans-6.1.13.jar!/:6.1.13]
+2026-09-19T15:27:12.257085377Z 	... 77 common frames omitted
+2026-09-19T15:27:12.257087227Z 
+2026-09-19T15:27:16.606427259Z ==> Exited with status 1
+2026-09-19T15:27:16.608766494Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+2026-09-19T15:27:21.93853439Z ==> No open ports detected, continuing to scan...
+2026-09-19T15:27:22.113432662Z ==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
+2026-09-19T15:27:28.731123758Z 
+2026-09-19T15:27:28.73119991Z   .   ____          _            __ _ _
+2026-09-19T15:27:28.731209Z  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+2026-09-19T15:27:28.731212311Z ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+2026-09-19T15:27:28.73121536Z  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+2026-09-19T15:27:28.731218311Z   '  |____| .__|_| |_|_| |_\__, | / / / /
+2026-09-19T15:27:28.731221501Z  =========|_|==============|___/=/_/_/_/
+2026-09-19T15:27:28.731224411Z 
+2026-09-19T15:27:28.826040835Z  :: Spring Boot ::                (v3.3.4)
+2026-09-19T15:27:28.826068175Z 
+2026-09-19T15:27:30.329219854Z 2026-09-19T15:27:30.327Z  INFO 1 --- [moneymanager] [           main] c.f.m.MoneyManagerApplication            : Starting MoneyManagerApplication v0.1.0 using Java 17.0.20 with PID 1 (/app/app.jar started by root in /app)
+2026-09-19T15:27:30.330250077Z 2026-09-19T15:27:30.330Z  INFO 1 --- [moneymanager] [           main] c.f.m.MoneyManagerApplication            : No active profile set, falling back to 1 default profile: "default"
