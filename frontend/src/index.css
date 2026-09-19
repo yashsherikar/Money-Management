@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark mode: manual overrides for the recurring neutral utility classes,
+   scoped under .dark (toggled on <html>, see index.html + Layout.jsx),
+   so every page reskins without touching each component. */
+.dark .bg-white { background-color: #1e293b; }
+.dark .bg-slate-50 { background-color: #0f172a; }
+.dark .bg-slate-100 { background-color: #334155; }
+.dark .bg-brand-50 { background-color: rgba(47, 111, 237, 0.15); }
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1); }
+
+.dark .border-slate-100 { border-color: #334155; }
+.dark .border-slate-200 { border-color: #334155; }
+.dark .border-slate-300 { border-color: #475569; }
+.dark .divide-slate-100 > * + * { border-color: #334155; }
+
+.dark .text-slate-900 { color: #f1f5f9; }
+.dark .text-slate-700 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #94a3b8; }
+.dark .text-slate-500 { color: #94a3b8; }
+.dark .text-slate-400 { color: #64748b; }
+.dark .text-brand-700 { color: #93c5fd; }
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}

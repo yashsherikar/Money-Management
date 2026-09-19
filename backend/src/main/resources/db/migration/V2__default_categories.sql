@@ -1,0 +1,16 @@
+INSERT INTO categories (user_id, name, essential, is_default) VALUES
+    (NULL, 'Salary', true, true),
+    (NULL, 'Rent', true, true),
+    (NULL, 'Groceries', true, true),
+    (NULL, 'Utilities', true, true),
+    (NULL, 'EMI', true, true),
+    (NULL, 'Insurance', true, true),
+    (NULL, 'Healthcare', true, true),
+    (NULL, 'Transport', true, true),
+    (NULL, 'Education', true, true),
+    (NULL, 'Dining Out', false, true),
+    (NULL, 'Entertainment', false, true),
+    (NULL, 'Shopping', false, true),
+    (NULL, 'Travel', false, true),
+    (NULL, 'Subscriptions', false, true),
+    (NULL, 'Other', false, true);
