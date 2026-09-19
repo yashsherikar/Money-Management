@@ -212,6 +212,16 @@ export const mr = {
   'Send requests': 'विनंत्या पाठवा',
   'Request the shortfall from group members': 'गट सदस्यांकडून तूट मागवा',
   'Remove this wishlist item?': 'ही इच्छा यादीतील वस्तू काढायची का?',
+  WishRoom: 'विशरूम',
+  'Connected as': 'यांच्या नावाने जोडलेले:',
+  'Import from WishRoom': 'विशरूम मधून आणा',
+  Disconnect: 'डिस्कनेक्ट करा',
+  'Pick a room': 'रूम निवडा',
+  'No items in this room.': 'या रूममध्ये काहीही नाही.',
+  Import: 'आणा',
+  'WishRoom email': 'विशरूम ईमेल',
+  'WishRoom password': 'विशरूम पासवर्ड',
+  'Connect WishRoom': 'विशरूम जोडा',
 
   // groups
   'Create a group': 'गट तयार करा',

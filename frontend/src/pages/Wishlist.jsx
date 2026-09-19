@@ -20,15 +20,75 @@ export default function Wishlist() {
   const [requestOpenFor, setRequestOpenFor] = useState(null)
   const [requestAmounts, setRequestAmounts] = useState({}) // memberId -> amount
 
+  const [wishroom, setWishroom] = useState({ connected: false, email: '', name: '' })
+  const [wishroomForm, setWishroomForm] = useState({ email: '', password: '' })
+  const [wishroomError, setWishroomError] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
+  const [wishroomRooms, setWishroomRooms] = useState([])
+  const [selectedRoomId, setSelectedRoomId] = useState('')
+  const [wishroomItems, setWishroomItems] = useState([])
+  const [importGroupId, setImportGroupId] = useState('')
+
   async function loadAll() {
-    const [itemsRes, groupsRes] = await Promise.all([client.get('/wishlist'), client.get('/groups')])
+    const [itemsRes, groupsRes, wishroomRes] = await Promise.all([
+      client.get('/wishlist'),
+      client.get('/groups'),
+      client.get('/wishroom/status'),
+    ])
     setItems(itemsRes.data)
     setGroups(groupsRes.data)
+    setWishroom(wishroomRes.data)
   }
 
   useEffect(() => {
     loadAll()
   }, [])
+
+  async function handleWishroomConnect(e) {
+    e.preventDefault()
+    setWishroomError('')
+    try {
+      const { data } = await client.post('/wishroom/connect', wishroomForm)
+      setWishroom(data)
+      setWishroomForm({ email: '', password: '' })
+    } catch (err) {
+      setWishroomError(err.response?.data?.message || t('Save failed'))
+    }
+  }
+
+  async function handleWishroomDisconnect() {
+    await client.delete('/wishroom/connect')
+    setWishroom({ connected: false, email: '', name: '' })
+    setImportOpen(false)
+  }
+
+  async function openImportPanel() {
+    setImportOpen(true)
+    setWishroomItems([])
+    setSelectedRoomId('')
+    const { data } = await client.get('/wishroom/rooms')
+    setWishroomRooms(data)
+  }
+
+  async function selectRoom(roomId) {
+    setSelectedRoomId(roomId)
+    const { data } = await client.get(`/wishroom/rooms/${roomId}/items`)
+    setWishroomItems(data)
+  }
+
+  async function importWishroomItem(item) {
+    setWishroomError('')
+    try {
+      await client.post('/wishroom/import', {
+        roomId: selectedRoomId,
+        itemId: item.id,
+        groupId: importGroupId ? Number(importGroupId) : null,
+      })
+      loadAll()
+    } catch (err) {
+      setWishroomError(err.response?.data?.message || t('Save failed'))
+    }
+  }
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -83,6 +143,57 @@ export default function Wishlist() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Wishlist')}</h1>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6">
+        <h2 className="font-semibold mb-3">{t('WishRoom')}</h2>
+        {wishroom.connected ? (
+          <div>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <div className="text-sm text-slate-600">
+                {t('Connected as')} <strong>{wishroom.name || wishroom.email}</strong>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={openImportPanel} className="text-sm text-brand-600">{t('Import from WishRoom')}</button>
+                <button onClick={handleWishroomDisconnect} className="text-sm text-red-600">{t('Disconnect')}</button>
+              </div>
+            </div>
+
+            {importOpen && (
+              <div className="border-t border-slate-100 pt-3 space-y-3">
+                <select value={selectedRoomId} onChange={(e) => selectRoom(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md w-full">
+                  <option value="">{t('Pick a room')}</option>
+                  {wishroomRooms.map((r) => <option key={r.id} value={r.id}>{r.name} ({r.itemCount})</option>)}
+                </select>
+
+                {selectedRoomId && (
+                  <>
+                    <select value={importGroupId} onChange={(e) => setImportGroupId(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md w-full">
+                      <option value="">{t('No group (just for me)')}</option>
+                      {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                    <div className="space-y-2">
+                      {wishroomItems.length === 0 && <div className="text-sm text-slate-500">{t('No items in this room.')}</div>}
+                      {wishroomItems.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between text-sm border border-slate-100 rounded-md px-3 py-2">
+                          <span>{item.title}{item.price ? ` · ${money(item.price)}` : ''}</span>
+                          <button onClick={() => importWishroomItem(item)} className="text-brand-600">{t('Import')}</button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <form onSubmit={handleWishroomConnect} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input required type="email" placeholder={t('WishRoom email')} value={wishroomForm.email} onChange={(e) => setWishroomForm({ ...wishroomForm, email: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+            <input required type="password" placeholder={t('WishRoom password')} value={wishroomForm.password} onChange={(e) => setWishroomForm({ ...wishroomForm, password: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{t('Connect WishRoom')}</button>
+          </form>
+        )}
+        {wishroomError && <div className="mt-2 text-sm text-red-600">{wishroomError}</div>}
+      </div>
 
       <form onSubmit={handleAdd} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
         <input required placeholder={t('Item name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
