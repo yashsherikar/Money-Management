@@ -61,6 +61,9 @@ export const mr = {
   'Nothing flagged. Nice.': 'काहीही आढळले नाही. छान.',
 
   // transactions
+  Salary: 'पगार',
+  Freelance: 'फ्रीलान्स',
+  'Share Market': 'शेअर बाजार',
   'Transactions (this month)': 'व्यवहार (या महिन्याचे)',
   'Account...': 'खाते...',
   'No category': 'श्रेणी नाही',
