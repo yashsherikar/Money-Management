@@ -18,7 +18,7 @@ import java.util.List;
 @Service
 public class WishlistService {
 
-    private static final BigDecimal COMFORTABLE_MULTIPLIER = BigDecimal.valueOf(1.5);
+    private static final BigDecimal COMFORTABLE_MULTIPLIER = BigDecimal.valueOf(4);
 
     private final WishlistItemRepository wishlistItemRepository;
     private final AccountRepository accountRepository;
@@ -26,18 +26,21 @@ public class WishlistService {
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
     private final PushService pushService;
+    private final UdharEntryRepository udharEntryRepository;
 
     public WishlistService(WishlistItemRepository wishlistItemRepository, AccountRepository accountRepository,
                             ContributionRequestRepository contributionRequestRepository,
                             UserRepository userRepository,
                             TransactionRepository transactionRepository,
-                            PushService pushService) {
+                            PushService pushService,
+                            UdharEntryRepository udharEntryRepository) {
         this.wishlistItemRepository = wishlistItemRepository;
         this.accountRepository = accountRepository;
         this.contributionRequestRepository = contributionRequestRepository;
         this.userRepository = userRepository;
         this.transactionRepository = transactionRepository;
         this.pushService = pushService;
+        this.udharEntryRepository = udharEntryRepository;
     }
 
     public List<WishlistItemResponse> list(User user) {
@@ -64,12 +67,24 @@ public class WishlistService {
         return toResponse(wishlistItemRepository.save(item));
     }
 
+    @Transactional(readOnly = true)
     public AffordabilityResponse affordability(User user, Long id) {
         WishlistItem item = getOwned(user, id);
-        BigDecimal availableFunds = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
+        List<Account> spendableAccounts = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
                 .filter(a -> a.getType() != AccountType.CARD && a.getType() != AccountType.EMERGENCY_FUND)
-                .map(Account::getBalance)
+                .toList();
+        Account primary = spendableAccounts.stream().filter(Account::isPrimary).findFirst()
+                .or(() -> spendableAccounts.stream().findFirst())
+                .orElse(null);
+        BigDecimal accountFunds = primary == null ? BigDecimal.ZERO : primary.getBalance();
+
+        // Money borrowed (udhar) sits in the account balance too, but it isn't really spendable —
+        // it has to go back out, so it doesn't count as funds available for a new purchase.
+        BigDecimal owedToOthers = udharEntryRepository.findByUserIdOrderByTxnDateDesc(user.getId()).stream()
+                .filter(e -> !e.isSettled() && e.getType() == UdharType.BORROWED)
+                .map(UdharEntry::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal availableFunds = accountFunds.subtract(owedToOthers);
 
         BigDecimal shortfall = item.getPrice().subtract(availableFunds).max(BigDecimal.ZERO);
         boolean affordable = shortfall.compareTo(BigDecimal.ZERO) == 0;

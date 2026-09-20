@@ -17,7 +17,8 @@ public class UdharDtos {
             @NotNull @DecimalMin("0.01") BigDecimal amount,
             String note,
             @NotNull LocalDate txnDate,
-            LocalDate dueDate
+            LocalDate dueDate,
+            String contactEmail
     ) {}
 
     public record UdharResponse(
@@ -31,7 +32,10 @@ public class UdharDtos {
             LocalDate txnDate,
             LocalDate dueDate,
             boolean settled,
-            LocalDate settledDate
+            LocalDate settledDate,
+            String contactEmail,
+            boolean contactLinked,
+            boolean settleRequested
     ) {}
 
     public record UdharSummary(

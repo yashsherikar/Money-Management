@@ -39,6 +39,11 @@ public class UdharController {
         return udharService.settle(user, id);
     }
 
+    @PostMapping("/{id}/request-settle")
+    public UdharResponse requestSettle(@AuthenticationPrincipal User user, @PathVariable Long id) {
+        return udharService.requestSettle(user, id);
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@AuthenticationPrincipal User user, @PathVariable Long id) {
         udharService.delete(user, id);

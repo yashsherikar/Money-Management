@@ -54,4 +54,14 @@ public class UdharEntry {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
+
+    @Column(name = "contact_email")
+    private String contactEmail;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contact_user_id")
+    private User contactUser;
+
+    @Column(name = "settle_requested_at")
+    private Instant settleRequestedAt;
 }
