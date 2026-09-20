@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { enablePush, disablePush, isPushEnabled, isPushSupported } from '../push.js'
+import AccountsManager from '../components/AccountsManager.jsx'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
@@ -181,6 +182,10 @@ export default function Profile() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Profile')}</h1>
+
+      <div className="max-w-3xl mb-6">
+        <AccountsManager />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-3xl">
         <div className="bg-white border border-slate-200 rounded-xl p-6">

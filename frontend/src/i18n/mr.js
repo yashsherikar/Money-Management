@@ -15,6 +15,8 @@ export const mr = {
   Requests: 'विनंत्या',
   Profile: 'प्रोफाइल',
   'Toggle dark mode': 'डार्क मोड बदला',
+  Menu: 'मेनू',
+  Close: 'बंद करा',
   'Log out': 'लॉग आउट',
 
   // common
