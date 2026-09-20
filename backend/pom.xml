@@ -62,6 +62,13 @@
             <version>4.5.14</version>
         </dependency>
         <dependency>
+            <!-- also runtime-scope only in web-push's own POM; PushService.send() declares
+                 "throws JoseException" so javac needs the class at compile time too -->
+            <groupId>org.bitbucket.b_c</groupId>
+            <artifactId>jose4j</artifactId>
+            <version>0.7.9</version>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
