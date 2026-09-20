@@ -183,6 +183,38 @@ export default function Profile() {
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Profile')}</h1>
 
+      <div className="max-w-3xl mb-6 bg-white border border-slate-200 rounded-xl p-6">
+        <h2 className="font-semibold mb-1">{t('Total across all accounts')}</h2>
+        <p className="text-xs text-slate-500 mb-4">{t('Hidden by default — needs your secret PIN to reveal.')}</p>
+
+        {balanceRevealed ? (
+          <div className="flex items-center justify-between">
+            <div className="text-2xl font-bold tracking-tight">{money(balanceValue)}</div>
+            <button onClick={hideBalance} className="text-sm text-slate-500">{t('Hide')}</button>
+          </div>
+        ) : askingPin ? (
+          <form onSubmit={submitReveal} className="flex items-center gap-2">
+            <input
+              type="password" inputMode="numeric" autoFocus placeholder={t('Enter PIN')}
+              value={revealPin} onChange={(e) => setRevealPin(e.target.value)}
+              className="px-3 py-2 border border-slate-300 rounded-md w-32"
+            />
+            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-2 text-sm font-medium">{t('Unlock')}</button>
+            <button type="button" onClick={() => setAskingPin(false)} className="text-sm text-slate-500">{t('Cancel')}</button>
+          </form>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="text-2xl font-bold tracking-tight text-slate-300 select-none">₹ • • • • • •</div>
+            {profile.pinSet ? (
+              <button onClick={openRevealPrompt} className="text-sm text-brand-600">{t('Unlock')}</button>
+            ) : (
+              <span className="text-xs text-slate-400">{t('Set a PIN below')}</span>
+            )}
+          </div>
+        )}
+        {revealError && <div className="mt-2 text-sm text-red-600">{revealError}</div>}
+      </div>
+
       <div className="max-w-3xl mb-6">
         <AccountsManager />
       </div>
@@ -259,38 +291,6 @@ export default function Profile() {
               )}
             </div>
             {pushError && <div className="mt-2 text-sm text-red-600">{pushError}</div>}
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
-            <h2 className="font-semibold mb-1">{t('Total across all accounts')}</h2>
-            <p className="text-xs text-slate-500 mb-4">{t('Hidden by default — needs your secret PIN to reveal.')}</p>
-
-            {balanceRevealed ? (
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold tracking-tight">{money(balanceValue)}</div>
-                <button onClick={hideBalance} className="text-sm text-slate-500">{t('Hide')}</button>
-              </div>
-            ) : askingPin ? (
-              <form onSubmit={submitReveal} className="flex items-center gap-2">
-                <input
-                  type="password" inputMode="numeric" autoFocus placeholder={t('Enter PIN')}
-                  value={revealPin} onChange={(e) => setRevealPin(e.target.value)}
-                  className="px-3 py-2 border border-slate-300 rounded-md w-32"
-                />
-                <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-2 text-sm font-medium">{t('Unlock')}</button>
-                <button type="button" onClick={() => setAskingPin(false)} className="text-sm text-slate-500">{t('Cancel')}</button>
-              </form>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold tracking-tight text-slate-300 select-none">₹ • • • • • •</div>
-                {profile.pinSet ? (
-                  <button onClick={openRevealPrompt} className="text-sm text-brand-600">{t('Unlock')}</button>
-                ) : (
-                  <span className="text-xs text-slate-400">{t('Set a PIN below')}</span>
-                )}
-              </div>
-            )}
-            {revealError && <div className="mt-2 text-sm text-red-600">{revealError}</div>}
           </div>
 
           <form onSubmit={handlePinSubmit} className="bg-white border border-slate-200 rounded-xl p-6">

@@ -221,6 +221,8 @@ export const mr = {
   'Add to wishlist': 'इच्छा यादीत जोडा',
   'Nothing on your wishlist yet.': 'तुमच्या इच्छा यादीत अजून काहीही नाही.',
   'Check affordability': 'परवडते का ते तपासा',
+  PURCHASED: 'खरेदी केले',
+  'Mark purchased': 'खरेदी केले म्हणून चिन्हांकित करा',
   'Available funds:': 'उपलब्ध निधी:',
   'Shortfall:': 'तूट:',
   'Send requests': 'विनंत्या पाठवा',
