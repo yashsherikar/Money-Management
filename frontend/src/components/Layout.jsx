@@ -53,8 +53,11 @@ export default function Layout({ children }) {
           <button onClick={toggleTheme} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100" title={t('Toggle dark mode')}>
             🌙
           </button>
-          <button onClick={handleLogout} className="w-8 h-8 flex items-center justify-center rounded-lg text-red-600 hover:bg-red-50" title={t('Log out')}>
-            ⏻
+          <button onClick={handleLogout} className="w-8 h-8 flex items-center justify-center rounded-lg text-red-600 hover:bg-red-50" title={t('Log out')} aria-label={t('Log out')}>
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <path d="M8 3H4.5A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17H8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13 14l4-4-4-4M17 10H7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </div>
       </header>
