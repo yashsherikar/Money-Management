@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
+import LoadingBar from './components/LoadingBar.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -28,6 +29,7 @@ function Protected({ children }) {
 export default function App() {
   return (
     <>
+    <LoadingBar />
     <DueReminders />
     <Routes>
       <Route path="/login" element={<Login />} />
