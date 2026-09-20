@@ -200,7 +200,7 @@ export default function Profile() {
               className="w-full mb-1 px-3 py-2 border border-slate-300 rounded-md"
             />
             <p className="text-xs text-slate-500 mb-4">
-              {t('Needed so group members can pay you directly when they accept a contribution request.')}
+              {t('Needed so people can pay you directly when they accept a contribution request.')}
             </p>
             {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
             {saved && <div className="mb-4 text-sm text-emerald-600">{t('Saved.')}</div>}

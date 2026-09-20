@@ -24,6 +24,11 @@ public class SplitBillController {
         return splitBillService.list(user);
     }
 
+    @GetMapping("/owed-by-me")
+    public List<OwedSplitBillResponse> owedByMe(@AuthenticationPrincipal User user) {
+        return splitBillService.owedByMe(user);
+    }
+
     @PostMapping
     public SplitBillResponse create(@AuthenticationPrincipal User user, @Valid @RequestBody SplitBillRequest request) {
         return splitBillService.create(user, request);

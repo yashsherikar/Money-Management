@@ -14,7 +14,6 @@ import SplitBills from './pages/SplitBills.jsx'
 import Investments from './pages/Investments.jsx'
 import Recurring from './pages/Recurring.jsx'
 import Wishlist from './pages/Wishlist.jsx'
-import Groups from './pages/Groups.jsx'
 import Requests from './pages/Requests.jsx'
 import Profile from './pages/Profile.jsx'
 
@@ -43,7 +42,6 @@ export default function App() {
       <Route path="/investments" element={<Protected><Investments /></Protected>} />
       <Route path="/recurring" element={<Protected><Recurring /></Protected>} />
       <Route path="/wishlist" element={<Protected><Wishlist /></Protected>} />
-      <Route path="/groups" element={<Protected><Groups /></Protected>} />
       <Route path="/requests" element={<Protected><Requests /></Protected>} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
     </Routes>

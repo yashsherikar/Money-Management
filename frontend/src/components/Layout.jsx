@@ -12,7 +12,6 @@ const links = [
   { to: '/investments', label: 'Investments' },
   { to: '/recurring', label: 'Recurring' },
   { to: '/wishlist', label: 'Wishlist' },
-  { to: '/groups', label: 'Groups' },
   { to: '/requests', label: 'Requests' },
   { to: '/profile', label: 'Profile' },
 ]

@@ -28,7 +28,7 @@ public class ContributionRequest {
     @JoinColumn(name = "requester_id", nullable = false)
     private User requester;
 
-    /** Group member being asked to contribute, i.e. the one who pays. */
+    /** The person being asked to contribute, i.e. the one who pays. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "member_id", nullable = false)
     private User member;

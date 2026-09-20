@@ -2,6 +2,7 @@ package com.moneymanager.backend.dto;
 
 import com.moneymanager.backend.entity.WishlistStatus;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -13,8 +14,7 @@ public class WishlistDtos {
     public record WishlistItemRequest(
             @NotBlank String name,
             @NotNull @DecimalMin("0.01") BigDecimal price,
-            String productUrl,
-            Long groupId
+            String productUrl
     ) {}
 
     public record WishlistItemResponse(
@@ -22,9 +22,7 @@ public class WishlistDtos {
             String name,
             BigDecimal price,
             String productUrl,
-            WishlistStatus status,
-            Long groupId,
-            String groupName
+            WishlistStatus status
     ) {}
 
     public record AffordabilityResponse(
@@ -37,7 +35,7 @@ public class WishlistDtos {
     ) {}
 
     public record ContributionRequestCreate(
-            @NotNull Long memberId,
+            @NotBlank @Email String email,
             @NotNull @DecimalMin("0.01") BigDecimal amount
     ) {}
 

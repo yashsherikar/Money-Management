@@ -14,7 +14,8 @@ public class SplitBillDtos {
 
     public record ParticipantRequest(
             @NotBlank String name,
-            @NotNull @DecimalMin("0.01") BigDecimal shareAmount
+            @NotNull @DecimalMin("0.01") BigDecimal shareAmount,
+            String email
     ) {}
 
     public record SplitBillRequest(
@@ -31,7 +32,19 @@ public class SplitBillDtos {
             String name,
             BigDecimal shareAmount,
             boolean paid,
-            LocalDate paidDate
+            LocalDate paidDate,
+            boolean linked
+    ) {}
+
+    /** What a linked participant sees on their own Requests page. */
+    public record OwedSplitBillResponse(
+            Long participantId,
+            Long splitBillId,
+            String title,
+            BigDecimal shareAmount,
+            boolean paid,
+            String payerName,
+            String upiPayLink
     ) {}
 
     public record SplitBillResponse(

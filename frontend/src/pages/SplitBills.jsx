@@ -12,7 +12,7 @@ const emptyForm = {
   accountId: '',
   billDate: new Date().toISOString().slice(0, 10),
   note: '',
-  participants: [{ name: '', shareAmount: '' }],
+  participants: [{ name: '', shareAmount: '', email: '' }],
 }
 
 export default function SplitBills() {
@@ -38,7 +38,7 @@ export default function SplitBills() {
   }
 
   function addParticipantRow() {
-    setForm({ ...form, participants: [...form.participants, { name: '', shareAmount: '' }] })
+    setForm({ ...form, participants: [...form.participants, { name: '', shareAmount: '', email: '' }] })
   }
 
   function removeParticipantRow(index) {
@@ -57,7 +57,7 @@ export default function SplitBills() {
         note: form.note || null,
         participants: form.participants
           .filter((p) => p.name && p.shareAmount)
-          .map((p) => ({ name: p.name, shareAmount: Number(p.shareAmount) })),
+          .map((p) => ({ name: p.name, shareAmount: Number(p.shareAmount), email: p.email || null })),
       })
       setForm(emptyForm)
       loadAll()
@@ -95,15 +95,17 @@ export default function SplitBills() {
         <div className="space-y-2">
           <div className="text-sm font-medium text-slate-700">{t('Who owes what')}</div>
           {form.participants.map((p, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input placeholder={t('Name')} value={p.name} onChange={(e) => updateParticipant(i, 'name', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md flex-1" />
-              <input type="number" step="0.01" min="0.01" placeholder={t('Their share')} value={p.shareAmount} onChange={(e) => updateParticipant(i, 'shareAmount', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md w-36" />
+            <div key={i} className="flex items-center gap-2 flex-wrap">
+              <input placeholder={t('Name')} value={p.name} onChange={(e) => updateParticipant(i, 'name', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md flex-1 min-w-[120px]" />
+              <input type="number" step="0.01" min="0.01" placeholder={t('Their share')} value={p.shareAmount} onChange={(e) => updateParticipant(i, 'shareAmount', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md w-32" />
+              <input type="email" placeholder={t('Their email (optional, if they use this app)')} value={p.email} onChange={(e) => updateParticipant(i, 'email', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md flex-1 min-w-[180px]" />
               {form.participants.length > 1 && (
                 <button type="button" onClick={() => removeParticipantRow(i)} className="text-sm text-red-600">{t('Remove')}</button>
               )}
             </div>
           ))}
           <button type="button" onClick={addParticipantRow} className="text-sm text-brand-600">{t('+ Add another person')}</button>
+          <p className="text-xs text-slate-500">{t("If their email matches a Money Manager account, this bill shows up on their Requests page too.")}</p>
         </div>
 
         <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md w-full" />
@@ -136,6 +138,7 @@ export default function SplitBills() {
                 <div key={p.id} className="py-2 flex items-center justify-between text-sm">
                   <div>
                     {p.name}
+                    {p.linked && <span className="ml-2 text-xs text-brand-600" title={t('This person can see and pay this on their own Requests page')}>🔗</span>}
                     {p.paid && <span className="ml-2 text-xs text-emerald-600 font-medium">{t('PAID')}</span>}
                   </div>
                   <div className="flex items-center gap-3">

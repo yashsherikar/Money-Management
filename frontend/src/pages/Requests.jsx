@@ -17,14 +17,17 @@ export default function Requests() {
   const { t } = useLanguage()
   const [incoming, setIncoming] = useState([])
   const [outgoing, setOutgoing] = useState([])
+  const [owedBills, setOwedBills] = useState([])
 
   async function load() {
-    const [inRes, outRes] = await Promise.all([
+    const [inRes, outRes, owedRes] = await Promise.all([
       client.get('/contribution-requests/incoming'),
       client.get('/contribution-requests/outgoing'),
+      client.get('/split-bills/owed-by-me'),
     ])
     setIncoming(inRes.data)
     setOutgoing(outRes.data)
+    setOwedBills(owedRes.data)
   }
 
   useEffect(() => {
@@ -38,6 +41,30 @@ export default function Requests() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Contribution requests')}</h1>
+
+      <h2 className="font-semibold mb-3">{t('Split bills you owe')}</h2>
+      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 mb-8">
+        {owedBills.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No requests.')}</div>}
+        {owedBills.map((b) => (
+          <div key={b.participantId} className="p-4 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <div className="font-medium">
+                {b.payerName} {t('wants')} {money(b.shareAmount)} {t('for')} "{b.title}"
+              </div>
+              {b.paid && <div className="text-xs font-medium text-emerald-600">{t('PAID')}</div>}
+            </div>
+            {!b.paid && (
+              b.upiPayLink ? (
+                <a href={b.upiPayLink} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
+                  {t('Pay via UPI')}
+                </a>
+              ) : (
+                <span className="text-xs text-slate-500">{b.payerName} {t("hasn't added a UPI ID yet")}</span>
+              )
+            )}
+          </div>
+        ))}
+      </div>
 
       <h2 className="font-semibold mb-3">{t('Asking you to pay')}</h2>
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 mb-8">
