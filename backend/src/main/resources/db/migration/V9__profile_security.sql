@@ -1,0 +1,4 @@
+ALTER TABLE users ADD COLUMN photo TEXT;
+ALTER TABLE users ADD COLUMN pin_hash VARCHAR(255);
+ALTER TABLE users ADD COLUMN pin_failed_attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN pin_locked_until TIMESTAMP;
