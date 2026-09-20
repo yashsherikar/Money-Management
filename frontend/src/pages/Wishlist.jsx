@@ -103,6 +103,11 @@ export default function Wishlist() {
     loadAll()
   }
 
+  async function handleMarkPurchased(id) {
+    await client.patch(`/wishlist/${id}/purchased`)
+    loadAll()
+  }
+
   async function checkAffordability(item) {
     const { data } = await client.get(`/wishlist/${item.id}/affordability`)
     setAffordability((prev) => ({ ...prev, [item.id]: data }))
@@ -211,10 +216,13 @@ export default function Wishlist() {
                     ) : item.name}
                   </div>
                   <div className="text-xs text-slate-500">
-                    {money(item.price)} · {item.status}
+                    {money(item.price)} · {t(item.status)}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  {item.status !== 'PURCHASED' && (
+                    <button onClick={() => handleMarkPurchased(item.id)} className="text-sm text-emerald-600">{t('Mark purchased')}</button>
+                  )}
                   <button onClick={() => checkAffordability(item)} className="text-sm text-brand-600">{t('Check affordability')}</button>
                   <button onClick={() => handleDelete(item.id)} className="text-sm text-red-600">{t('Delete')}</button>
                 </div>

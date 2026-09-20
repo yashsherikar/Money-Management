@@ -94,6 +94,7 @@ export default function Obligations() {
     }
   }
 
+  async function toggleEmiActive(e) { await client.patch(`/emis/${e.id}/active?active=${!e.active}`); load() }
   async function deleteEmi(id) { await client.delete(`/emis/${id}`); load() }
   async function deleteFd(id) { await client.delete(`/fixed-deposits/${id}`); load() }
   async function deleteIns(id) { await client.delete(`/insurance-policies/${id}`); load() }
@@ -155,6 +156,7 @@ export default function Obligations() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="font-semibold">{money(e.emiAmount)}/{t('mo')}</div>
+                  <button onClick={() => toggleEmiActive(e)} className="text-sm text-brand-600">{e.active ? t('Pause') : t('Resume')}</button>
                   <button onClick={() => deleteEmi(e.id)} className="text-sm text-red-600">{t('Delete')}</button>
                 </div>
               </div>
