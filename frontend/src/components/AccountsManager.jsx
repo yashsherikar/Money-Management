@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 
 const TYPES = ['BANK', 'CASH', 'CARD', 'EMERGENCY_FUND']
 
-export default function Accounts() {
+export default function AccountsManager() {
   const { t } = useLanguage()
   const [accounts, setAccounts] = useState([])
   const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false })
@@ -59,10 +59,10 @@ export default function Accounts() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">{t('Accounts')}</h1>
+    <div className="bg-white border border-slate-200 rounded-xl p-6">
+      <h2 className="font-semibold mb-4">{t('Accounts')}</h2>
 
-      <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
         <input
           placeholder={t('Account name')}
           required
@@ -107,7 +107,7 @@ export default function Accounts() {
         {error && <div className="md:col-span-4 text-sm text-red-600">{error}</div>}
       </form>
 
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+      <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
         {accounts.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No accounts yet.')}</div>}
         {accounts.map((acc) => (
           <div key={acc.id} className="p-4 flex items-center justify-between">
