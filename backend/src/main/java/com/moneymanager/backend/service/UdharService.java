@@ -27,11 +27,13 @@ public class UdharService {
         this.accountRepository = accountRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<UdharResponse> list(User user) {
         return udharEntryRepository.findByUserIdOrderByTxnDateDesc(user.getId()).stream()
                 .map(this::toResponse).toList();
     }
 
+    @Transactional(readOnly = true)
     public UdharSummary summary(User user) {
         List<UdharEntry> entries = udharEntryRepository.findByUserIdOrderByTxnDateDesc(user.getId());
         BigDecimal owedToYou = entries.stream()
