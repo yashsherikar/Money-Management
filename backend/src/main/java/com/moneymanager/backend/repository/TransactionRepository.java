@@ -31,7 +31,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                                          @Param("from") LocalDate from,
                                          @Param("to") LocalDate to);
 
-    @Query("select t from Transaction t where t.user.id = :userId and t.type = 'EXPENSE' " +
+    @Query("select t from Transaction t join fetch t.category where t.user.id = :userId and t.type = 'EXPENSE' " +
             "and t.category.essential = false and t.txnDate between :from and :to order by t.amount desc")
     List<Transaction> findNonEssentialExpenses(@Param("userId") Long userId,
                                                 @Param("from") LocalDate from,
