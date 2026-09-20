@@ -29,6 +29,7 @@ public class TransactionService {
         this.categoryRepository = categoryRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<TransactionResponse> list(User user, LocalDate from, LocalDate to) {
         return transactionRepository.findByUserIdAndTxnDateBetweenOrderByTxnDateDesc(user.getId(), from, to)
                 .stream().map(this::toResponse).toList();
