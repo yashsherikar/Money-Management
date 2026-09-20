@@ -184,6 +184,57 @@ export default function Profile() {
       <h1 className="text-2xl font-bold mb-6">{t('Profile')}</h1>
 
       <div className="max-w-3xl mb-6 bg-white border border-slate-200 rounded-xl p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="relative">
+            {profile.photo ? (
+              <img src={profile.photo} alt="" className="w-16 h-16 rounded-full object-cover" />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xl font-bold">
+                {(profile.name || '?').charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-sm text-brand-600 block">
+              {t('Change photo')}
+            </button>
+            {profile.photo && (
+              <button type="button" onClick={handlePhotoRemove} className="text-sm text-red-600 block mt-1">
+                {t('Remove photo')}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('Name')}</label>
+          <input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full mb-4 px-3 py-2 border border-slate-300 rounded-md"
+          />
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('Email')}</label>
+          <input value={profile.email} disabled className="w-full mb-4 px-3 py-2 border border-slate-200 rounded-md bg-slate-50 text-slate-500" />
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('UPI ID')}</label>
+          <input
+            placeholder="yourname@upi"
+            value={form.upiId}
+            onChange={(e) => setForm({ ...form, upiId: e.target.value })}
+            className="w-full mb-1 px-3 py-2 border border-slate-300 rounded-md"
+          />
+          <p className="text-xs text-slate-500 mb-4">
+            {t('Needed so people can pay you directly when they accept a contribution request.')}
+          </p>
+          {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
+          {saved && <div className="mb-4 text-sm text-emerald-600">{t('Saved.')}</div>}
+          <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">
+            {t('Save')}
+          </button>
+        </form>
+      </div>
+
+      <div className="max-w-3xl mb-6 bg-white border border-slate-200 rounded-xl p-6">
         <h2 className="font-semibold mb-1">{t('Total across all accounts')}</h2>
         <p className="text-xs text-slate-500 mb-4">{t('Hidden by default — needs your secret PIN to reveal.')}</p>
 
@@ -219,58 +270,7 @@ export default function Profile() {
         <AccountsManager />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-3xl">
-        <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="relative">
-              {profile.photo ? (
-                <img src={profile.photo} alt="" className="w-16 h-16 rounded-full object-cover" />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xl font-bold">
-                  {(profile.name || '?').charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="text-sm text-brand-600 block">
-                {t('Change photo')}
-              </button>
-              {profile.photo && (
-                <button type="button" onClick={handlePhotoRemove} className="text-sm text-red-600 block mt-1">
-                  {t('Remove photo')}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Name')}</label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full mb-4 px-3 py-2 border border-slate-300 rounded-md"
-            />
-            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Email')}</label>
-            <input value={profile.email} disabled className="w-full mb-4 px-3 py-2 border border-slate-200 rounded-md bg-slate-50 text-slate-500" />
-            <label className="block text-sm font-medium text-slate-700 mb-1">{t('UPI ID')}</label>
-            <input
-              placeholder="yourname@upi"
-              value={form.upiId}
-              onChange={(e) => setForm({ ...form, upiId: e.target.value })}
-              className="w-full mb-1 px-3 py-2 border border-slate-300 rounded-md"
-            />
-            <p className="text-xs text-slate-500 mb-4">
-              {t('Needed so people can pay you directly when they accept a contribution request.')}
-            </p>
-            {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
-            {saved && <div className="mb-4 text-sm text-emerald-600">{t('Saved.')}</div>}
-            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">
-              {t('Save')}
-            </button>
-          </form>
-        </div>
-
+      <div className="max-w-3xl">
         <div className="space-y-6">
           <div className="bg-white border border-slate-200 rounded-xl p-6">
             <div className="flex items-center justify-between">

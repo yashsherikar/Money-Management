@@ -28,7 +28,7 @@ export default function Obligations() {
     const [obRes, accRes] = await Promise.all([client.get('/obligations/summary'), client.get('/accounts')])
     setSummary(obRes.data)
     setAccounts(accRes.data)
-    const primary = accRes.data.find((a) => a.isPrimary)
+    const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
     if (primary) setEmiForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
   }
 

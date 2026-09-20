@@ -14,6 +14,8 @@ export default function Transactions() {
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
 
   async function loadAll() {
     const [txnRes, accRes, catRes] = await Promise.all([
@@ -24,7 +26,7 @@ export default function Transactions() {
     setTransactions(txnRes.data)
     setAccounts(accRes.data)
     setCategories(catRes.data)
-    const primary = accRes.data.find((a) => a.isPrimary)
+    const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
     if (primary) setForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
   }
 
@@ -79,6 +81,16 @@ export default function Transactions() {
     loadAll()
   }
 
+  async function handleAddCategory(e) {
+    e.preventDefault()
+    if (!newCategoryName.trim()) return
+    const { data } = await client.post('/categories', { name: newCategoryName.trim(), essential: false })
+    setCategories((prev) => [...prev, data])
+    setForm((f) => ({ ...f, categoryId: String(data.id) }))
+    setNewCategoryName('')
+    setAddingCategory(false)
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Transactions (this month)')}</h1>
@@ -100,10 +112,31 @@ export default function Transactions() {
             {INCOME_SOURCES.map((name) => <option key={name} value={name}>{t(name)}</option>)}
             <option value="Other">{t('Other')}</option>
           </select>
+        ) : addingCategory ? (
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              placeholder={t('New category name')}
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory(e))}
+              className="px-3 py-2 border border-slate-300 rounded-md flex-1"
+            />
+            <button type="button" onClick={handleAddCategory} className="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium">{t('Add')}</button>
+            <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
+          </div>
         ) : (
-          <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
+          <select
+            value={form.categoryId}
+            onChange={(e) => {
+              const picked = categories.find((c) => String(c.id) === e.target.value)
+              if (picked?.name === 'Other') setAddingCategory(true)
+              else setForm({ ...form, categoryId: e.target.value })
+            }}
+            className="px-3 py-2 border border-slate-300 rounded-md"
+          >
             <option value="">{t('No category')}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}{!c.essential ? ` ${t('(non-essential)')}` : ''}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name === 'Other' ? t('Other (add new)') : c.name}{!c.essential ? ` ${t('(non-essential)')}` : ''}</option>)}
           </select>
         )}
         <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, categoryId: '' })} className="px-3 py-2 border border-slate-300 rounded-md">

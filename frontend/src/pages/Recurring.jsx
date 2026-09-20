@@ -25,7 +25,7 @@ export default function Recurring() {
     setItems(itemsRes.data)
     setAccounts(accRes.data)
     setCategories(catRes.data)
-    const primary = accRes.data.find((a) => a.isPrimary)
+    const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
     if (primary) setForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
   }
 

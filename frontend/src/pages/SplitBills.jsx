@@ -26,6 +26,8 @@ export default function SplitBills() {
     const [billsRes, accountsRes] = await Promise.all([client.get('/split-bills'), client.get('/accounts')])
     setBills(billsRes.data)
     setAccounts(accountsRes.data)
+    const primary = accountsRes.data.find((a) => a.isPrimary) || accountsRes.data[0]
+    if (primary) setForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
   }
 
   useEffect(() => {
