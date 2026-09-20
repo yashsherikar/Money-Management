@@ -3,6 +3,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
 import LoadingBar from './components/LoadingBar.jsx'
+import InstallPrompt from './components/InstallPrompt.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -30,6 +31,7 @@ export default function App() {
     <>
     <LoadingBar />
     <DueReminders />
+    <InstallPrompt />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />

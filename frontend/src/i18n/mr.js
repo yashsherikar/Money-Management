@@ -269,6 +269,9 @@ export const mr = {
   'Needed so people can pay you directly when they accept a contribution request.':
     'लोकांनी योगदान विनंती स्वीकारल्यावर तुम्हाला थेट पैसे पाठवण्यासाठी हे आवश्यक आहे.',
   'Saved.': 'जतन झाले.',
+  'Install Money Manager on your device for quick access': 'जलद प्रवेशासाठी Money Manager तुमच्या डिव्हाइसवर इंस्टॉल करा',
+  Install: 'इंस्टॉल करा',
+  'To install: tap Share, then "Add to Home Screen"': 'इंस्टॉल करण्यासाठी: शेअर दाबा, नंतर "Add to Home Screen" निवडा',
   'Push notifications': 'पुश सूचना',
   'Get notified on this device when someone requests money from you.': 'कोणी तुमच्याकडे पैसे मागितल्यास या डिव्हाइसवर सूचना मिळवा.',
   'Not supported in this browser': 'या ब्राउझरमध्ये समर्थित नाही',
