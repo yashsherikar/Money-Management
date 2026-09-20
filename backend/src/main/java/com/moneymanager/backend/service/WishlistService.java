@@ -25,16 +25,19 @@ public class WishlistService {
     private final ContributionRequestRepository contributionRequestRepository;
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final PushService pushService;
 
     public WishlistService(WishlistItemRepository wishlistItemRepository, AccountRepository accountRepository,
                             ContributionRequestRepository contributionRequestRepository,
                             UserRepository userRepository,
-                            TransactionRepository transactionRepository) {
+                            TransactionRepository transactionRepository,
+                            PushService pushService) {
         this.wishlistItemRepository = wishlistItemRepository;
         this.accountRepository = accountRepository;
         this.contributionRequestRepository = contributionRequestRepository;
         this.userRepository = userRepository;
         this.transactionRepository = transactionRepository;
+        this.pushService = pushService;
     }
 
     public List<WishlistItemResponse> list(User user) {
@@ -100,6 +103,8 @@ public class WishlistService {
             cr.setMember(member);
             cr.setAmount(r.amount());
             contributionRequestRepository.save(cr);
+            pushService.notifyUser(member, "Money request",
+                    user.getName() + " is asking for ₹" + r.amount() + " for \"" + item.getName() + "\"");
             return toResponse(cr);
         }).toList();
     }

@@ -269,6 +269,11 @@ export const mr = {
   'Needed so people can pay you directly when they accept a contribution request.':
     'लोकांनी योगदान विनंती स्वीकारल्यावर तुम्हाला थेट पैसे पाठवण्यासाठी हे आवश्यक आहे.',
   'Saved.': 'जतन झाले.',
+  'Push notifications': 'पुश सूचना',
+  'Get notified on this device when someone requests money from you.': 'कोणी तुमच्याकडे पैसे मागितल्यास या डिव्हाइसवर सूचना मिळवा.',
+  'Not supported in this browser': 'या ब्राउझरमध्ये समर्थित नाही',
+  Disable: 'बंद करा',
+  Enable: 'सुरू करा',
   'Change photo': 'फोटो बदला',
   'Remove photo': 'फोटो काढा',
   'Total across all accounts': 'सर्व खात्यांची एकूण रक्कम',

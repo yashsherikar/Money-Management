@@ -28,15 +28,18 @@ public class SplitBillService {
     private final SplitBillParticipantRepository participantRepository;
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
+    private final PushService pushService;
 
     public SplitBillService(SplitBillRepository splitBillRepository,
                              SplitBillParticipantRepository participantRepository,
                              AccountRepository accountRepository,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             PushService pushService) {
         this.splitBillRepository = splitBillRepository;
         this.participantRepository = participantRepository;
         this.accountRepository = accountRepository;
         this.userRepository = userRepository;
+        this.pushService = pushService;
     }
 
     public List<SplitBillResponse> list(User user) {
@@ -101,7 +104,14 @@ public class SplitBillService {
             bill.getParticipants().add(participant);
         }
 
-        return toResponse(splitBillRepository.save(bill));
+        SplitBillResponse response = toResponse(splitBillRepository.save(bill));
+        for (SplitBillParticipant participant : bill.getParticipants()) {
+            if (participant.getUser() != null) {
+                pushService.notifyUser(participant.getUser(), "Split bill",
+                        user.getName() + " added you to \"" + bill.getTitle() + "\" — you owe ₹" + participant.getShareAmount());
+            }
+        }
+        return response;
     }
 
     @Transactional
