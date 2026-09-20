@@ -3,6 +3,8 @@ package com.moneymanager.backend.config;
 import com.moneymanager.backend.security.JwtAuthFilter;
 import com.moneymanager.backend.security.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +26,8 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
@@ -49,6 +53,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
         return (request, response, authException) -> {
+            log.warn("401 on {} {}: {}", request.getMethod(), request.getRequestURI(), authException.getMessage());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"message\":\"authentication required\"}");
