@@ -10,12 +10,12 @@ import java.util.Optional;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    @Query("select c from Category c where c.user.id = :userId or c.isDefault = true order by c.name")
+    @Query("select c from Category c left join c.user u where c.isDefault = true or u.id = :userId order by c.name")
     List<Category> findVisibleToUser(@Param("userId") Long userId);
 
     Optional<Category> findByIdAndUserId(Long id, Long userId);
 
-    @Query("select c from Category c where c.id = :id and (c.user.id = :userId or c.isDefault = true)")
+    @Query("select c from Category c left join c.user u where c.id = :id and (c.isDefault = true or u.id = :userId)")
     Optional<Category> findVisibleById(@Param("id") Long id, @Param("userId") Long userId);
 
     Optional<Category> findByNameAndIsDefaultTrue(String name);
