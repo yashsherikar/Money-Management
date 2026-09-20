@@ -7,12 +7,15 @@ import com.moneymanager.backend.entity.UdharType;
 import com.moneymanager.backend.entity.User;
 import com.moneymanager.backend.repository.AccountRepository;
 import com.moneymanager.backend.repository.UdharEntryRepository;
+import com.moneymanager.backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -21,10 +24,15 @@ public class UdharService {
 
     private final UdharEntryRepository udharEntryRepository;
     private final AccountRepository accountRepository;
+    private final UserRepository userRepository;
+    private final PushService pushService;
 
-    public UdharService(UdharEntryRepository udharEntryRepository, AccountRepository accountRepository) {
+    public UdharService(UdharEntryRepository udharEntryRepository, AccountRepository accountRepository,
+                         UserRepository userRepository, PushService pushService) {
         this.udharEntryRepository = udharEntryRepository;
         this.accountRepository = accountRepository;
+        this.userRepository = userRepository;
+        this.pushService = pushService;
     }
 
     @Transactional(readOnly = true)
@@ -56,6 +64,12 @@ public class UdharService {
         entry.setTxnDate(request.txnDate());
         entry.setDueDate(request.dueDate());
 
+        if (StringUtils.hasText(request.contactEmail())) {
+            String email = request.contactEmail().trim();
+            entry.setContactEmail(email);
+            userRepository.findByIgnoreCaseEmail(email).ifPresent(entry::setContactUser);
+        }
+
         if (request.accountId() != null) {
             Account account = getOwnedAccount(user, request.accountId());
             entry.setAccount(account);
@@ -84,6 +98,26 @@ public class UdharService {
         }
         entry.setSettled(true);
         entry.setSettledDate(LocalDate.now());
+        return toResponse(udharEntryRepository.save(entry));
+    }
+
+    /** Ping the lender (if they're a linked Money Manager user) that you still owe them. */
+    @Transactional
+    public UdharResponse requestSettle(User user, Long id) {
+        UdharEntry entry = getOwned(user, id);
+        if (entry.getType() != UdharType.BORROWED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "only entries you borrowed can be settle-requested");
+        }
+        if (entry.isSettled()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already settled");
+        }
+        if (entry.getContactUser() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "add their Money Manager email to this entry first");
+        }
+        entry.setSettleRequestedAt(Instant.now());
+        pushService.notifyUser(entry.getContactUser(), "Repayment reminder",
+                user.getName() + " confirmed they still owe you ₹" + entry.getAmount().toPlainString()
+                        + (StringUtils.hasText(entry.getNote()) ? " for " + entry.getNote() : ""));
         return toResponse(udharEntryRepository.save(entry));
     }
 
@@ -119,7 +153,10 @@ public class UdharService {
                 e.getTxnDate(),
                 e.getDueDate(),
                 e.isSettled(),
-                e.getSettledDate()
+                e.getSettledDate(),
+                e.getContactEmail(),
+                e.getContactUser() != null,
+                e.getSettleRequestedAt() != null
         );
     }
 }

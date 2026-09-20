@@ -7,7 +7,7 @@ function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
 }
 
-const emptyForm = { accountId: '', contactName: '', type: 'LENT', amount: '', note: '', txnDate: new Date().toISOString().slice(0, 10), dueDate: '' }
+const emptyForm = { accountId: '', contactName: '', type: 'LENT', amount: '', note: '', txnDate: new Date().toISOString().slice(0, 10), dueDate: '', contactEmail: '' }
 
 export default function Udhar() {
   const { t } = useLanguage()
@@ -46,6 +46,7 @@ export default function Udhar() {
         note: form.note || null,
         txnDate: form.txnDate,
         dueDate: form.dueDate || null,
+        contactEmail: form.contactEmail || null,
       })
       setForm(emptyForm)
       loadAll()
@@ -57,6 +58,16 @@ export default function Udhar() {
   async function handleSettle(id) {
     await client.patch(`/udhar/${id}/settle`)
     loadAll()
+  }
+
+  async function handleRequestSettle(id) {
+    setError('')
+    try {
+      await client.post(`/udhar/${id}/request-settle`)
+      loadAll()
+    } catch (err) {
+      setError(err.response?.data?.message || t('Save failed'))
+    }
   }
 
   async function handleDelete(id) {
@@ -90,7 +101,14 @@ export default function Udhar() {
         </select>
         <input type="date" required value={form.txnDate} onChange={(e) => setForm({ ...form, txnDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
         <input type="date" placeholder={t('Due date (optional)')} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md md:col-span-3" />
+        <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md md:col-span-2" />
+        <input
+          type="email"
+          placeholder={t("Their Money Manager email (optional, to send a repayment reminder)")}
+          value={form.contactEmail}
+          onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+          className="px-3 py-2 border border-slate-300 rounded-md"
+        />
         <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-3">{t('Add entry')}</button>
         {error && <div className="md:col-span-3 text-sm text-red-600">{error}</div>}
       </form>
@@ -110,6 +128,11 @@ export default function Udhar() {
             </div>
             <div className="flex items-center gap-4">
               <div className={`font-semibold ${e.type === 'LENT' ? 'text-emerald-600' : 'text-red-600'}`}>{money(e.amount)}</div>
+              {!e.settled && e.type === 'BORROWED' && e.contactLinked && (
+                <button onClick={() => handleRequestSettle(e.id)} className="text-sm text-brand-600">
+                  {e.settleRequested ? t('Remind again') : t('Notify lender')}
+                </button>
+              )}
               {!e.settled && <button onClick={() => handleSettle(e.id)} className="text-sm text-brand-600">{t('Settle')}</button>}
               <button onClick={() => handleDelete(e.id)} className="text-sm text-red-600">{t('Delete')}</button>
             </div>
