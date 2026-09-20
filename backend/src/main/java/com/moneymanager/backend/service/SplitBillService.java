@@ -8,12 +8,16 @@ import com.moneymanager.backend.entity.User;
 import com.moneymanager.backend.repository.AccountRepository;
 import com.moneymanager.backend.repository.SplitBillParticipantRepository;
 import com.moneymanager.backend.repository.SplitBillRepository;
+import com.moneymanager.backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -23,18 +27,48 @@ public class SplitBillService {
     private final SplitBillRepository splitBillRepository;
     private final SplitBillParticipantRepository participantRepository;
     private final AccountRepository accountRepository;
+    private final UserRepository userRepository;
+    private final PushService pushService;
 
     public SplitBillService(SplitBillRepository splitBillRepository,
                              SplitBillParticipantRepository participantRepository,
-                             AccountRepository accountRepository) {
+                             AccountRepository accountRepository,
+                             UserRepository userRepository,
+                             PushService pushService) {
         this.splitBillRepository = splitBillRepository;
         this.participantRepository = participantRepository;
         this.accountRepository = accountRepository;
+        this.userRepository = userRepository;
+        this.pushService = pushService;
     }
 
     public List<SplitBillResponse> list(User user) {
         return splitBillRepository.findByUserIdOrderByBillDateDesc(user.getId()).stream()
                 .map(this::toResponse).toList();
+    }
+
+    /** Split bills where the current user is a linked participant — what they owe, and to whom. */
+    public List<OwedSplitBillResponse> owedByMe(User user) {
+        return participantRepository.findByUserIdOrderByIdDesc(user.getId()).stream()
+                .map(p -> {
+                    SplitBill bill = p.getSplitBill();
+                    User payer = bill.getUser();
+                    String upiLink = null;
+                    if (StringUtils.hasText(payer.getUpiId())) {
+                        upiLink = "upi://pay?pa=" + encode(payer.getUpiId())
+                                + "&pn=" + encode(payer.getName())
+                                + "&am=" + p.getShareAmount().toPlainString()
+                                + "&cu=INR"
+                                + "&tn=" + encode(bill.getTitle());
+                    }
+                    return new OwedSplitBillResponse(p.getId(), bill.getId(), bill.getTitle(),
+                            p.getShareAmount(), p.isPaid(), payer.getName(), upiLink);
+                })
+                .toList();
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     @Transactional
@@ -64,10 +98,20 @@ public class SplitBillService {
             participant.setSplitBill(bill);
             participant.setName(p.name());
             participant.setShareAmount(p.shareAmount());
+            if (StringUtils.hasText(p.email())) {
+                userRepository.findByEmail(p.email().trim().toLowerCase()).ifPresent(participant::setUser);
+            }
             bill.getParticipants().add(participant);
         }
 
-        return toResponse(splitBillRepository.save(bill));
+        SplitBillResponse response = toResponse(splitBillRepository.save(bill));
+        for (SplitBillParticipant participant : bill.getParticipants()) {
+            if (participant.getUser() != null) {
+                pushService.notifyUser(participant.getUser(), "Split bill",
+                        user.getName() + " added you to \"" + bill.getTitle() + "\" — you owe ₹" + participant.getShareAmount());
+            }
+        }
+        return response;
     }
 
     @Transactional
@@ -124,7 +168,7 @@ public class SplitBillService {
         BigDecimal yourShare = bill.getTotalAmount().subtract(shareTotal);
 
         List<ParticipantResponse> participants = bill.getParticipants().stream()
-                .map(p -> new ParticipantResponse(p.getId(), p.getName(), p.getShareAmount(), p.isPaid(), p.getPaidDate()))
+                .map(p -> new ParticipantResponse(p.getId(), p.getName(), p.getShareAmount(), p.isPaid(), p.getPaidDate(), p.getUser() != null))
                 .toList();
 
         return new SplitBillResponse(

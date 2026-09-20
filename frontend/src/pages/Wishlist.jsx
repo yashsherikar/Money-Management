@@ -1,24 +1,22 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
-import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
 }
 
-const emptyForm = { name: '', price: '', productUrl: '', groupId: '' }
+const emptyForm = { name: '', price: '', productUrl: '' }
 
 export default function Wishlist() {
-  const { user } = useAuth()
   const { t } = useLanguage()
   const [items, setItems] = useState([])
-  const [groups, setGroups] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
   const [affordability, setAffordability] = useState({}) // itemId -> data
   const [requestOpenFor, setRequestOpenFor] = useState(null)
-  const [requestAmounts, setRequestAmounts] = useState({}) // memberId -> amount
+  const [requestRows, setRequestRows] = useState([{ email: '', amount: '' }])
+  const [requestError, setRequestError] = useState('')
 
   const [wishroom, setWishroom] = useState({ connected: false, email: '', name: '' })
   const [wishroomForm, setWishroomForm] = useState({ email: '', password: '' })
@@ -27,16 +25,13 @@ export default function Wishlist() {
   const [wishroomRooms, setWishroomRooms] = useState([])
   const [selectedRoomId, setSelectedRoomId] = useState('')
   const [wishroomItems, setWishroomItems] = useState([])
-  const [importGroupId, setImportGroupId] = useState('')
 
   async function loadAll() {
-    const [itemsRes, groupsRes, wishroomRes] = await Promise.all([
+    const [itemsRes, wishroomRes] = await Promise.all([
       client.get('/wishlist'),
-      client.get('/groups'),
       client.get('/wishroom/status'),
     ])
     setItems(itemsRes.data)
-    setGroups(groupsRes.data)
     setWishroom(wishroomRes.data)
   }
 
@@ -79,11 +74,7 @@ export default function Wishlist() {
   async function importWishroomItem(item) {
     setWishroomError('')
     try {
-      await client.post('/wishroom/import', {
-        roomId: selectedRoomId,
-        itemId: item.id,
-        groupId: importGroupId ? Number(importGroupId) : null,
-      })
+      await client.post('/wishroom/import', { roomId: selectedRoomId, itemId: item.id })
       loadAll()
     } catch (err) {
       setWishroomError(err.response?.data?.message || t('Save failed'))
@@ -98,7 +89,6 @@ export default function Wishlist() {
         name: form.name,
         price: Number(form.price),
         productUrl: form.productUrl || null,
-        groupId: form.groupId ? Number(form.groupId) : null,
       })
       setForm(emptyForm)
       loadAll()
@@ -119,25 +109,35 @@ export default function Wishlist() {
   }
 
   function openRequestForm(item) {
-    const group = groups.find((g) => g.id === item.groupId)
-    const others = group ? group.members.filter((m) => m.userId !== user?.id) : []
-    const shortfall = affordability[item.id]?.shortfall ?? 0
-    const share = others.length ? (Number(shortfall) / others.length).toFixed(2) : '0'
-    const initial = {}
-    others.forEach((m) => { initial[m.userId] = share })
-    setRequestAmounts(initial)
+    setRequestError('')
+    setRequestRows([{ email: '', amount: '' }])
     setRequestOpenFor(item.id)
   }
 
+  function updateRequestRow(index, field, value) {
+    setRequestRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
+  }
+
+  function addRequestRow() {
+    setRequestRows((rows) => [...rows, { email: '', amount: '' }])
+  }
+
+  function removeRequestRow(index) {
+    setRequestRows((rows) => rows.filter((_, i) => i !== index))
+  }
+
   async function submitRequests(item) {
-    const group = groups.find((g) => g.id === item.groupId)
-    const others = group ? group.members.filter((m) => m.userId !== user?.id) : []
-    const requests = others
-      .map((m) => ({ memberId: m.userId, amount: Number(requestAmounts[m.userId]) }))
-      .filter((r) => r.amount > 0)
+    setRequestError('')
+    const requests = requestRows
+      .filter((r) => r.email && r.amount)
+      .map((r) => ({ email: r.email.trim(), amount: Number(r.amount) }))
     if (requests.length === 0) return
-    await client.post(`/wishlist/${item.id}/contribution-requests`, { requests })
-    setRequestOpenFor(null)
+    try {
+      await client.post(`/wishlist/${item.id}/contribution-requests`, { requests })
+      setRequestOpenFor(null)
+    } catch (err) {
+      setRequestError(err.response?.data?.message || t('Save failed'))
+    }
   }
 
   return (
@@ -166,21 +166,15 @@ export default function Wishlist() {
                 </select>
 
                 {selectedRoomId && (
-                  <>
-                    <select value={importGroupId} onChange={(e) => setImportGroupId(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md w-full">
-                      <option value="">{t('No group (just for me)')}</option>
-                      {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
-                    <div className="space-y-2">
-                      {wishroomItems.length === 0 && <div className="text-sm text-slate-500">{t('No items in this room.')}</div>}
-                      {wishroomItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-sm border border-slate-100 rounded-md px-3 py-2">
-                          <span>{item.title}{item.price ? ` · ${money(item.price)}` : ''}</span>
-                          <button onClick={() => importWishroomItem(item)} className="text-brand-600">{t('Import')}</button>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                  <div className="space-y-2">
+                    {wishroomItems.length === 0 && <div className="text-sm text-slate-500">{t('No items in this room.')}</div>}
+                    {wishroomItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between text-sm border border-slate-100 rounded-md px-3 py-2">
+                        <span>{item.title}{item.price ? ` · ${money(item.price)}` : ''}</span>
+                        <button onClick={() => importWishroomItem(item)} className="text-brand-600">{t('Import')}</button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -199,10 +193,6 @@ export default function Wishlist() {
         <input required placeholder={t('Item name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
         <input required type="number" step="0.01" min="0.01" placeholder={t('Price')} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
         <input placeholder={t('Product link (optional)')} value={form.productUrl} onChange={(e) => setForm({ ...form, productUrl: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="">{t('No group (just for me)')}</option>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </select>
         <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-4">{t('Add to wishlist')}</button>
         {error && <div className="md:col-span-4 text-sm text-red-600">{error}</div>}
       </form>
@@ -221,7 +211,7 @@ export default function Wishlist() {
                     ) : item.name}
                   </div>
                   <div className="text-xs text-slate-500">
-                    {money(item.price)} · {item.status}{item.groupName ? ` · ${item.groupName}` : ''}
+                    {money(item.price)} · {item.status}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -238,30 +228,36 @@ export default function Wishlist() {
                   </div>
                   <p className={a.comfortable ? 'text-emerald-600' : a.affordable ? 'text-amber-600' : 'text-red-600'}>{a.recommendation}</p>
 
-                  {Number(a.shortfall) > 0 && item.groupId && (
+                  {Number(a.shortfall) > 0 && (
                     <div className="mt-3">
                       {requestOpenFor === item.id ? (
                         <div className="space-y-2">
-                          {groups.find((g) => g.id === item.groupId)?.members
-                            .filter((m) => m.userId !== user?.id)
-                            .map((m) => (
-                              <div key={m.userId} className="flex items-center gap-2">
-                                <span className="w-32 truncate">{m.name}</span>
-                                <input
-                                  type="number" step="0.01" min="0"
-                                  value={requestAmounts[m.userId] || ''}
-                                  onChange={(e) => setRequestAmounts({ ...requestAmounts, [m.userId]: e.target.value })}
-                                  className="px-2 py-1 border border-slate-300 rounded-md w-28"
-                                />
-                              </div>
-                            ))}
+                          {requestRows.map((r, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <input
+                                type="email" placeholder={t('Their email')}
+                                value={r.email} onChange={(e) => updateRequestRow(i, 'email', e.target.value)}
+                                className="px-2 py-1 border border-slate-300 rounded-md flex-1"
+                              />
+                              <input
+                                type="number" step="0.01" min="0.01" placeholder={t('Amount')}
+                                value={r.amount} onChange={(e) => updateRequestRow(i, 'amount', e.target.value)}
+                                className="px-2 py-1 border border-slate-300 rounded-md w-28"
+                              />
+                              {requestRows.length > 1 && (
+                                <button onClick={() => removeRequestRow(i)} className="text-red-600 text-sm">{t('Remove')}</button>
+                              )}
+                            </div>
+                          ))}
+                          <button onClick={addRequestRow} className="text-sm text-brand-600 block">{t('+ Add another person')}</button>
+                          {requestError && <div className="text-sm text-red-600">{requestError}</div>}
                           <div className="flex gap-2">
                             <button onClick={() => submitRequests(item)} className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">{t('Send requests')}</button>
                             <button onClick={() => setRequestOpenFor(null)} className="px-3 py-1.5 text-sm border border-slate-300 rounded-md">{t('Cancel')}</button>
                           </div>
                         </div>
                       ) : (
-                        <button onClick={() => openRequestForm(item)} className="text-sm text-brand-600">{t('Request the shortfall from group members')}</button>
+                        <button onClick={() => openRequestForm(item)} className="text-sm text-brand-600">{t('Request the shortfall from someone')}</button>
                       )}
                     </div>
                   )}

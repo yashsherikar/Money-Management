@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
+import LoadingBar from './components/LoadingBar.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -13,7 +14,6 @@ import SplitBills from './pages/SplitBills.jsx'
 import Investments from './pages/Investments.jsx'
 import Recurring from './pages/Recurring.jsx'
 import Wishlist from './pages/Wishlist.jsx'
-import Groups from './pages/Groups.jsx'
 import Requests from './pages/Requests.jsx'
 import Profile from './pages/Profile.jsx'
 
@@ -28,6 +28,7 @@ function Protected({ children }) {
 export default function App() {
   return (
     <>
+    <LoadingBar />
     <DueReminders />
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -41,7 +42,6 @@ export default function App() {
       <Route path="/investments" element={<Protected><Investments /></Protected>} />
       <Route path="/recurring" element={<Protected><Recurring /></Protected>} />
       <Route path="/wishlist" element={<Protected><Wishlist /></Protected>} />
-      <Route path="/groups" element={<Protected><Groups /></Protected>} />
       <Route path="/requests" element={<Protected><Requests /></Protected>} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
     </Routes>

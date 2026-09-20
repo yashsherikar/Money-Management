@@ -183,6 +183,11 @@ export const mr = {
   pending: 'प्रलंबित',
   PAID: 'दिले',
   'Mark paid': 'दिले म्हणून चिन्हांकित करा',
+  'Their email (optional, if they use this app)': 'त्यांचा ईमेल (ऐच्छिक, ते हे अ‍ॅप वापरत असल्यास)',
+  'If their email matches a Money Manager account, this bill shows up on their Requests page too.':
+    'त्यांचा ईमेल Money Manager खात्याशी जुळल्यास, हे बिल त्यांच्या विनंत्या पानावरही दिसेल.',
+  'This person can see and pay this on their own Requests page': 'ही व्यक्ती हे स्वतःच्या विनंत्या पानावर पाहू आणि भरू शकते',
+  'Split bills you owe': 'तुम्ही देणे असलेली विभागलेली बिले',
   'Delete this split bill?': 'हे विभागलेले बिल हटवायचे का?',
 
   // investments
@@ -217,7 +222,8 @@ export const mr = {
   'Available funds:': 'उपलब्ध निधी:',
   'Shortfall:': 'तूट:',
   'Send requests': 'विनंत्या पाठवा',
-  'Request the shortfall from group members': 'गट सदस्यांकडून तूट मागवा',
+  'Request the shortfall from someone': 'कोणाकडूनतरी तूट मागवा',
+  'Their email': 'त्यांचा ईमेल',
   'Remove this wishlist item?': 'ही इच्छा यादीतील वस्तू काढायची का?',
   WishRoom: 'विशरूम',
   'Connected as': 'यांच्या नावाने जोडलेले:',
@@ -260,9 +266,14 @@ export const mr = {
 
   // profile
   'UPI ID': 'UPI आयडी',
-  'Needed so group members can pay you directly when they accept a contribution request.':
-    'गट सदस्यांनी योगदान विनंती स्वीकारल्यावर तुम्हाला थेट पैसे पाठवण्यासाठी हे आवश्यक आहे.',
+  'Needed so people can pay you directly when they accept a contribution request.':
+    'लोकांनी योगदान विनंती स्वीकारल्यावर तुम्हाला थेट पैसे पाठवण्यासाठी हे आवश्यक आहे.',
   'Saved.': 'जतन झाले.',
+  'Push notifications': 'पुश सूचना',
+  'Get notified on this device when someone requests money from you.': 'कोणी तुमच्याकडे पैसे मागितल्यास या डिव्हाइसवर सूचना मिळवा.',
+  'Not supported in this browser': 'या ब्राउझरमध्ये समर्थित नाही',
+  Disable: 'बंद करा',
+  Enable: 'सुरू करा',
   'Change photo': 'फोटो बदला',
   'Remove photo': 'फोटो काढा',
   'Total across all accounts': 'सर्व खात्यांची एकूण रक्कम',

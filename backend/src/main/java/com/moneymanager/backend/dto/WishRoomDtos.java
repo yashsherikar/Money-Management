@@ -34,7 +34,6 @@ public class WishRoomDtos {
 
     public record ImportItemRequest(
             @NotBlank String roomId,
-            @NotBlank String itemId,
-            Long groupId
+            @NotBlank String itemId
     ) {}
 }

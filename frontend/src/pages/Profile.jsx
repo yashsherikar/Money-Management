@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { enablePush, disablePush, isPushEnabled, isPushSupported } from '../push.js'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
@@ -53,6 +54,10 @@ export default function Profile() {
   const [revealPin, setRevealPin] = useState('')
   const [revealError, setRevealError] = useState('')
 
+  const [pushOn, setPushOn] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState('')
+
   function load() {
     client.get('/profile').then((res) => {
       setProfile(res.data)
@@ -62,7 +67,26 @@ export default function Profile() {
 
   useEffect(() => {
     load()
+    isPushEnabled().then(setPushOn)
   }, [])
+
+  async function togglePush() {
+    setPushError('')
+    setPushBusy(true)
+    try {
+      if (pushOn) {
+        await disablePush(client)
+        setPushOn(false)
+      } else {
+        await enablePush(client)
+        setPushOn(true)
+      }
+    } catch (err) {
+      setPushError(err.message || t('Save failed'))
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -200,7 +224,7 @@ export default function Profile() {
               className="w-full mb-1 px-3 py-2 border border-slate-300 rounded-md"
             />
             <p className="text-xs text-slate-500 mb-4">
-              {t('Needed so group members can pay you directly when they accept a contribution request.')}
+              {t('Needed so people can pay you directly when they accept a contribution request.')}
             </p>
             {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
             {saved && <div className="mb-4 text-sm text-emerald-600">{t('Saved.')}</div>}
@@ -211,6 +235,27 @@ export default function Profile() {
         </div>
 
         <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold">{t('Push notifications')}</h2>
+                <p className="text-xs text-slate-500 mt-1">{t('Get notified on this device when someone requests money from you.')}</p>
+              </div>
+              {isPushSupported() ? (
+                <button
+                  onClick={togglePush}
+                  disabled={pushBusy}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium ${pushOn ? 'border border-slate-300' : 'bg-brand-500 hover:bg-brand-600 text-white'}`}
+                >
+                  {pushOn ? t('Disable') : t('Enable')}
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400">{t('Not supported in this browser')}</span>
+              )}
+            </div>
+            {pushError && <div className="mt-2 text-sm text-red-600">{pushError}</div>}
+          </div>
+
           <div className="bg-white border border-slate-200 rounded-xl p-6">
             <h2 className="font-semibold mb-1">{t('Total across all accounts')}</h2>
             <p className="text-xs text-slate-500 mb-4">{t('Hidden by default — needs your secret PIN to reveal.')}</p>

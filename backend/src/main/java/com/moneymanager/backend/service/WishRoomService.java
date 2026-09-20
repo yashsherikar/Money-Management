@@ -80,7 +80,7 @@ public class WishRoomService {
         }
 
         WishlistItemRequest wishlistRequest = new WishlistItemRequest(
-                item.title(), BigDecimal.valueOf(item.price()), item.url(), request.groupId());
+                item.title(), BigDecimal.valueOf(item.price()), item.url());
         return wishlistService.create(user, wishlistRequest);
     }
 

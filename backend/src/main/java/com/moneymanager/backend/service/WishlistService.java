@@ -23,20 +23,21 @@ public class WishlistService {
     private final WishlistItemRepository wishlistItemRepository;
     private final AccountRepository accountRepository;
     private final ContributionRequestRepository contributionRequestRepository;
-    private final GroupMemberRepository groupMemberRepository;
-    private final GroupService groupService;
+    private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final PushService pushService;
 
     public WishlistService(WishlistItemRepository wishlistItemRepository, AccountRepository accountRepository,
                             ContributionRequestRepository contributionRequestRepository,
-                            GroupMemberRepository groupMemberRepository, GroupService groupService,
-                            TransactionRepository transactionRepository) {
+                            UserRepository userRepository,
+                            TransactionRepository transactionRepository,
+                            PushService pushService) {
         this.wishlistItemRepository = wishlistItemRepository;
         this.accountRepository = accountRepository;
         this.contributionRequestRepository = contributionRequestRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.groupService = groupService;
+        this.userRepository = userRepository;
         this.transactionRepository = transactionRepository;
+        this.pushService = pushService;
     }
 
     public List<WishlistItemResponse> list(User user) {
@@ -50,9 +51,6 @@ public class WishlistService {
         item.setName(request.name());
         item.setPrice(request.price());
         item.setProductUrl(request.productUrl());
-        if (request.groupId() != null) {
-            item.setGroup(groupService.getIfMember(user, request.groupId()));
-        }
         return toResponse(wishlistItemRepository.save(item));
     }
 
@@ -81,9 +79,9 @@ public class WishlistService {
         if (comfortable) {
             recommendation = "You can buy this now and still keep a healthy buffer.";
         } else if (affordable) {
-            recommendation = "You can afford it, but it'll eat most of your savings. Consider waiting or asking your group to chip in.";
+            recommendation = "You can afford it, but it'll eat most of your savings. Consider waiting or asking someone to chip in.";
         } else {
-            recommendation = "You're short by " + shortfall + ". Request the difference from your group, or save more first.";
+            recommendation = "You're short by " + shortfall + ". Request the difference from someone, or save more first.";
         }
 
         return new AffordabilityResponse(item.getPrice(), availableFunds, shortfall, affordable, comfortable, recommendation);
@@ -92,21 +90,21 @@ public class WishlistService {
     @Transactional
     public List<ContributionRequestResponse> requestContributions(User user, Long itemId, BulkContributionRequest request) {
         WishlistItem item = getOwned(user, itemId);
-        if (item.getGroup() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "attach this item to a group before requesting contributions");
-        }
         return request.requests().stream().map(r -> {
-            if (!groupMemberRepository.existsByGroupIdAndUserId(item.getGroup().getId(), r.memberId())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "member " + r.memberId() + " is not in this group");
+            String email = r.email().trim().toLowerCase();
+            User member = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no Money Manager user with email " + email));
+            if (member.getId().equals(user.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you can't request a contribution from yourself");
             }
-            User member = groupMemberRepository.findByGroupIdAndUserId(item.getGroup().getId(), r.memberId())
-                    .orElseThrow().getUser();
             ContributionRequest cr = new ContributionRequest();
             cr.setWishlistItem(item);
             cr.setRequester(user);
             cr.setMember(member);
             cr.setAmount(r.amount());
             contributionRequestRepository.save(cr);
+            pushService.notifyUser(member, "Money request",
+                    user.getName() + " is asking for ₹" + r.amount() + " for \"" + item.getName() + "\"");
             return toResponse(cr);
         }).toList();
     }
@@ -168,9 +166,7 @@ public class WishlistService {
     }
 
     private WishlistItemResponse toResponse(WishlistItem item) {
-        return new WishlistItemResponse(item.getId(), item.getName(), item.getPrice(), item.getProductUrl(),
-                item.getStatus(), item.getGroup() == null ? null : item.getGroup().getId(),
-                item.getGroup() == null ? null : item.getGroup().getName());
+        return new WishlistItemResponse(item.getId(), item.getName(), item.getPrice(), item.getProductUrl(), item.getStatus());
     }
 
     private ContributionRequestResponse toResponse(ContributionRequest cr) {

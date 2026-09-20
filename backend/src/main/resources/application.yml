@@ -29,3 +29,9 @@ app:
 wishroom:
   api:
     base-url: ${WISHROOM_API_URL:https://bucketlist-4nwg.onrender.com}
+
+push:
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY:}
+    private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:mailto:admin@example.com}
