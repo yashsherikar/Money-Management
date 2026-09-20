@@ -45,8 +45,21 @@
         </dependency>
         <dependency>
             <groupId>nl.martijndwars</groupId>
-            <artifactId>webpush</artifactId>
-            <version>5.1.1</version>
+            <artifactId>web-push</artifactId>
+            <version>5.1.2</version>
+        </dependency>
+        <dependency>
+            <!-- web-push marks this optional in its own POM, so it isn't pulled transitively -->
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk15on</artifactId>
+            <version>1.70</version>
+        </dependency>
+        <dependency>
+            <!-- web-push depends on this at runtime scope only; PushService.send() returns
+                 org.apache.http.HttpResponse, so we need it at compile scope too -->
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.14</version>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
