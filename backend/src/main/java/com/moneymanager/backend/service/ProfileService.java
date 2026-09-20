@@ -3,7 +3,10 @@ package com.moneymanager.backend.service;
 import com.moneymanager.backend.dto.ProfileDtos.*;
 import com.moneymanager.backend.entity.Account;
 import com.moneymanager.backend.entity.User;
+import com.moneymanager.backend.entity.UdharEntry;
+import com.moneymanager.backend.entity.UdharType;
 import com.moneymanager.backend.repository.AccountRepository;
+import com.moneymanager.backend.repository.UdharEntryRepository;
 import com.moneymanager.backend.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 public class ProfileService {
@@ -25,12 +29,14 @@ public class ProfileService {
 
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
+    private final UdharEntryRepository udharEntryRepository;
     private final PasswordEncoder passwordEncoder;
 
     public ProfileService(UserRepository userRepository, AccountRepository accountRepository,
-                           PasswordEncoder passwordEncoder) {
+                           UdharEntryRepository udharEntryRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
+        this.udharEntryRepository = udharEntryRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -106,10 +112,20 @@ public class ProfileService {
         user.setPinLockedUntil(null);
         userRepository.save(user);
 
-        BigDecimal total = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
+        List<Account> accounts = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId());
+        BigDecimal cashOnHand = accounts.stream()
                 .map(Account::getBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TotalBalanceResponse(total);
+        List<AccountBalance> byAccount = accounts.stream()
+                .map(a -> new AccountBalance(a.getId(), a.getName(), a.getType(), a.getBalance()))
+                .toList();
+
+        BigDecimal udharOwed = udharEntryRepository.findByUserIdOrderByTxnDateDesc(user.getId()).stream()
+                .filter(e -> !e.isSettled() && e.getType() == UdharType.BORROWED)
+                .map(UdharEntry::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new TotalBalanceResponse(cashOnHand.subtract(udharOwed), cashOnHand, udharOwed, byAccount);
     }
 
     private void registerFailedAttempt(User user) {
