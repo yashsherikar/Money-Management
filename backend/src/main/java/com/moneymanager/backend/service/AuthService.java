@@ -23,7 +23,7 @@ public class AuthService {
     }
 
     public AuthResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        if (userRepository.existsByIgnoreCaseEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
         }
         User user = new User();
@@ -35,8 +35,8 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email().toLowerCase())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid credentials"));
+        User user = userRepository.findByIgnoreCaseEmail(request.email())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no account with this email — please sign up"));
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid credentials");
         }

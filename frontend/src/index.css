@@ -34,6 +34,26 @@ body {
   transform: translateY(0);
 }
 
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  font-size: 0.9375rem;
+}
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
+  border-color: #94a3b8;
+}
+input::placeholder, textarea::placeholder {
+  color: #94a3b8;
+}
+.dark input::placeholder, .dark textarea::placeholder {
+  color: #64748b;
+}
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  padding-right: 2.25rem;
+}
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: #2f6fed;
@@ -42,6 +62,21 @@ input:focus, select:focus, textarea:focus {
 .dark input:focus, .dark select:focus, .dark textarea:focus {
   border-color: #7ba4f5;
   box-shadow: 0 0 0 3px rgba(123, 164, 245, 0.2);
+}
+
+button {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, background-color 0.12s ease;
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#root > div {
+  animation: fade-in-up 0.25s ease both;
 }
 
 /* Dark mode: manual overrides for the recurring neutral utility classes,

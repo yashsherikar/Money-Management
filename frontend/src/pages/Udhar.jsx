@@ -26,6 +26,8 @@ export default function Udhar() {
     setEntries(entriesRes.data)
     setSummary(summaryRes.data)
     setAccounts(accountsRes.data)
+    const primary = accountsRes.data.find((a) => a.isPrimary) || accountsRes.data[0]
+    if (primary) setForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
   }
 
   useEffect(() => {

@@ -92,7 +92,7 @@ public class WishlistService {
         WishlistItem item = getOwned(user, itemId);
         return request.requests().stream().map(r -> {
             String email = r.email().trim().toLowerCase();
-            User member = userRepository.findByEmail(email)
+            User member = userRepository.findByIgnoreCaseEmail(email)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no Money Manager user with email " + email));
             if (member.getId().equals(user.getId())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you can't request a contribution from yourself");

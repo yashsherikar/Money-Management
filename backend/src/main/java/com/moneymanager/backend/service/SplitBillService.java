@@ -99,7 +99,7 @@ public class SplitBillService {
             participant.setName(p.name());
             participant.setShareAmount(p.shareAmount());
             if (StringUtils.hasText(p.email())) {
-                userRepository.findByEmail(p.email().trim().toLowerCase()).ifPresent(participant::setUser);
+                userRepository.findByIgnoreCaseEmail(p.email().trim()).ifPresent(participant::setUser);
             }
             bill.getParticipants().add(participant);
         }
