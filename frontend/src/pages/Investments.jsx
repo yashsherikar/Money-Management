@@ -95,6 +95,7 @@ export default function Investments() {
           <option value="MUTUAL_FUND">{t('MUTUAL_FUND')}</option>
           <option value="STOCK">{t('STOCK')}</option>
           <option value="SIP">{t('SIP')}</option>
+          <option value="RD">{t('RD')}</option>
           <option value="OTHER">{t('OTHER')}</option>
         </select>
         <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />

@@ -1,5 +1,5 @@
 package com.moneymanager.backend.entity;
 
 public enum AccountType {
-    BANK, CASH, CARD
+    BANK, CASH, CARD, EMERGENCY_FUND
 }

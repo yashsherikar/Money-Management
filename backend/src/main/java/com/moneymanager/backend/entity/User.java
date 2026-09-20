@@ -30,6 +30,18 @@ public class User {
     @Column(name = "upi_id")
     private String upiId;
 
+    @Column(columnDefinition = "TEXT")
+    private String photo;
+
+    @Column(name = "pin_hash")
+    private String pinHash;
+
+    @Column(name = "pin_failed_attempts", nullable = false)
+    private int pinFailedAttempts = 0;
+
+    @Column(name = "pin_locked_until")
+    private Instant pinLockedUntil;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 }

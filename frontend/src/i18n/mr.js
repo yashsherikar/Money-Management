@@ -80,6 +80,12 @@ export const mr = {
   BANK: 'बँक',
   CASH: 'रोख',
   CARD: 'कार्ड',
+  EMERGENCY_FUND: 'आपत्कालीन निधी',
+  PRIMARY: 'मुख्य',
+  'Primary account — default for daily spending, EMIs, and everything else you log':
+    'मुख्य खाते — दैनंदिन खर्च, ईएमआय आणि इतर सर्व नोंदींसाठी डीफॉल्ट.',
+  'Emergency fund money is excluded from affordability checks — it never counts as spendable.':
+    'आपत्कालीन निधीतील पैसे परवडण्याच्या तपासणीतून वगळले जातात — ते कधीच खर्च करण्यायोग्य मानले जात नाहीत.',
 
   // obligations
   'Monthly EMI outgo': 'मासिक ईएमआय खर्च',
@@ -188,6 +194,7 @@ export const mr = {
   MUTUAL_FUND: 'म्युच्युअल फंड',
   STOCK: 'शेअर',
   SIP: 'एसआयपी',
+  RD: 'आरडी',
   OTHER: 'इतर',
   'Add investment': 'गुंतवणूक जोडा',
   'No investments tracked yet.': 'अजून कोणतीही गुंतवणूक नोंदवलेली नाही.',
@@ -256,6 +263,28 @@ export const mr = {
   'Needed so group members can pay you directly when they accept a contribution request.':
     'गट सदस्यांनी योगदान विनंती स्वीकारल्यावर तुम्हाला थेट पैसे पाठवण्यासाठी हे आवश्यक आहे.',
   'Saved.': 'जतन झाले.',
+  'Change photo': 'फोटो बदला',
+  'Remove photo': 'फोटो काढा',
+  'Total across all accounts': 'सर्व खात्यांची एकूण रक्कम',
+  'Hidden by default — needs your secret PIN to reveal.': 'डीफॉल्टनुसार लपवलेले — पाहण्यासाठी तुमचा गुप्त पिन आवश्यक.',
+  Hide: 'लपवा',
+  'Enter PIN': 'पिन टाका',
+  Unlock: 'उघडा',
+  'Set a PIN below': 'खाली पिन सेट करा',
+  'Change secret PIN': 'गुप्त पिन बदला',
+  'Set a secret PIN': 'गुप्त पिन सेट करा',
+  'A 4-6 digit PIN just for revealing your total balance — separate from your login password.':
+    'फक्त एकूण रक्कम पाहण्यासाठी ४-६ अंकी पिन — तुमच्या लॉगिन पासवर्डपेक्षा वेगळा.',
+  'Current password': 'सध्याचा पासवर्ड',
+  'New PIN (4-6 digits)': 'नवीन पिन (४-६ अंक)',
+  'Confirm PIN': 'पिनची पुष्टी करा',
+  'Save PIN': 'पिन जतन करा',
+  "PINs don't match": 'पिन जुळत नाहीत',
+  'Incorrect PIN': 'चुकीचा पिन',
+  'Change password': 'पासवर्ड बदला',
+  'New password': 'नवीन पासवर्ड',
+  'Confirm new password': 'नवीन पासवर्डची पुष्टी करा',
+  "New passwords don't match": 'नवीन पासवर्ड जुळत नाहीत',
 
   // due reminders popup
   'Did you pay these?': 'तुम्ही हे भरले का?',
