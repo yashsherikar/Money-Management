@@ -34,10 +34,23 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
-      <aside className="md:w-56 bg-white border-b md:border-b-0 md:border-r border-slate-200 p-4 flex md:flex-col gap-2">
-        <div className="flex items-center gap-2 mb-2">
-          <img src="/logo-32.png" alt="" className="w-6 h-6" />
-          <span className="font-bold text-brand-600 text-lg hidden md:inline">Money Manager</span>
+      <aside className="md:w-60 bg-white border-b md:border-b-0 md:border-r border-slate-200 p-3 md:p-4 flex flex-col md:flex-col gap-2">
+        <div className="flex items-center justify-between gap-2 mb-1 md:mb-2">
+          <div className="flex items-center gap-2">
+            <img src="/logo-32.png" alt="" className="w-7 h-7 rounded-lg" />
+            <span className="font-bold text-brand-700 text-lg hidden md:inline tracking-tight">Money Manager</span>
+          </div>
+          <div className="flex items-center gap-1 md:hidden">
+            <button onClick={() => setLang(lang === 'mr' ? 'en' : 'mr')} className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" title={lang === 'mr' ? 'English' : 'मराठी'}>
+              {lang === 'mr' ? 'EN' : 'मर'}
+            </button>
+            <button onClick={toggleTheme} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100" title={t('Toggle dark mode')}>
+              🌙
+            </button>
+            <button onClick={handleLogout} className="w-8 h-8 flex items-center justify-center rounded-lg text-red-600 hover:bg-red-50" title={t('Log out')}>
+              ⏻
+            </button>
+          </div>
         </div>
         <nav className="flex md:flex-col gap-1 flex-1 overflow-x-auto">
           {links.map((l) => (
@@ -46,8 +59,8 @@ export default function Layout({ children }) {
               to={l.to}
               end={l.to === '/'}
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${
-                  isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+                `px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap border-l-2 transition-colors ${
+                  isActive ? 'bg-brand-50 text-brand-700 border-brand-500' : 'text-slate-600 hover:bg-slate-100 border-transparent'
                 }`
               }
             >

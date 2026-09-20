@@ -2,6 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Premium visual pass: a distinct type family plus elevation/focus polish on the
+   handful of class combos every page already shares, so it applies app-wide
+   without touching each page. */
+body {
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.bg-white.border.border-slate-200.rounded-xl {
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px -14px rgba(15, 23, 42, 0.16);
+}
+
+.bg-brand-500.text-white.rounded-md,
+.bg-emerald-500.text-white.rounded-md {
+  box-shadow: 0 1px 2px rgba(47, 111, 237, 0.25), 0 6px 16px -6px rgba(47, 111, 237, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.bg-brand-500.text-white.rounded-md:hover,
+.bg-emerald-500.text-white.rounded-md:hover {
+  transform: translateY(-1px);
+}
+.bg-brand-500.text-white.rounded-md:active,
+.bg-emerald-500.text-white.rounded-md:active {
+  transform: translateY(0);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #2f6fed;
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15);
+}
+.dark input:focus, .dark select:focus, .dark textarea:focus {
+  border-color: #7ba4f5;
+  box-shadow: 0 0 0 3px rgba(123, 164, 245, 0.2);
+}
+
 /* Dark mode: manual overrides for the recurring neutral utility classes,
    scoped under .dark (toggled on <html>, see index.html + Layout.jsx),
    so every page reskins without touching each component. */
