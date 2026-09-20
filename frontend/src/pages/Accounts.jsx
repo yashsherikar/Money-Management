@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
-const TYPES = ['BANK', 'CASH', 'CARD']
+const TYPES = ['BANK', 'CASH', 'CARD', 'EMERGENCY_FUND']
 
 export default function Accounts() {
   const { t } = useLanguage()
   const [accounts, setAccounts] = useState([])
-  const [form, setForm] = useState({ name: '', type: 'BANK', balance: '' })
+  const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false })
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
 
@@ -21,7 +21,7 @@ export default function Accounts() {
   }, [])
 
   function resetForm() {
-    setForm({ name: '', type: 'BANK', balance: '' })
+    setForm({ name: '', type: 'BANK', balance: '', isPrimary: false })
     setEditingId(null)
   }
 
@@ -29,7 +29,12 @@ export default function Accounts() {
     e.preventDefault()
     setError('')
     try {
-      const payload = { name: form.name, type: form.type, balance: form.balance === '' ? 0 : Number(form.balance) }
+      const payload = {
+        name: form.name,
+        type: form.type,
+        balance: form.balance === '' ? 0 : Number(form.balance),
+        isPrimary: form.isPrimary,
+      }
       if (editingId) {
         await client.put(`/accounts/${editingId}`, payload)
       } else {
@@ -44,7 +49,7 @@ export default function Accounts() {
 
   function startEdit(acc) {
     setEditingId(acc.id)
-    setForm({ name: acc.name, type: acc.type, balance: acc.balance })
+    setForm({ name: acc.name, type: acc.type, balance: acc.balance, isPrimary: acc.isPrimary })
   }
 
   async function handleDelete(id) {
@@ -92,6 +97,13 @@ export default function Accounts() {
             </button>
           )}
         </div>
+        <label className="flex items-center gap-2 text-sm text-slate-600 md:col-span-4">
+          <input type="checkbox" checked={form.isPrimary} onChange={(e) => setForm({ ...form, isPrimary: e.target.checked })} />
+          {t('Primary account — default for daily spending, EMIs, and everything else you log')}
+        </label>
+        {form.type === 'EMERGENCY_FUND' && (
+          <p className="text-xs text-amber-600 md:col-span-4">{t('Emergency fund money is excluded from affordability checks — it never counts as spendable.')}</p>
+        )}
         {error && <div className="md:col-span-4 text-sm text-red-600">{error}</div>}
       </form>
 
@@ -100,7 +112,10 @@ export default function Accounts() {
         {accounts.map((acc) => (
           <div key={acc.id} className="p-4 flex items-center justify-between">
             <div>
-              <div className="font-medium">{acc.name}</div>
+              <div className="font-medium">
+                {acc.name}
+                {acc.isPrimary && <span className="ml-2 text-xs text-brand-600 font-medium">{t('PRIMARY')}</span>}
+              </div>
               <div className="text-xs text-slate-500">{t(acc.type)}</div>
             </div>
             <div className="flex items-center gap-4">

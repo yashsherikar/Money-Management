@@ -11,13 +11,15 @@ public class AccountDtos {
     public record AccountRequest(
             @NotBlank String name,
             @NotNull AccountType type,
-            BigDecimal balance
+            BigDecimal balance,
+            boolean isPrimary
     ) {}
 
     public record AccountResponse(
             Long id,
             String name,
             AccountType type,
-            BigDecimal balance
+            BigDecimal balance,
+            boolean isPrimary
     ) {}
 }

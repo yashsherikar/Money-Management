@@ -31,6 +31,7 @@ public class AccountService {
         account.setName(request.name());
         account.setType(request.type());
         account.setBalance(request.balance() == null ? BigDecimal.ZERO : request.balance());
+        applyPrimary(user, account, request.isPrimary());
         return toResponse(accountRepository.save(account));
     }
 
@@ -41,7 +42,19 @@ public class AccountService {
         if (request.balance() != null) {
             account.setBalance(request.balance());
         }
+        applyPrimary(user, account, request.isPrimary());
         return toResponse(accountRepository.save(account));
+    }
+
+    /** Only one account can be primary — demote whichever one currently holds it before promoting this one. */
+    private void applyPrimary(User user, Account account, boolean makePrimary) {
+        if (makePrimary && !account.isPrimary()) {
+            accountRepository.findByUserIdAndPrimaryTrue(user.getId()).ifPresent(existing -> {
+                existing.setPrimary(false);
+                accountRepository.save(existing);
+            });
+        }
+        account.setPrimary(makePrimary);
     }
 
     public void delete(User user, Long id) {
@@ -55,6 +68,6 @@ public class AccountService {
     }
 
     private AccountResponse toResponse(Account a) {
-        return new AccountResponse(a.getId(), a.getName(), a.getType(), a.getBalance());
+        return new AccountResponse(a.getId(), a.getName(), a.getType(), a.getBalance(), a.isPrimary());
     }
 }

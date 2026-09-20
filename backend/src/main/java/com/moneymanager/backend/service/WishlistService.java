@@ -69,7 +69,7 @@ public class WishlistService {
     public AffordabilityResponse affordability(User user, Long id) {
         WishlistItem item = getOwned(user, id);
         BigDecimal availableFunds = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .filter(a -> a.getType() != AccountType.CARD)
+                .filter(a -> a.getType() != AccountType.CARD && a.getType() != AccountType.EMERGENCY_FUND)
                 .map(Account::getBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -139,9 +139,11 @@ public class WishlistService {
         if (cr.getStatus() != ContributionStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "request must be accepted before it can be marked paid");
         }
-        Account account = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .filter(a -> a.getType() != AccountType.CARD)
-                .findFirst()
+        List<Account> spendableAccounts = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
+                .filter(a -> a.getType() != AccountType.CARD && a.getType() != AccountType.EMERGENCY_FUND)
+                .toList();
+        Account account = spendableAccounts.stream().filter(Account::isPrimary).findFirst()
+                .or(() -> spendableAccounts.stream().findFirst())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "add a bank/cash account first to receive this"));
 
         Transaction txn = new Transaction();
