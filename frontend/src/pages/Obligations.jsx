@@ -7,29 +7,38 @@ function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
 }
 
-const TABS = ['EMI', 'Fixed Deposits', 'Insurance']
+const TABS = ['EMI', 'Fixed Deposits', 'Insurance', 'Emergency Fund']
 
 const emiEmpty = { accountId: '', loanName: '', principal: '', interestRate: '', tenureMonths: '', emiAmount: '', startDate: new Date().toISOString().slice(0, 10), dueDay: '5' }
 const fdEmpty = { bankName: '', principal: '', interestRate: '', startDate: new Date().toISOString().slice(0, 10), maturityDate: '', maturityAmount: '' }
 const insEmpty = { type: 'HEALTH', policyName: '', premiumAmount: '', dueDate: '', frequency: 'YEARLY' }
+const efEmpty = { sourceAccountId: '', targetAccountId: '', amount: '', dayOfMonth: '1' }
 
 export default function Obligations() {
   const { t } = useLanguage()
   const [tab, setTab] = useState('EMI')
   const [summary, setSummary] = useState(null)
   const [accounts, setAccounts] = useState([])
+  const [emergencyPlans, setEmergencyPlans] = useState([])
 
   const [emiForm, setEmiForm] = useState(emiEmpty)
   const [fdForm, setFdForm] = useState(fdEmpty)
   const [insForm, setInsForm] = useState(insEmpty)
+  const [efForm, setEfForm] = useState(efEmpty)
   const [error, setError] = useState('')
 
   async function load() {
-    const [obRes, accRes] = await Promise.all([client.get('/obligations/summary'), client.get('/accounts')])
+    const [obRes, accRes, efRes] = await Promise.all([
+      client.get('/obligations/summary'),
+      client.get('/accounts'),
+      client.get('/emergency-fund'),
+    ])
     setSummary(obRes.data)
     setAccounts(accRes.data)
+    setEmergencyPlans(efRes.data)
     const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
     if (primary) setEmiForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
+    if (primary) setEfForm((f) => (f.sourceAccountId ? f : { ...f, sourceAccountId: String(primary.id) }))
   }
 
   useEffect(() => {
@@ -98,6 +107,29 @@ export default function Obligations() {
   async function deleteEmi(id) { await client.delete(`/emis/${id}`); load() }
   async function deleteFd(id) { await client.delete(`/fixed-deposits/${id}`); load() }
   async function deleteIns(id) { await client.delete(`/insurance-policies/${id}`); load() }
+
+  async function submitEf(e) {
+    e.preventDefault()
+    setError('')
+    try {
+      await client.post('/emergency-fund', {
+        sourceAccountId: Number(efForm.sourceAccountId),
+        targetAccountId: Number(efForm.targetAccountId),
+        amount: Number(efForm.amount),
+        dayOfMonth: Number(efForm.dayOfMonth),
+      })
+      setEfForm((f) => ({ ...efEmpty, sourceAccountId: f.sourceAccountId }))
+      load()
+    } catch (err) {
+      setError(err.response?.data?.message || t('Save failed'))
+    }
+  }
+
+  async function toggleEfActive(p) { await client.patch(`/emergency-fund/${p.id}/active?active=${!p.active}`); load() }
+  async function confirmEf(id) { await client.post(`/emergency-fund/${id}/confirm`); load() }
+  async function deleteEf(id) { await client.delete(`/emergency-fund/${id}`); load() }
+
+  const emergencyFundAccounts = accounts.filter((a) => a.type === 'EMERGENCY_FUND')
 
   if (!summary) return <div className="text-slate-500">Loading...</div>
 
@@ -224,6 +256,49 @@ export default function Obligations() {
                 <div className="flex items-center gap-4">
                   <div className="font-semibold">{money(p.premiumAmount)}</div>
                   <button onClick={() => deleteIns(p.id)} className="text-sm text-red-600">{t('Delete')}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {tab === 'Emergency Fund' && (
+        <div>
+          {emergencyFundAccounts.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6 text-sm text-slate-500">
+              {t('Create an account with type "Emergency fund" first (Profile → Accounts), then set up a monthly contribution here.')}
+            </div>
+          ) : (
+            <form onSubmit={submitEf} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <select required value={efForm.sourceAccountId} onChange={(e) => setEfForm({ ...efForm, sourceAccountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
+                <option value="">{t('From account...')}</option>
+                {accounts.filter((a) => a.type !== 'EMERGENCY_FUND').map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <select required value={efForm.targetAccountId} onChange={(e) => setEfForm({ ...efForm, targetAccountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
+                <option value="">{t('To emergency fund...')}</option>
+                {emergencyFundAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={efForm.amount} onChange={(e) => setEfForm({ ...efForm, amount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+              <input required type="number" min="1" max="28" placeholder={t('Day of month (1-28)')} value={efForm.dayOfMonth} onChange={(e) => setEfForm({ ...efForm, dayOfMonth: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+              <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-4">{t('Add monthly contribution')}</button>
+            </form>
+          )}
+          <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+            {emergencyPlans.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No emergency fund contributions set up.')}</div>}
+            {emergencyPlans.map((p) => (
+              <div key={p.id} className="p-4 flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <div className="font-medium">
+                    {p.sourceAccountName} → {p.targetAccountName}
+                    {!p.active && <span className="ml-2 text-xs text-slate-400">({t('paused')})</span>}
+                  </div>
+                  <div className="text-xs text-slate-500">{t('day')} {p.dayOfMonth} {t('of every month')}</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="font-semibold text-brand-700">{money(p.amount)}</div>
+                  <button onClick={() => confirmEf(p.id)} className="text-sm text-emerald-600">{t('Confirm this month')}</button>
+                  <button onClick={() => toggleEfActive(p)} className="text-sm text-brand-600">{p.active ? t('Pause') : t('Resume')}</button>
+                  <button onClick={() => deleteEf(p.id)} className="text-sm text-red-600">{t('Delete')}</button>
                 </div>
               </div>
             ))}

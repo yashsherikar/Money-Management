@@ -1,6 +1,7 @@
 package com.moneymanager.backend.scheduler;
 
 import com.moneymanager.backend.entity.*;
+import com.moneymanager.backend.repository.EmergencyFundPlanRepository;
 import com.moneymanager.backend.repository.EmiRepository;
 import com.moneymanager.backend.repository.FixedDepositRepository;
 import com.moneymanager.backend.repository.InsurancePolicyRepository;
@@ -10,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -28,21 +30,25 @@ public class DueDateReminderScheduler {
     private final EmiRepository emiRepository;
     private final InsurancePolicyRepository insurancePolicyRepository;
     private final FixedDepositRepository fixedDepositRepository;
+    private final EmergencyFundPlanRepository emergencyFundPlanRepository;
     private final PushService pushService;
 
     public DueDateReminderScheduler(RecurringTransactionRepository recurringTransactionRepository,
                                      EmiRepository emiRepository,
                                      InsurancePolicyRepository insurancePolicyRepository,
                                      FixedDepositRepository fixedDepositRepository,
+                                     EmergencyFundPlanRepository emergencyFundPlanRepository,
                                      PushService pushService) {
         this.recurringTransactionRepository = recurringTransactionRepository;
         this.emiRepository = emiRepository;
         this.insurancePolicyRepository = insurancePolicyRepository;
         this.fixedDepositRepository = fixedDepositRepository;
+        this.emergencyFundPlanRepository = emergencyFundPlanRepository;
         this.pushService = pushService;
     }
 
     @Scheduled(cron = "0 0 8 * * *")
+    @Transactional
     public void sendDueTomorrowReminders() {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
@@ -77,6 +83,16 @@ public class DueDateReminderScheduler {
             if (tomorrow.equals(fd.getMaturityDate())) {
                 pushService.notifyUser(fd.getUser(), "FD maturing tomorrow",
                         fd.getBankName() + " FD (" + money(fd.getMaturityAmount()) + ") matures tomorrow");
+            }
+        }
+
+        for (EmergencyFundPlan plan : emergencyFundPlanRepository.findByActiveTrue()) {
+            if (currentMonth.equals(plan.getLastLoggedMonth())) continue;
+            int effectiveDay = Math.min(plan.getDayOfMonth(), tomorrow.lengthOfMonth());
+            if (tomorrow.getDayOfMonth() == effectiveDay) {
+                pushService.notifyUser(plan.getUser(), "Emergency fund contribution tomorrow",
+                        money(plan.getAmount()) + " moves from " + plan.getSourceAccount().getName()
+                                + " to " + plan.getTargetAccount().getName() + " tomorrow");
             }
         }
 

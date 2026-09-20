@@ -164,7 +164,7 @@ export default function Profile() {
     setRevealError('')
     try {
       const { data } = await client.post('/profile/reveal-balance', { pin: revealPin })
-      setBalanceValue(data.totalBalance)
+      setBalanceValue(data)
       setBalanceRevealed(true)
       setAskingPin(false)
     } catch (err) {
@@ -239,9 +239,26 @@ export default function Profile() {
         <p className="text-xs text-slate-500 mb-4">{t('Hidden by default — needs your secret PIN to reveal.')}</p>
 
         {balanceRevealed ? (
-          <div className="flex items-center justify-between">
-            <div className="text-2xl font-bold tracking-tight">{money(balanceValue)}</div>
-            <button onClick={hideBalance} className="text-sm text-slate-500">{t('Hide')}</button>
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold tracking-tight">{money(balanceValue.totalBalance)}</div>
+              <button onClick={hideBalance} className="text-sm text-slate-500">{t('Hide')}</button>
+            </div>
+            {Number(balanceValue.udharOwed) > 0 && (
+              <p className="text-xs text-slate-500 mt-2">
+                {t('Cash in accounts')}: {money(balanceValue.cashOnHand)} · {t('Udhar you owe')}: −{money(balanceValue.udharOwed)}
+              </p>
+            )}
+            {balanceValue.byAccount?.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-100 space-y-1.5">
+                {balanceValue.byAccount.map((a) => (
+                  <div key={a.accountId} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600">{a.accountName}</span>
+                    <span className="font-medium">{money(a.balance)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : askingPin ? (
           <form onSubmit={submitReveal} className="flex items-center gap-2">

@@ -1,10 +1,12 @@
 package com.moneymanager.backend.dto;
 
+import com.moneymanager.backend.entity.AccountType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public class ProfileDtos {
 
@@ -26,5 +28,7 @@ public class ProfileDtos {
 
     public record RevealBalanceRequest(@NotBlank String pin) {}
 
-    public record TotalBalanceResponse(BigDecimal totalBalance) {}
+    public record AccountBalance(Long accountId, String accountName, AccountType type, BigDecimal balance) {}
+
+    public record TotalBalanceResponse(BigDecimal totalBalance, BigDecimal cashOnHand, BigDecimal udharOwed, List<AccountBalance> byAccount) {}
 }
