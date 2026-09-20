@@ -42,12 +42,14 @@ public class SplitBillService {
         this.pushService = pushService;
     }
 
+    @Transactional(readOnly = true)
     public List<SplitBillResponse> list(User user) {
         return splitBillRepository.findByUserIdOrderByBillDateDesc(user.getId()).stream()
                 .map(this::toResponse).toList();
     }
 
     /** Split bills where the current user is a linked participant — what they owe, and to whom. */
+    @Transactional(readOnly = true)
     public List<OwedSplitBillResponse> owedByMe(User user) {
         return participantRepository.findByUserIdOrderByIdDesc(user.getId()).stream()
                 .map(p -> {
