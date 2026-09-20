@@ -109,16 +109,19 @@ public class WishlistService {
         }).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<ContributionRequestResponse> incomingRequests(User user) {
         return contributionRequestRepository.findByMemberIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(this::toResponse).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<ContributionRequestResponse> outgoingRequests(User user) {
         return contributionRequestRepository.findByRequesterIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(this::toResponse).toList();
     }
 
+    @Transactional
     public ContributionRequestResponse respond(User user, Long requestId, boolean accept) {
         ContributionRequest cr = contributionRequestRepository.findByIdAndMemberId(requestId, user.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "request not found"));

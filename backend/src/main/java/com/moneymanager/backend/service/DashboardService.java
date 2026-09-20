@@ -7,6 +7,7 @@ import com.moneymanager.backend.entity.User;
 import com.moneymanager.backend.repository.CategoryRepository;
 import com.moneymanager.backend.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -26,6 +27,7 @@ public class DashboardService {
         this.categoryRepository = categoryRepository;
     }
 
+    @Transactional(readOnly = true)
     public DashboardSummary summary(User user, YearMonth month) {
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
@@ -59,7 +61,7 @@ public class DashboardService {
         List<Transaction> nonEssential = transactionRepository.findNonEssentialExpenses(user.getId(), from, to);
         BigDecimal unwantedTotal = nonEssential.stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         List<UnwantedExpense> unwanted = nonEssential.stream()
-                .map(t -> new UnwantedExpense(t.getId(), t.getDescription(), t.getCategory().getName(), t.getAmount()))
+                .map(t -> new UnwantedExpense(t.getId(), t.getDescription(), t.getCategory() == null ? null : t.getCategory().getName(), t.getAmount()))
                 .toList();
 
         return new DashboardSummary(income, expense, savings, savingsRate, prevSavings, savingsChangePercent,

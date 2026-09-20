@@ -34,6 +34,7 @@ public class RecurringTransactionService {
         this.transactionRepository = transactionRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<RecurringResponse> list(User user) {
         return recurringTransactionRepository.findByUserIdOrderByDayOfMonthAsc(user.getId()).stream()
                 .map(this::toResponse).toList();
@@ -63,6 +64,7 @@ public class RecurringTransactionService {
     }
 
     /** Active recurring transactions whose day has arrived this month and haven't been confirmed yet. */
+    @Transactional(readOnly = true)
     public List<RecurringResponse> due(User user) {
         LocalDate today = LocalDate.now();
         String currentMonth = YearMonth.from(today).toString();
