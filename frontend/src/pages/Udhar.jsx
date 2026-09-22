@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import StatCard from '../components/StatCard.jsx'
+import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -15,6 +16,7 @@ export default function Udhar() {
   const [summary, setSummary] = useState(null)
   const [accounts, setAccounts] = useState([])
   const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
 
   async function loadAll() {
@@ -38,7 +40,7 @@ export default function Udhar() {
     e.preventDefault()
     setError('')
     try {
-      await client.post('/udhar', {
+      const payload = {
         accountId: form.accountId ? Number(form.accountId) : null,
         contactName: form.contactName,
         type: form.type,
@@ -47,12 +49,36 @@ export default function Udhar() {
         txnDate: form.txnDate,
         dueDate: form.dueDate || null,
         contactEmail: form.contactEmail || null,
-      })
-      setForm(emptyForm)
+      }
+      if (editingId) {
+        await client.put(`/udhar/${editingId}`, payload)
+      } else {
+        await client.post('/udhar', payload)
+      }
+      resetForm()
       loadAll()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
     }
+  }
+
+  function resetForm() {
+    setForm(emptyForm)
+    setEditingId(null)
+  }
+
+  function startEdit(entry) {
+    setEditingId(entry.id)
+    setForm({
+      accountId: entry.accountId ? String(entry.accountId) : '',
+      contactName: entry.contactName,
+      type: entry.type,
+      amount: String(entry.amount),
+      note: entry.note || '',
+      txnDate: entry.txnDate,
+      dueDate: entry.dueDate || '',
+      contactEmail: entry.contactEmail || '',
+    })
   }
 
   async function handleSettle(id) {
@@ -109,7 +135,12 @@ export default function Udhar() {
           onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
           className="px-3 py-2 border border-slate-300 rounded-md"
         />
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-3">{t('Add entry')}</button>
+        <div className="flex gap-2 md:col-span-3">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingId ? t('Update entry') : t('Add entry')}</button>
+          {editingId && (
+            <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+          )}
+        </div>
         {error && <div className="md:col-span-3 text-sm text-red-600">{error}</div>}
       </form>
 
@@ -126,7 +157,7 @@ export default function Udhar() {
                 {e.txnDate}{e.dueDate ? ` · ${t('due')} ${e.dueDate}` : ''}{e.accountName ? ` · ${e.accountName}` : ''}{e.note ? ` · ${e.note}` : ''}
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className={`font-semibold ${e.type === 'LENT' ? 'text-emerald-600' : 'text-red-600'}`}>{money(e.amount)}</div>
               {!e.settled && e.type === 'BORROWED' && e.contactLinked && (
                 <button onClick={() => handleRequestSettle(e.id)} className="text-sm text-brand-600">
@@ -134,7 +165,10 @@ export default function Udhar() {
                 </button>
               )}
               {!e.settled && <button onClick={() => handleSettle(e.id)} className="text-sm text-brand-600">{t('Settle')}</button>}
-              <button onClick={() => handleDelete(e.id)} className="text-sm text-red-600">{t('Delete')}</button>
+              {!e.settled && (
+                <button onClick={() => startEdit(e)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+              )}
+              <button onClick={() => handleDelete(e.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
             </div>
           </div>
         ))}

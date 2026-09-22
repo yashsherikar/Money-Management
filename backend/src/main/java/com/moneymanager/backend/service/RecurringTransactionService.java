@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -143,8 +144,13 @@ public class RecurringTransactionService {
         if (r.recurrenceType() == RecurrenceType.MONTHLY && r.dayOfMonth() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dayOfMonth is required for a monthly recurrence");
         }
-        if (r.recurrenceType() == RecurrenceType.INTERVAL_DAYS && r.intervalDays() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "intervalDays is required for an every-N-days recurrence");
+        if (r.recurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            if (r.lastDoneDate() == null || r.nextDueDate() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "lastDoneDate and nextDueDate are required for an every-N-days recurrence");
+            }
+            if (!r.nextDueDate().isAfter(r.lastDoneDate())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nextDueDate must be after lastDoneDate");
+            }
         }
         rt.setAccount(account);
         rt.setCategory(category);
@@ -153,7 +159,12 @@ public class RecurringTransactionService {
         rt.setDescription(r.description());
         rt.setRecurrenceType(r.recurrenceType());
         rt.setDayOfMonth(r.recurrenceType() == RecurrenceType.MONTHLY ? r.dayOfMonth() : null);
-        rt.setIntervalDays(r.recurrenceType() == RecurrenceType.INTERVAL_DAYS ? r.intervalDays() : null);
+        if (r.recurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            rt.setLastLoggedDate(r.lastDoneDate());
+            rt.setIntervalDays((int) ChronoUnit.DAYS.between(r.lastDoneDate(), r.nextDueDate()));
+        } else {
+            rt.setIntervalDays(null);
+        }
     }
 
     private RecurringResponse toResponse(RecurringTransaction rt) {

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import StatCard from '../components/StatCard.jsx'
+import { EditIcon, DeleteIcon } from '../components/icons.jsx'
+import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -26,6 +28,9 @@ export default function Obligations() {
   const [insForm, setInsForm] = useState(insEmpty)
   const [efForm, setEfForm] = useState(efEmpty)
   const [error, setError] = useState('')
+  const [editingEmiId, setEditingEmiId] = useState(null)
+  const [editingFdId, setEditingFdId] = useState(null)
+  const [editingInsId, setEditingInsId] = useState(null)
 
   async function load() {
     const [obRes, accRes, efRes] = await Promise.all([
@@ -49,7 +54,7 @@ export default function Obligations() {
     e.preventDefault()
     setError('')
     try {
-      await client.post('/emis', {
+      const payload = {
         accountId: Number(emiForm.accountId),
         loanName: emiForm.loanName,
         principal: Number(emiForm.principal),
@@ -58,49 +63,104 @@ export default function Obligations() {
         emiAmount: Number(emiForm.emiAmount),
         startDate: emiForm.startDate,
         dueDay: Number(emiForm.dueDay),
-      })
+      }
+      if (editingEmiId) {
+        await client.put(`/emis/${editingEmiId}`, payload)
+      } else {
+        await client.post('/emis', payload)
+      }
       setEmiForm(emiEmpty)
+      setEditingEmiId(null)
       load()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
     }
+  }
+
+  function startEditEmi(e) {
+    setEditingEmiId(e.id)
+    setEmiForm({
+      accountId: String(e.accountId),
+      loanName: e.loanName,
+      principal: String(e.principal),
+      interestRate: String(e.interestRate),
+      tenureMonths: String(e.tenureMonths),
+      emiAmount: String(e.emiAmount),
+      startDate: e.startDate,
+      dueDay: String(e.dueDay),
+    })
   }
 
   async function submitFd(e) {
     e.preventDefault()
     setError('')
     try {
-      await client.post('/fixed-deposits', {
+      const payload = {
         bankName: fdForm.bankName,
         principal: Number(fdForm.principal),
         interestRate: Number(fdForm.interestRate),
         startDate: fdForm.startDate,
         maturityDate: fdForm.maturityDate,
         maturityAmount: Number(fdForm.maturityAmount),
-      })
+      }
+      if (editingFdId) {
+        await client.put(`/fixed-deposits/${editingFdId}`, payload)
+      } else {
+        await client.post('/fixed-deposits', payload)
+      }
       setFdForm(fdEmpty)
+      setEditingFdId(null)
       load()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
     }
   }
 
+  function startEditFd(fd) {
+    setEditingFdId(fd.id)
+    setFdForm({
+      bankName: fd.bankName,
+      principal: String(fd.principal),
+      interestRate: String(fd.interestRate),
+      startDate: fd.startDate,
+      maturityDate: fd.maturityDate,
+      maturityAmount: String(fd.maturityAmount),
+    })
+  }
+
   async function submitIns(e) {
     e.preventDefault()
     setError('')
     try {
-      await client.post('/insurance-policies', {
+      const payload = {
         type: insForm.type,
         policyName: insForm.policyName,
         premiumAmount: Number(insForm.premiumAmount),
         dueDate: insForm.dueDate,
         frequency: insForm.frequency,
-      })
+      }
+      if (editingInsId) {
+        await client.put(`/insurance-policies/${editingInsId}`, payload)
+      } else {
+        await client.post('/insurance-policies', payload)
+      }
       setInsForm(insEmpty)
+      setEditingInsId(null)
       load()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
     }
+  }
+
+  function startEditIns(p) {
+    setEditingInsId(p.id)
+    setInsForm({
+      type: p.type,
+      policyName: p.policyName,
+      premiumAmount: String(p.premiumAmount),
+      dueDate: p.dueDate,
+      frequency: p.frequency,
+    })
   }
 
   async function toggleEmiActive(e) { await client.patch(`/emis/${e.id}/active?active=${!e.active}`); load() }
@@ -175,8 +235,13 @@ export default function Obligations() {
             <input required type="number" placeholder={t('Tenure (months)')} value={emiForm.tenureMonths} onChange={(e) => setEmiForm({ ...emiForm, tenureMonths: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
             <input required type="number" step="0.01" placeholder={t('EMI amount')} value={emiForm.emiAmount} onChange={(e) => setEmiForm({ ...emiForm, emiAmount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
             <input required type="date" value={emiForm.startDate} onChange={(e) => setEmiForm({ ...emiForm, startDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" min="1" max="28" placeholder={t('Due day (1-28)')} value={emiForm.dueDay} onChange={(e) => setEmiForm({ ...emiForm, dueDay: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-4">{t('Add EMI')}</button>
+            <DayOfMonthSelect value={emiForm.dueDay} onChange={(e) => setEmiForm({ ...emiForm, dueDay: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+            <div className="flex gap-2 md:col-span-4">
+              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingEmiId ? t('Update EMI') : t('Add EMI')}</button>
+              {editingEmiId && (
+                <button type="button" onClick={() => { setEmiForm(emiEmpty); setEditingEmiId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+              )}
+            </div>
           </form>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {summary.emis.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No EMIs tracked.')}</div>}
@@ -186,10 +251,11 @@ export default function Obligations() {
                   <div className="font-medium">{e.loanName}</div>
                   <div className="text-xs text-slate-500">{e.tenureMonths} {t('months')} · {t('due day')} {e.dueDay} · {t(e.active ? 'active' : 'inactive')}</div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="font-semibold">{money(e.emiAmount)}/{t('mo')}</div>
                   <button onClick={() => toggleEmiActive(e)} className="text-sm text-brand-600">{e.active ? t('Pause') : t('Resume')}</button>
-                  <button onClick={() => deleteEmi(e.id)} className="text-sm text-red-600">{t('Delete')}</button>
+                  <button onClick={() => startEditEmi(e)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+                  <button onClick={() => deleteEmi(e.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
                 </div>
               </div>
             ))}
@@ -206,7 +272,12 @@ export default function Obligations() {
             <input required type="date" value={fdForm.startDate} onChange={(e) => setFdForm({ ...fdForm, startDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
             <input required type="date" placeholder={t('Maturity date')} value={fdForm.maturityDate} onChange={(e) => setFdForm({ ...fdForm, maturityDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
             <input required type="number" step="0.01" placeholder={t('Maturity amount')} value={fdForm.maturityAmount} onChange={(e) => setFdForm({ ...fdForm, maturityAmount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-3">{t('Add FD')}</button>
+            <div className="flex gap-2 md:col-span-3">
+              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingFdId ? t('Update FD') : t('Add FD')}</button>
+              {editingFdId && (
+                <button type="button" onClick={() => { setFdForm(fdEmpty); setEditingFdId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+              )}
+            </div>
           </form>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {summary.fixedDeposits.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No fixed deposits tracked.')}</div>}
@@ -216,9 +287,10 @@ export default function Obligations() {
                   <div className="font-medium">{fd.bankName}</div>
                   <div className="text-xs text-slate-500">{t('Matures')} {fd.maturityDate} {fd.maturingSoon && <span className="text-amber-600 font-medium">· {t('maturing soon')}</span>}</div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="font-semibold">{money(fd.maturityAmount)}</div>
-                  <button onClick={() => deleteFd(fd.id)} className="text-sm text-red-600">{t('Delete')}</button>
+                  <button onClick={() => startEditFd(fd)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+                  <button onClick={() => deleteFd(fd.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
                 </div>
               </div>
             ))}
@@ -243,7 +315,12 @@ export default function Obligations() {
               <option value="HALF_YEARLY">{t('HALF_YEARLY')}</option>
               <option value="YEARLY">{t('YEARLY')}</option>
             </select>
-            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{t('Add policy')}</button>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingInsId ? t('Update policy') : t('Add policy')}</button>
+              {editingInsId && (
+                <button type="button" onClick={() => { setInsForm(insEmpty); setEditingInsId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+              )}
+            </div>
           </form>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {summary.insurancePolicies.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No policies tracked.')}</div>}
@@ -253,9 +330,10 @@ export default function Obligations() {
                   <div className="font-medium">{p.policyName}</div>
                   <div className="text-xs text-slate-500">{t(p.type)} · {t(p.frequency)} · {t('due')} {p.dueDate} {p.dueSoon && <span className="text-amber-600 font-medium">· {t('due soon')}</span>}</div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="font-semibold">{money(p.premiumAmount)}</div>
-                  <button onClick={() => deleteIns(p.id)} className="text-sm text-red-600">{t('Delete')}</button>
+                  <button onClick={() => startEditIns(p)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+                  <button onClick={() => deleteIns(p.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
                 </div>
               </div>
             ))}
@@ -279,7 +357,7 @@ export default function Obligations() {
                 {emergencyFundAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
               <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={efForm.amount} onChange={(e) => setEfForm({ ...efForm, amount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-              <input required type="number" min="1" max="28" placeholder={t('Day of month (1-28)')} value={efForm.dayOfMonth} onChange={(e) => setEfForm({ ...efForm, dayOfMonth: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+              <DayOfMonthSelect value={efForm.dayOfMonth} onChange={(e) => setEfForm({ ...efForm, dayOfMonth: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
               <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-4">{t('Add monthly contribution')}</button>
             </form>
           )}
@@ -294,11 +372,11 @@ export default function Obligations() {
                   </div>
                   <div className="text-xs text-slate-500">{t('day')} {p.dayOfMonth} {t('of every month')}</div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="font-semibold text-brand-700">{money(p.amount)}</div>
                   <button onClick={() => confirmEf(p.id)} className="text-sm text-emerald-600">{t('Confirm this month')}</button>
                   <button onClick={() => toggleEfActive(p)} className="text-sm text-brand-600">{p.active ? t('Pause') : t('Resume')}</button>
-                  <button onClick={() => deleteEf(p.id)} className="text-sm text-red-600">{t('Delete')}</button>
+                  <button onClick={() => deleteEf(p.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
                 </div>
               </div>
             ))}

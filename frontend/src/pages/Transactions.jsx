@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import { categoryIcon } from '../utils/categoryIcon.js'
+import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
@@ -174,12 +175,12 @@ export default function Transactions() {
                 <div className="text-xs text-slate-500">{txn.txnDate} · {txn.accountName}{txn.categoryName ? ` · ${txn.categoryName}` : ''}</div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className={`font-semibold ${txn.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>
                 {txn.type === 'INCOME' ? '+' : '-'}₹{Number(txn.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
-              <button onClick={() => startEdit(txn)} className="text-sm text-brand-600">{t('Edit')}</button>
-              <button onClick={() => handleDelete(txn.id)} className="text-sm text-red-600">{t('Delete')}</button>
+              <button onClick={() => startEdit(txn)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+              <button onClick={() => handleDelete(txn.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
             </div>
           </div>
         ))}

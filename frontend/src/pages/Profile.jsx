@@ -58,6 +58,8 @@ export default function Profile() {
   const [pushOn, setPushOn] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState('')
+  const [testResults, setTestResults] = useState(null)
+  const [testBusy, setTestBusy] = useState(false)
 
   function load() {
     client.get('/profile').then((res) => {
@@ -86,6 +88,19 @@ export default function Profile() {
       setPushError(err.message || t('Save failed'))
     } finally {
       setPushBusy(false)
+    }
+  }
+
+  async function sendTestPush() {
+    setTestBusy(true)
+    setTestResults(null)
+    try {
+      const { data } = await client.post('/push/test')
+      setTestResults(data)
+    } catch (err) {
+      setTestResults({ vapidConfigured: false, subscriptionCount: 0, results: [err.response?.data?.message || t('Save failed')] })
+    } finally {
+      setTestBusy(false)
     }
   }
 
@@ -310,6 +325,25 @@ export default function Profile() {
               )}
             </div>
             {pushError && <div className="mt-2 text-sm text-red-600">{pushError}</div>}
+            {pushOn && (
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <button
+                  onClick={sendTestPush}
+                  disabled={testBusy}
+                  className="text-sm text-brand-600 disabled:opacity-60"
+                >
+                  {testBusy ? t('Sending...') : t('Send test notification')}
+                </button>
+                <p className="text-xs text-slate-500 mt-1">{t('Close the app fully after enabling, then send a test — a real notification should still arrive.')}</p>
+                {testResults && (
+                  <div className="mt-2 text-xs bg-slate-50 rounded p-2 space-y-1">
+                    <div>{t('VAPID configured on server')}: {testResults.vapidConfigured ? t('yes') : t('NO')}</div>
+                    <div>{t('Subscriptions found')}: {testResults.subscriptionCount}</div>
+                    {testResults.results.map((r, i) => <div key={i} className="text-slate-600">{r}</div>)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <form onSubmit={handlePinSubmit} className="bg-white border border-slate-200 rounded-xl p-6">

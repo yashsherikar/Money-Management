@@ -17,7 +17,8 @@ public class RecurringTransactionDtos {
             @NotBlank String description,
             @NotNull RecurrenceType recurrenceType,
             @Min(1) @Max(28) Integer dayOfMonth,
-            @Min(1) Integer intervalDays
+            LocalDate lastDoneDate,
+            LocalDate nextDueDate
     ) {}
 
     public record RecurringResponse(

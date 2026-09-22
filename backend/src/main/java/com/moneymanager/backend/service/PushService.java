@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.security.Security;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Sends Web Push notifications (browser/phone push, works even when the app is closed). */
@@ -86,6 +87,38 @@ public class PushService {
                 log.warn("push notification failed for user {}: {}", user.getId(), e.getMessage());
             }
         }
+    }
+
+    /** Self-test: sends a real push and reports exactly what happened per subscription, instead of swallowing errors. */
+    public TestPushResponse sendTest(User user) {
+        List<PushSubscription> subs = subscriptionRepository.findByUserId(user.getId());
+        List<String> results = new ArrayList<>();
+        if (!enabled) {
+            results.add("VAPID keys not configured on the server");
+            return new TestPushResponse(false, subs.size(), results);
+        }
+        if (subs.isEmpty()) {
+            results.add("No push subscription found for this account — turn on the Push notifications toggle in Profile first");
+            return new TestPushResponse(true, 0, results);
+        }
+        String payload = "{\"title\":" + jsonString("Test notification") + ",\"body\":" + jsonString("If you see this, push notifications work.") + "}";
+        for (PushSubscription sub : subs) {
+            try {
+                Subscription subscription = new Subscription(sub.getEndpoint(),
+                        new Subscription.Keys(sub.getP256dh(), sub.getAuth()));
+                var response = webPush.send(new Notification(subscription, payload));
+                int status = response.getStatusLine().getStatusCode();
+                if (status == HttpStatus.NOT_FOUND.value() || status == HttpStatus.GONE.value()) {
+                    subscriptionRepository.delete(sub);
+                    results.add("Subscription " + sub.getId() + ": expired (removed) — re-enable push in Profile");
+                } else {
+                    results.add("Subscription " + sub.getId() + ": sent, status " + status);
+                }
+            } catch (Exception e) {
+                results.add("Subscription " + sub.getId() + ": FAILED — " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            }
+        }
+        return new TestPushResponse(true, subs.size(), results);
     }
 
     private String jsonString(String value) {

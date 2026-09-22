@@ -79,6 +79,41 @@ public class UdharService {
     }
 
     @Transactional
+    public UdharResponse update(User user, Long id, UdharRequest request) {
+        UdharEntry entry = getOwned(user, id);
+        if (entry.isSettled()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot edit a settled entry");
+        }
+        if (entry.getAccount() != null) {
+            applyBalance(entry.getAccount(), initialDelta(entry).negate());
+        }
+
+        entry.setContactName(request.contactName());
+        entry.setType(request.type());
+        entry.setAmount(request.amount());
+        entry.setNote(request.note());
+        entry.setTxnDate(request.txnDate());
+        entry.setDueDate(request.dueDate());
+
+        entry.setContactEmail(null);
+        entry.setContactUser(null);
+        if (StringUtils.hasText(request.contactEmail())) {
+            String email = request.contactEmail().trim();
+            entry.setContactEmail(email);
+            userRepository.findByIgnoreCaseEmail(email).ifPresent(entry::setContactUser);
+        }
+
+        if (request.accountId() != null) {
+            Account account = getOwnedAccount(user, request.accountId());
+            entry.setAccount(account);
+            applyBalance(account, initialDelta(entry));
+        } else {
+            entry.setAccount(null);
+        }
+        return toResponse(udharEntryRepository.save(entry));
+    }
+
+    @Transactional
     public void delete(User user, Long id) {
         UdharEntry entry = getOwned(user, id);
         if (!entry.isSettled() && entry.getAccount() != null) {
