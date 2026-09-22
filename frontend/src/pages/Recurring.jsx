@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
+import { categoryIcon } from '../utils/categoryIcon.js'
+import { EditIcon, DeleteIcon } from '../components/icons.jsx'
+import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
 }
 
-const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', recurrenceType: 'MONTHLY', dayOfMonth: '1', intervalDays: '28' }
+const today = new Date().toISOString().slice(0, 10)
+const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', recurrenceType: 'MONTHLY', dayOfMonth: '1', lastDoneDate: today, nextDueDate: '' }
 
 export default function Recurring() {
   const { t } = useLanguage()
@@ -14,6 +18,7 @@ export default function Recurring() {
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -39,7 +44,7 @@ export default function Recurring() {
     e.preventDefault()
     setError('')
     try {
-      await client.post('/recurring-transactions', {
+      const payload = {
         accountId: Number(form.accountId),
         categoryId: form.categoryId ? Number(form.categoryId) : null,
         type: form.type,
@@ -47,13 +52,42 @@ export default function Recurring() {
         description: form.description,
         recurrenceType: form.recurrenceType,
         dayOfMonth: form.recurrenceType === 'MONTHLY' ? Number(form.dayOfMonth) : null,
-        intervalDays: form.recurrenceType === 'INTERVAL_DAYS' ? Number(form.intervalDays) : null,
-      })
-      setForm(emptyForm)
+        lastDoneDate: form.recurrenceType === 'INTERVAL_DAYS' ? form.lastDoneDate : null,
+        nextDueDate: form.recurrenceType === 'INTERVAL_DAYS' ? form.nextDueDate : null,
+      }
+      if (editingId) {
+        await client.put(`/recurring-transactions/${editingId}`, payload)
+      } else {
+        await client.post('/recurring-transactions', payload)
+      }
+      resetForm()
       loadAll()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
     }
+  }
+
+  function resetForm() {
+    setForm(emptyForm)
+    setEditingId(null)
+  }
+
+  function startEdit(item) {
+    setEditingId(item.id)
+    const lastDoneDate = item.nextDueDate && item.intervalDays
+      ? new Date(new Date(item.nextDueDate).getTime() - item.intervalDays * 86400000).toISOString().slice(0, 10)
+      : today
+    setForm({
+      accountId: String(item.accountId),
+      categoryId: item.categoryId ? String(item.categoryId) : '',
+      type: item.type,
+      amount: String(item.amount),
+      description: item.description,
+      recurrenceType: item.recurrenceType,
+      dayOfMonth: item.dayOfMonth ? String(item.dayOfMonth) : '1',
+      lastDoneDate,
+      nextDueDate: item.nextDueDate || '',
+    })
   }
 
   async function toggleActive(item) {
@@ -125,31 +159,51 @@ export default function Recurring() {
           <option value="INTERVAL_DAYS">{t('Every N days (e.g. 28-day recharge)')}</option>
         </select>
         {form.recurrenceType === 'MONTHLY' ? (
-          <input required type="number" min="1" max="28" placeholder={t('Day of month (1-28)')} value={form.dayOfMonth} onChange={(e) => setForm({ ...form, dayOfMonth: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+          <DayOfMonthSelect value={form.dayOfMonth} onChange={(e) => setForm({ ...form, dayOfMonth: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
         ) : (
-          <input required type="number" min="1" placeholder={t('Every how many days')} value={form.intervalDays} onChange={(e) => setForm({ ...form, intervalDays: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+          <>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">{t('Last done on')}</label>
+              <input required type="date" value={form.lastDoneDate} onChange={(e) => setForm({ ...form, lastDoneDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">{t('Next due date')}</label>
+              <input required type="date" min={form.lastDoneDate} value={form.nextDueDate} onChange={(e) => setForm({ ...form, nextDueDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md" />
+            </div>
+          </>
         )}
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-2">{t('Add recurring transaction')}</button>
+        <div className="flex gap-2 md:col-span-2">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">
+            {editingId ? t('Update recurring transaction') : t('Add recurring transaction')}
+          </button>
+          {editingId && (
+            <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+          )}
+        </div>
         {error && <div className="md:col-span-3 text-sm text-red-600">{error}</div>}
       </form>
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {items.length === 0 && <div className="p-4 text-sm text-slate-500">{t('Nothing set up yet.')}</div>}
         {items.map((r) => (
-          <div key={r.id} className="p-4 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <div className="font-medium">{r.description}{!r.active && <span className="ml-2 text-xs text-slate-400">({t('paused')})</span>}</div>
-              <div className="text-xs text-slate-500">
-                {r.recurrenceType === 'INTERVAL_DAYS'
-                  ? `${t('every')} ${r.intervalDays} ${t('days')} · ${t('next')} ${r.nextDueDate}`
-                  : `${t('day')} ${r.dayOfMonth} ${t('of every month')}`}
-                {' · '}{r.accountName}{r.categoryName ? ` · ${r.categoryName}` : ''}
+          <div key={r.id} className="p-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xl leading-none">{categoryIcon(r.categoryName, r.type)}</span>
+              <div>
+                <div className="font-medium">{r.description}{!r.active && <span className="ml-2 text-xs text-slate-400">({t('paused')})</span>}</div>
+                <div className="text-xs text-slate-500">
+                  {r.recurrenceType === 'INTERVAL_DAYS'
+                    ? `${t('every')} ${r.intervalDays} ${t('days')} · ${t('next')} ${r.nextDueDate}`
+                    : `${t('day')} ${r.dayOfMonth} ${t('of every month')}`}
+                  {' · '}{r.accountName}{r.categoryName ? ` · ${r.categoryName}` : ''}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <div className={`font-semibold ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>{money(r.amount)}</div>
               <button onClick={() => toggleActive(r)} className="text-sm text-brand-600">{r.active ? t('Pause') : t('Resume')}</button>
-              <button onClick={() => handleDelete(r.id)} className="text-sm text-red-600">{t('Delete')}</button>
+              <button onClick={() => startEdit(r)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+              <button onClick={() => handleDelete(r.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
             </div>
           </div>
         ))}

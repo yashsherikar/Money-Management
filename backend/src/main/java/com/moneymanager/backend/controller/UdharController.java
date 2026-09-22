@@ -34,6 +34,11 @@ public class UdharController {
         return udharService.create(user, request);
     }
 
+    @PutMapping("/{id}")
+    public UdharResponse update(@AuthenticationPrincipal User user, @PathVariable Long id, @Valid @RequestBody UdharRequest request) {
+        return udharService.update(user, id, request);
+    }
+
     @PatchMapping("/{id}/settle")
     public UdharResponse settle(@AuthenticationPrincipal User user, @PathVariable Long id) {
         return udharService.settle(user, id);

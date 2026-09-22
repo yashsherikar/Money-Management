@@ -36,4 +36,9 @@ public class PushController {
     public void unsubscribe(@AuthenticationPrincipal User user, @Valid @RequestBody UnsubscribeRequest request) {
         pushService.unsubscribe(user, request);
     }
+
+    @PostMapping("/test")
+    public TestPushResponse test(@AuthenticationPrincipal User user) {
+        return pushService.sendTest(user);
+    }
 }
