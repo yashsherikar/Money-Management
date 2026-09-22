@@ -77,6 +77,7 @@ public class WishlistService {
                 .or(() -> spendableAccounts.stream().findFirst())
                 .orElse(null);
         BigDecimal accountFunds = primary == null ? BigDecimal.ZERO : primary.getBalance();
+        BigDecimal minimumBalance = primary == null ? BigDecimal.ZERO : primary.getMinimumBalance();
 
         // Money borrowed (udhar) sits in the account balance too, but it isn't really spendable —
         // it has to go back out, so it doesn't count as funds available for a new purchase.
@@ -84,7 +85,7 @@ public class WishlistService {
                 .filter(e -> !e.isSettled() && e.getType() == UdharType.BORROWED)
                 .map(UdharEntry::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal availableFunds = accountFunds.subtract(owedToOthers);
+        BigDecimal availableFunds = accountFunds.subtract(owedToOthers).subtract(minimumBalance);
 
         BigDecimal shortfall = item.getPrice().subtract(availableFunds).max(BigDecimal.ZERO);
         boolean affordable = shortfall.compareTo(BigDecimal.ZERO) == 0;

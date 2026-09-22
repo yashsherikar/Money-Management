@@ -244,9 +244,11 @@ export default function Profile() {
               <div className="text-2xl font-bold tracking-tight">{money(balanceValue.totalBalance)}</div>
               <button onClick={hideBalance} className="text-sm text-slate-500">{t('Hide')}</button>
             </div>
-            {Number(balanceValue.udharOwed) > 0 && (
+            {(Number(balanceValue.udharOwed) > 0 || Number(balanceValue.lockedMinimumBalance) > 0) && (
               <p className="text-xs text-slate-500 mt-2">
-                {t('Cash in accounts')}: {money(balanceValue.cashOnHand)} · {t('Udhar you owe')}: −{money(balanceValue.udharOwed)}
+                {t('Cash in accounts')}: {money(balanceValue.cashOnHand)}
+                {Number(balanceValue.udharOwed) > 0 && ` · ${t('Udhar you owe')}: −${money(balanceValue.udharOwed)}`}
+                {Number(balanceValue.lockedMinimumBalance) > 0 && ` · ${t('Locked minimum balance')}: −${money(balanceValue.lockedMinimumBalance)}`}
               </p>
             )}
             {balanceValue.byAccount?.length > 0 && (

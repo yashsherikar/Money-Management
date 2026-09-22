@@ -63,26 +63,45 @@ public class RecurringTransactionService {
         return toResponse(recurringTransactionRepository.save(rt));
     }
 
-    /** Active recurring transactions whose day has arrived this month and haven't been confirmed yet. */
+    /** Active recurring transactions whose day/cycle has arrived and haven't been confirmed yet. */
     @Transactional(readOnly = true)
     public List<RecurringResponse> due(User user) {
         LocalDate today = LocalDate.now();
-        String currentMonth = YearMonth.from(today).toString();
         return recurringTransactionRepository.findByUserIdOrderByDayOfMonthAsc(user.getId()).stream()
                 .filter(RecurringTransaction::isActive)
-                .filter(rt -> !currentMonth.equals(rt.getLastLoggedMonth()))
-                .filter(rt -> today.getDayOfMonth() >= Math.min(rt.getDayOfMonth(), today.lengthOfMonth()))
+                .filter(rt -> isDue(rt, today))
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private boolean isDue(RecurringTransaction rt, LocalDate today) {
+        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            return !today.isBefore(nextDueDate(rt));
+        }
+        String currentMonth = YearMonth.from(today).toString();
+        if (currentMonth.equals(rt.getLastLoggedMonth())) return false;
+        return today.getDayOfMonth() >= Math.min(rt.getDayOfMonth(), today.lengthOfMonth());
+    }
+
+    /** For INTERVAL_DAYS plans: the next date the cycle renews, counting forward from the last confirm (or creation). */
+    private LocalDate nextDueDate(RecurringTransaction rt) {
+        LocalDate anchor = rt.getLastLoggedDate() != null
+                ? rt.getLastLoggedDate()
+                : rt.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate();
+        return anchor.plusDays(rt.getIntervalDays());
     }
 
     /** User confirmed the payment actually happened: logs the transaction and moves the account balance. */
     @Transactional
     public RecurringResponse confirmPaid(User user, Long id) {
         RecurringTransaction rt = get(user, id);
-        String currentMonth = YearMonth.from(LocalDate.now()).toString();
-        if (currentMonth.equals(rt.getLastLoggedMonth())) {
+        LocalDate today = LocalDate.now();
+        String currentMonth = YearMonth.from(today).toString();
+        if (rt.getRecurrenceType() == RecurrenceType.MONTHLY && currentMonth.equals(rt.getLastLoggedMonth())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already confirmed for this month");
+        }
+        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS && today.isBefore(nextDueDate(rt))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not due yet");
         }
 
         Account account = rt.getAccount();
@@ -93,14 +112,18 @@ public class RecurringTransactionService {
         txn.setType(rt.getType());
         txn.setAmount(rt.getAmount());
         txn.setDescription(rt.getDescription());
-        txn.setTxnDate(LocalDate.now());
+        txn.setTxnDate(today);
         transactionRepository.save(txn);
 
         BigDecimal delta = rt.getType() == TransactionType.INCOME ? rt.getAmount() : rt.getAmount().negate();
         account.setBalance(account.getBalance().add(delta));
         accountRepository.save(account);
 
-        rt.setLastLoggedMonth(currentMonth);
+        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            rt.setLastLoggedDate(today);
+        } else {
+            rt.setLastLoggedMonth(currentMonth);
+        }
         return toResponse(recurringTransactionRepository.save(rt));
     }
 
@@ -117,12 +140,20 @@ public class RecurringTransactionService {
             category = categoryRepository.findVisibleById(r.categoryId(), user.getId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "category not found"));
         }
+        if (r.recurrenceType() == RecurrenceType.MONTHLY && r.dayOfMonth() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dayOfMonth is required for a monthly recurrence");
+        }
+        if (r.recurrenceType() == RecurrenceType.INTERVAL_DAYS && r.intervalDays() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "intervalDays is required for an every-N-days recurrence");
+        }
         rt.setAccount(account);
         rt.setCategory(category);
         rt.setType(r.type());
         rt.setAmount(r.amount());
         rt.setDescription(r.description());
-        rt.setDayOfMonth(r.dayOfMonth());
+        rt.setRecurrenceType(r.recurrenceType());
+        rt.setDayOfMonth(r.recurrenceType() == RecurrenceType.MONTHLY ? r.dayOfMonth() : null);
+        rt.setIntervalDays(r.recurrenceType() == RecurrenceType.INTERVAL_DAYS ? r.intervalDays() : null);
     }
 
     private RecurringResponse toResponse(RecurringTransaction rt) {
@@ -135,7 +166,10 @@ public class RecurringTransactionService {
                 rt.getType(),
                 rt.getAmount(),
                 rt.getDescription(),
+                rt.getRecurrenceType(),
                 rt.getDayOfMonth(),
+                rt.getIntervalDays(),
+                rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS ? nextDueDate(rt) : null,
                 rt.isActive()
         );
     }

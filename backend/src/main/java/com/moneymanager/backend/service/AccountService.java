@@ -31,6 +31,7 @@ public class AccountService {
         account.setName(request.name());
         account.setType(request.type());
         account.setBalance(request.balance() == null ? BigDecimal.ZERO : request.balance());
+        account.setMinimumBalance(request.minimumBalance() == null ? BigDecimal.ZERO : request.minimumBalance());
         applyPrimary(user, account, request.isPrimary());
         return toResponse(accountRepository.save(account));
     }
@@ -41,6 +42,9 @@ public class AccountService {
         account.setType(request.type());
         if (request.balance() != null) {
             account.setBalance(request.balance());
+        }
+        if (request.minimumBalance() != null) {
+            account.setMinimumBalance(request.minimumBalance());
         }
         applyPrimary(user, account, request.isPrimary());
         return toResponse(accountRepository.save(account));
@@ -68,6 +72,6 @@ public class AccountService {
     }
 
     private AccountResponse toResponse(Account a) {
-        return new AccountResponse(a.getId(), a.getName(), a.getType(), a.getBalance(), a.isPrimary());
+        return new AccountResponse(a.getId(), a.getName(), a.getType(), a.getBalance(), a.isPrimary(), a.getMinimumBalance());
     }
 }

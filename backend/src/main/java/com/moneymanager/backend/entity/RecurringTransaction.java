@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "recurring_transactions")
@@ -41,13 +42,25 @@ public class RecurringTransaction {
     @Column(nullable = false)
     private String description;
 
-    @Column(name = "day_of_month", nullable = false)
+    @Column(name = "day_of_month")
     private Integer dayOfMonth;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recurrence_type", nullable = false)
+    private RecurrenceType recurrenceType = RecurrenceType.MONTHLY;
+
+    /** For RecurrenceType.INTERVAL_DAYS — e.g. 28 for a 28-day recharge validity. */
+    @Column(name = "interval_days")
+    private Integer intervalDays;
+
+    /** For RecurrenceType.INTERVAL_DAYS — the anchor date the next due date counts forward from. */
+    @Column(name = "last_logged_date")
+    private LocalDate lastLoggedDate;
 
     @Column(nullable = false)
     private boolean active = true;
 
-    /** Year-month (yyyy-MM) this was last auto-logged, prevents double-logging. */
+    /** Year-month (yyyy-MM) this was last auto-logged (MONTHLY type), prevents double-logging. */
     @Column(name = "last_logged_month")
     private String lastLoggedMonth;
 

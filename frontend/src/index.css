@@ -22,7 +22,7 @@ body {
 
 .bg-brand-500.text-white.rounded-md,
 .bg-emerald-500.text-white.rounded-md {
-  box-shadow: 0 1px 2px rgba(47, 111, 237, 0.25), 0 6px 16px -6px rgba(47, 111, 237, 0.45);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25), 0 6px 16px -6px rgba(37, 99, 235, 0.45);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .bg-brand-500.text-white.rounded-md:hover,
@@ -45,7 +45,7 @@ input::placeholder, textarea::placeholder {
   color: #94a3b8;
 }
 .dark input::placeholder, .dark textarea::placeholder {
-  color: #64748b;
+  color: #475569;
 }
 select {
   appearance: none;
@@ -56,12 +56,12 @@ select {
 }
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: #2f6fed;
-  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15);
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 .dark input:focus, .dark select:focus, .dark textarea:focus {
-  border-color: #7ba4f5;
-  box-shadow: 0 0 0 3px rgba(123, 164, 245, 0.2);
+  border-color: #60A5FA;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
 }
 
 button {
@@ -82,11 +82,11 @@ button:active:not(:disabled) {
 /* Dark mode: manual overrides for the recurring neutral utility classes,
    scoped under .dark (toggled on <html>, see index.html + Layout.jsx),
    so every page reskins without touching each component. */
-.dark .bg-white { background-color: #1e293b; }
-.dark .bg-slate-50 { background-color: #0f172a; }
-.dark .bg-slate-100 { background-color: #334155; }
-.dark .bg-brand-50 { background-color: rgba(47, 111, 237, 0.15); }
-.dark .bg-brand-100 { background-color: rgba(47, 111, 237, 0.2); }
+.dark .bg-white { background-color: #1E293B; }
+.dark .bg-slate-50 { background-color: #0F172A; }
+.dark .bg-slate-100 { background-color: #1A2744; }
+.dark .bg-brand-50 { background-color: rgba(59, 130, 246, 0.15); }
+.dark .bg-brand-100 { background-color: rgba(59, 130, 246, 0.2); }
 .dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1); }
 
 .dark .border-slate-100 { border-color: #334155; }
@@ -94,16 +94,16 @@ button:active:not(:disabled) {
 .dark .border-slate-300 { border-color: #475569; }
 .dark .divide-slate-100 > * + * { border-color: #334155; }
 
-.dark .text-slate-900 { color: #f1f5f9; }
-.dark .text-slate-700 { color: #cbd5e1; }
-.dark .text-slate-600 { color: #94a3b8; }
-.dark .text-slate-500 { color: #94a3b8; }
-.dark .text-slate-400 { color: #64748b; }
-.dark .text-brand-700 { color: #93c5fd; }
+.dark .text-slate-900 { color: #F1F5F9; }
+.dark .text-slate-700 { color: #94A3B8; }
+.dark .text-slate-600 { color: #94A3B8; }
+.dark .text-slate-500 { color: #94A3B8; }
+.dark .text-slate-400 { color: #475569; }
+.dark .text-brand-700 { color: #60A5FA; }
 
 .dark input,
 .dark select,
 .dark textarea {
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: #0F172A;
+  color: #F1F5F9;
 }

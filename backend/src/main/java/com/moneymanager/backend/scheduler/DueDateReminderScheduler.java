@@ -55,6 +55,16 @@ public class DueDateReminderScheduler {
         String currentMonth = YearMonth.from(today).toString();
 
         for (RecurringTransaction rt : recurringTransactionRepository.findByActiveTrue()) {
+            if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+                LocalDate anchor = rt.getLastLoggedDate() != null
+                        ? rt.getLastLoggedDate()
+                        : rt.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate();
+                if (tomorrow.equals(anchor.plusDays(rt.getIntervalDays()))) {
+                    pushService.notifyUser(rt.getUser(), "Expiring tomorrow",
+                            rt.getDescription() + " (" + money(rt.getAmount()) + ") expires/renews tomorrow");
+                }
+                continue;
+            }
             if (currentMonth.equals(rt.getLastLoggedMonth())) continue;
             int effectiveDay = Math.min(rt.getDayOfMonth(), tomorrow.lengthOfMonth());
             if (tomorrow.getDayOfMonth() == effectiveDay) {

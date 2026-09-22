@@ -1,0 +1,1 @@
+ALTER TABLE accounts ADD COLUMN minimum_balance NUMERIC(14,2) NOT NULL DEFAULT 0;

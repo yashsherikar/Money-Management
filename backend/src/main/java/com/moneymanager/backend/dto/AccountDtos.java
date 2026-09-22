@@ -12,7 +12,8 @@ public class AccountDtos {
             @NotBlank String name,
             @NotNull AccountType type,
             BigDecimal balance,
-            boolean isPrimary
+            boolean isPrimary,
+            BigDecimal minimumBalance
     ) {}
 
     public record AccountResponse(
@@ -20,6 +21,7 @@ public class AccountDtos {
             String name,
             AccountType type,
             BigDecimal balance,
-            boolean isPrimary
+            boolean isPrimary,
+            BigDecimal minimumBalance
     ) {}
 }

@@ -7,7 +7,7 @@ const TYPES = ['BANK', 'CASH', 'CARD', 'EMERGENCY_FUND']
 export default function AccountsManager() {
   const { t } = useLanguage()
   const [accounts, setAccounts] = useState([])
-  const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false })
+  const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '' })
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
 
@@ -21,7 +21,7 @@ export default function AccountsManager() {
   }, [])
 
   function resetForm() {
-    setForm({ name: '', type: 'BANK', balance: '', isPrimary: false })
+    setForm({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '' })
     setEditingId(null)
   }
 
@@ -34,6 +34,7 @@ export default function AccountsManager() {
         type: form.type,
         balance: form.balance === '' ? 0 : Number(form.balance),
         isPrimary: form.isPrimary,
+        minimumBalance: form.minimumBalance === '' ? 0 : Number(form.minimumBalance),
       }
       if (editingId) {
         await client.put(`/accounts/${editingId}`, payload)
@@ -49,7 +50,7 @@ export default function AccountsManager() {
 
   function startEdit(acc) {
     setEditingId(acc.id)
-    setForm({ name: acc.name, type: acc.type, balance: acc.balance, isPrimary: acc.isPrimary })
+    setForm({ name: acc.name, type: acc.type, balance: acc.balance, isPrimary: acc.isPrimary, minimumBalance: acc.minimumBalance })
   }
 
   async function handleDelete(id) {
@@ -87,6 +88,15 @@ export default function AccountsManager() {
           onChange={(e) => setForm({ ...form, balance: e.target.value })}
           className="px-3 py-2 border border-slate-300 rounded-md"
         />
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder={t('Minimum balance to maintain (optional)')}
+          value={form.minimumBalance}
+          onChange={(e) => setForm({ ...form, minimumBalance: e.target.value })}
+          className="px-3 py-2 border border-slate-300 rounded-md"
+        />
         <div className="flex gap-2">
           <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-2 font-medium">
             {editingId ? t('Update') : t('Add')}
@@ -101,6 +111,9 @@ export default function AccountsManager() {
           <input type="checkbox" checked={form.isPrimary} onChange={(e) => setForm({ ...form, isPrimary: e.target.checked })} />
           {t('Primary account — default for daily spending, EMIs, and everything else you log')}
         </label>
+        <p className="text-xs text-slate-500 md:col-span-4 -mt-2">
+          {t('Minimum balance is excluded from affordability checks and your "Total across all accounts" figure — it never counts as spendable.')}
+        </p>
         {form.type === 'EMERGENCY_FUND' && (
           <p className="text-xs text-amber-600 md:col-span-4">{t('Emergency fund money is excluded from affordability checks — it never counts as spendable.')}</p>
         )}
@@ -116,7 +129,10 @@ export default function AccountsManager() {
                 {acc.name}
                 {acc.isPrimary && <span className="ml-2 text-xs text-brand-600 font-medium">{t('PRIMARY')}</span>}
               </div>
-              <div className="text-xs text-slate-500">{t(acc.type)}</div>
+              <div className="text-xs text-slate-500">
+                {t(acc.type)}
+                {Number(acc.minimumBalance) > 0 && ` · ${t('min balance')} ₹${Number(acc.minimumBalance).toLocaleString('en-IN')}`}
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <div className={`font-semibold ${acc.balance < 0 ? 'text-red-600' : 'text-slate-900'}`}>

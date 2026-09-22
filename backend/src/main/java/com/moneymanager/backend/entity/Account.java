@@ -36,6 +36,10 @@ public class Account {
     @Column(name = "is_primary", nullable = false)
     private boolean primary = false;
 
+    /** Bank-mandated minimum balance — excluded from spendable/affordability calculations. */
+    @Column(name = "minimum_balance", nullable = false)
+    private BigDecimal minimumBalance = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 }
