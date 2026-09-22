@@ -70,9 +70,14 @@ public class PushService {
 
     /** Best-effort: a push failure never blocks the action that triggered it (e.g. creating a request). */
     public void notifyUser(User user, String title, String body) {
+        notifyUser(user, title, body, "/");
+    }
+
+    /** @param url in-app page to open when the notification (or its View action) is tapped. */
+    public void notifyUser(User user, String title, String body, String url) {
         if (!enabled) return;
         List<PushSubscription> subs = subscriptionRepository.findByUserId(user.getId());
-        String payload = "{\"title\":" + jsonString(title) + ",\"body\":" + jsonString(body) + "}";
+        String payload = "{\"title\":" + jsonString(title) + ",\"body\":" + jsonString(body) + ",\"url\":" + jsonString(url) + "}";
 
         for (PushSubscription sub : subs) {
             try {
@@ -101,7 +106,7 @@ public class PushService {
             results.add("No push subscription found for this account — turn on the Push notifications toggle in Profile first");
             return new TestPushResponse(true, 0, results);
         }
-        String payload = "{\"title\":" + jsonString("Test notification") + ",\"body\":" + jsonString("If you see this, push notifications work.") + "}";
+        String payload = "{\"title\":" + jsonString("Test notification") + ",\"body\":" + jsonString("If you see this, push notifications work.") + ",\"url\":" + jsonString("/") + "}";
         for (PushSubscription sub : subs) {
             try {
                 Subscription subscription = new Subscription(sub.getEndpoint(),

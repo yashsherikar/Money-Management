@@ -120,7 +120,7 @@ public class WishlistService {
             cr.setAmount(r.amount());
             contributionRequestRepository.save(cr);
             pushService.notifyUser(member, "Money request",
-                    user.getName() + " is asking for ₹" + r.amount() + " for \"" + item.getName() + "\"");
+                    user.getName() + " is asking for ₹" + r.amount() + " for \"" + item.getName() + "\"", "/requests");
             return toResponse(cr);
         }).toList();
     }
