@@ -5,7 +5,7 @@ import StatCard from '../components/StatCard.jsx'
 import { categoryIcon } from '../utils/categoryIcon.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
-const COLORS = ['#2f6fed', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
+const COLORS = ['#2563EB', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`

@@ -30,5 +30,5 @@ public class ProfileDtos {
 
     public record AccountBalance(Long accountId, String accountName, AccountType type, BigDecimal balance) {}
 
-    public record TotalBalanceResponse(BigDecimal totalBalance, BigDecimal cashOnHand, BigDecimal udharOwed, List<AccountBalance> byAccount) {}
+    public record TotalBalanceResponse(BigDecimal totalBalance, BigDecimal cashOnHand, BigDecimal udharOwed, BigDecimal lockedMinimumBalance, List<AccountBalance> byAccount) {}
 }

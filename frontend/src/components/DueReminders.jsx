@@ -41,7 +41,11 @@ export default function DueReminders() {
                 <div className="font-medium">{item.description}</div>
                 <div className="font-semibold">{money(item.amount)}</div>
               </div>
-              <div className="text-xs text-slate-500 mb-2">{t('Due day')} {item.dayOfMonth} {t('of this month')}</div>
+              <div className="text-xs text-slate-500 mb-2">
+                {item.recurrenceType === 'INTERVAL_DAYS'
+                  ? `${t('Every')} ${item.intervalDays} ${t('days')}`
+                  : `${t('Due day')} ${item.dayOfMonth} ${t('of this month')}`}
+              </div>
 
               {expandedId === item.id && (
                 <div className="text-sm text-slate-600 bg-slate-50 rounded p-2 mb-2 space-y-0.5">

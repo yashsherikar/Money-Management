@@ -125,7 +125,12 @@ public class ProfileService {
                 .map(UdharEntry::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return new TotalBalanceResponse(cashOnHand.subtract(udharOwed), cashOnHand, udharOwed, byAccount);
+        BigDecimal lockedMinimumBalance = accounts.stream()
+                .map(Account::getMinimumBalance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal total = cashOnHand.subtract(udharOwed).subtract(lockedMinimumBalance);
+        return new TotalBalanceResponse(total, cashOnHand, udharOwed, lockedMinimumBalance, byAccount);
     }
 
     private void registerFailedAttempt(User user) {
