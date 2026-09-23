@@ -110,7 +110,7 @@ public class SplitBillService {
         for (SplitBillParticipant participant : bill.getParticipants()) {
             if (participant.getUser() != null) {
                 pushService.notifyUser(participant.getUser(), "Split bill",
-                        user.getName() + " added you to \"" + bill.getTitle() + "\" — you owe ₹" + participant.getShareAmount());
+                        user.getName() + " added you to \"" + bill.getTitle() + "\" — you owe ₹" + participant.getShareAmount(), "/split-bills");
             }
         }
         return response;

@@ -61,7 +61,7 @@ public class DueDateReminderScheduler {
                         : rt.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate();
                 if (tomorrow.equals(anchor.plusDays(rt.getIntervalDays()))) {
                     pushService.notifyUser(rt.getUser(), "Expiring tomorrow",
-                            rt.getDescription() + " (" + money(rt.getAmount()) + ") expires/renews tomorrow");
+                            rt.getDescription() + " (" + money(rt.getAmount()) + ") expires/renews tomorrow", "/recurring");
                 }
                 continue;
             }
@@ -69,7 +69,7 @@ public class DueDateReminderScheduler {
             int effectiveDay = Math.min(rt.getDayOfMonth(), tomorrow.lengthOfMonth());
             if (tomorrow.getDayOfMonth() == effectiveDay) {
                 pushService.notifyUser(rt.getUser(), "Due tomorrow",
-                        rt.getDescription() + " (" + money(rt.getAmount()) + ") is due tomorrow");
+                        rt.getDescription() + " (" + money(rt.getAmount()) + ") is due tomorrow", "/recurring");
             }
         }
 
@@ -78,21 +78,21 @@ public class DueDateReminderScheduler {
             int effectiveDay = Math.min(emi.getDueDay(), tomorrow.lengthOfMonth());
             if (tomorrow.getDayOfMonth() == effectiveDay) {
                 pushService.notifyUser(emi.getUser(), "EMI due tomorrow",
-                        emi.getLoanName() + " EMI (" + money(emi.getEmiAmount()) + ") is due tomorrow");
+                        emi.getLoanName() + " EMI (" + money(emi.getEmiAmount()) + ") is due tomorrow", "/obligations");
             }
         }
 
         for (InsurancePolicy policy : insurancePolicyRepository.findAll()) {
             if (policy.isActive() && tomorrow.equals(policy.getDueDate())) {
                 pushService.notifyUser(policy.getUser(), "Premium due tomorrow",
-                        policy.getPolicyName() + " premium (" + money(policy.getPremiumAmount()) + ") is due tomorrow");
+                        policy.getPolicyName() + " premium (" + money(policy.getPremiumAmount()) + ") is due tomorrow", "/obligations");
             }
         }
 
         for (FixedDeposit fd : fixedDepositRepository.findAll()) {
             if (tomorrow.equals(fd.getMaturityDate())) {
                 pushService.notifyUser(fd.getUser(), "FD maturing tomorrow",
-                        fd.getBankName() + " FD (" + money(fd.getMaturityAmount()) + ") matures tomorrow");
+                        fd.getBankName() + " FD (" + money(fd.getMaturityAmount()) + ") matures tomorrow", "/obligations");
             }
         }
 
@@ -102,7 +102,7 @@ public class DueDateReminderScheduler {
             if (tomorrow.getDayOfMonth() == effectiveDay) {
                 pushService.notifyUser(plan.getUser(), "Emergency fund contribution tomorrow",
                         money(plan.getAmount()) + " moves from " + plan.getSourceAccount().getName()
-                                + " to " + plan.getTargetAccount().getName() + " tomorrow");
+                                + " to " + plan.getTargetAccount().getName() + " tomorrow", "/obligations");
             }
         }
 

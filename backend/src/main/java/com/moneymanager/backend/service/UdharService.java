@@ -152,7 +152,7 @@ public class UdharService {
         entry.setSettleRequestedAt(Instant.now());
         pushService.notifyUser(entry.getContactUser(), "Repayment reminder",
                 user.getName() + " confirmed they still owe you ₹" + entry.getAmount().toPlainString()
-                        + (StringUtils.hasText(entry.getNote()) ? " for " + entry.getNote() : ""));
+                        + (StringUtils.hasText(entry.getNote()) ? " for " + entry.getNote() : ""), "/udhar");
         return toResponse(udharEntryRepository.save(entry));
     }
 
