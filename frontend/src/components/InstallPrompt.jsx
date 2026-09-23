@@ -48,7 +48,7 @@ export default function InstallPrompt() {
 
   if (deferredPrompt) {
     return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 max-w-sm w-[calc(100%-2rem)]">
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 max-w-sm w-[calc(100%-2rem)]">
         <img src="/logo-32.png" alt="" className="w-8 h-8 rounded-md flex-shrink-0" />
         <div className="flex-1 text-sm">{t('Install Money Manager on your device for quick access')}</div>
         <button onClick={handleInstall} className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap">{t('Install')}</button>
@@ -59,7 +59,7 @@ export default function InstallPrompt() {
 
   if (isIOS()) {
     return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 max-w-sm w-[calc(100%-2rem)] text-sm">
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 flex items-center gap-3 max-w-sm w-[calc(100%-2rem)] text-sm">
         <img src="/logo-32.png" alt="" className="w-8 h-8 rounded-md flex-shrink-0" />
         <span className="flex-1">{t('To install: tap Share, then "Add to Home Screen"')}</span>
         <button onClick={dismiss} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
