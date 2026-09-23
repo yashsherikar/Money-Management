@@ -5,7 +5,7 @@ import StatCard from '../components/StatCard.jsx'
 import { categoryIcon } from '../utils/categoryIcon.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
-const COLORS = ['#2563EB', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
+const COLORS = ['#226DFF', '#00F5D4', '#f59e0b', '#FF5376', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
@@ -59,8 +59,8 @@ export default function Dashboard() {
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => money(v)} />
-                <Legend />
+                <Tooltip formatter={(v) => money(v)} contentStyle={{ background: '#1F293A', border: 'none', borderRadius: 8, color: '#F1F5F9' }} />
+                <Legend wrapperStyle={{ color: '#8A99AD' }} />
               </PieChart>
             </ResponsiveContainer>
           )}

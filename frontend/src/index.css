@@ -2,73 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Premium visual pass: a distinct type family plus elevation/focus polish on the
-   handful of class combos every page already shares, so it applies app-wide
-   without touching each page. */
+/* Dark navy design system — the app's one and only theme (no light/dark toggle).
+   Every page already shares a handful of Tailwind class combos (bg-white cards,
+   text-slate-* labels, bg-slate-50 page background, emerald/red for income/expense),
+   so re-skinning those combos here reskins the whole app without touching each page. */
+
 body {
   font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
+  background-color: #0D1117 !important;
+  color: #F1F5F9;
 }
 
 @keyframes loading-bar {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
-}
-
-.bg-white.border.border-slate-200.rounded-xl {
-  border-color: transparent;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px -14px rgba(15, 23, 42, 0.16);
-}
-
-.bg-brand-500.text-white.rounded-md,
-.bg-emerald-500.text-white.rounded-md {
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25), 0 6px 16px -6px rgba(37, 99, 235, 0.45);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-.bg-brand-500.text-white.rounded-md:hover,
-.bg-emerald-500.text-white.rounded-md:hover {
-  transform: translateY(-1px);
-}
-.bg-brand-500.text-white.rounded-md:active,
-.bg-emerald-500.text-white.rounded-md:active {
-  transform: translateY(0);
-}
-
-input, select, textarea {
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
-  font-size: 0.9375rem;
-}
-input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
-  border-color: #94a3b8;
-}
-input::placeholder, textarea::placeholder {
-  color: #94a3b8;
-}
-.dark input::placeholder, .dark textarea::placeholder {
-  color: #475569;
-}
-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.6rem center;
-  padding-right: 2.25rem;
-}
-input:focus, select:focus, textarea:focus {
-  outline: none;
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-.dark input:focus, .dark select:focus, .dark textarea:focus {
-  border-color: #60A5FA;
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
-}
-
-button {
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, background-color 0.12s ease;
-}
-button:active:not(:disabled) {
-  transform: scale(0.97);
 }
 
 @keyframes fade-in-up {
@@ -79,31 +27,98 @@ button:active:not(:disabled) {
   animation: fade-in-up 0.25s ease both;
 }
 
-/* Dark mode: manual overrides for the recurring neutral utility classes,
-   scoped under .dark (toggled on <html>, see index.html + Layout.jsx),
-   so every page reskins without touching each component. */
-.dark .bg-white { background-color: #1E293B; }
-.dark .bg-slate-50 { background-color: #0F172A; }
-.dark .bg-slate-100 { background-color: #1A2744; }
-.dark .bg-brand-50 { background-color: rgba(59, 130, 246, 0.15); }
-.dark .bg-brand-100 { background-color: rgba(59, 130, 246, 0.2); }
-.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.1); }
-
-.dark .border-slate-100 { border-color: #334155; }
-.dark .border-slate-200 { border-color: #334155; }
-.dark .border-slate-300 { border-color: #475569; }
-.dark .divide-slate-100 > * + * { border-color: #334155; }
-
-.dark .text-slate-900 { color: #F1F5F9; }
-.dark .text-slate-700 { color: #94A3B8; }
-.dark .text-slate-600 { color: #94A3B8; }
-.dark .text-slate-500 { color: #94A3B8; }
-.dark .text-slate-400 { color: #475569; }
-.dark .text-brand-700 { color: #60A5FA; }
-
-.dark input,
-.dark select,
-.dark textarea {
-  background-color: #0F172A;
-  color: #F1F5F9;
+/* Page background + cards */
+.bg-white,
+.bg-slate-100 {
+  background-color: #161D2B !important;
 }
+/* bg-slate-50 is used both as a full-page wrapper (Login/Signup) and as a muted
+   nested box inside cards (Profile, DueReminders) — the field tone works for both. */
+.bg-slate-50 { background-color: #1F293A !important; }
+.bg-brand-50 { background-color: rgba(34, 109, 255, 0.15) !important; }
+.bg-brand-100 { background-color: rgba(34, 109, 255, 0.22) !important; }
+.bg-red-50 { background-color: rgba(255, 83, 118, 0.12) !important; }
+.bg-emerald-50 { background-color: rgba(0, 245, 212, 0.1) !important; }
+
+.bg-white.border.border-slate-200.rounded-xl,
+.border.border-slate-200.rounded-xl {
+  border-color: transparent;
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+}
+
+.border-slate-100,
+.border-slate-200 { border-color: #22304A !important; }
+.border-slate-300 { border-color: #2E3F5C !important; }
+.divide-slate-100 > * + * { border-color: #22304A !important; }
+
+/* Text */
+.text-slate-900 { color: #F1F5F9 !important; }
+.text-slate-700 { color: #C4CEDB !important; }
+.text-slate-600,
+.text-slate-500 { color: #8A99AD !important; }
+.text-slate-400 { color: #5C6E82 !important; }
+.text-brand-700 { color: #4C8CFF !important; }
+
+/* Income / positive → teal, expense / negative → pink, matching the reference design's accent language */
+.text-emerald-600 { color: #00F5D4 !important; }
+.text-red-600 { color: #FF5376 !important; }
+.bg-emerald-500 { background-color: #00C9AE !important; }
+.bg-red-500 { background-color: #FF5376 !important; }
+
+/* Inputs — flat field surface, no visible border, matching the pill-field style */
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  font-size: 0.9375rem;
+  background-color: #1F293A !important;
+  color: #F1F5F9 !important;
+  border-color: transparent !important;
+}
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
+  background-color: #26314A !important;
+}
+input::placeholder, textarea::placeholder {
+  color: #5C6E82;
+}
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A99AD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  padding-right: 2.25rem;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34, 109, 255, 0.35);
+}
+
+/* Buttons */
+button {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, background-color 0.12s ease;
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.bg-brand-500.text-white,
+.bg-emerald-500.text-white {
+  box-shadow: 0 1px 2px rgba(34, 109, 255, 0.3), 0 6px 16px -6px rgba(34, 109, 255, 0.5);
+}
+.bg-brand-500.text-white:hover,
+.bg-emerald-500.text-white:hover {
+  transform: translateY(-1px);
+}
+.bg-brand-500.text-white:active,
+.bg-emerald-500.text-white:active {
+  transform: translateY(0);
+}
+.bg-brand-500.text-white.rounded-md,
+.bg-emerald-500.text-white.rounded-md {
+  border-radius: 26px !important;
+}
+
+/* Recharts renders text via SVG fill, not Tailwind classes — needs an explicit dark-theme color. */
+.recharts-text,
+.recharts-legend-item-text {
+  fill: #8A99AD !important;
+}
+
