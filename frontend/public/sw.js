@@ -20,6 +20,7 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: '/logo-192.png',
       badge: '/logo-32.png',
+      vibrate: [100, 50, 100],
       data: { url: data.url },
       actions: [{ action: 'view', title: 'View' }],
     })
