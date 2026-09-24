@@ -4,6 +4,7 @@ import { categoryIcon } from '../utils/categoryIcon.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
+import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -23,6 +24,7 @@ export default function Recurring() {
   const [error, setError] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
 
   async function loadAll() {
     const [itemsRes, accRes, catRes] = await Promise.all([
@@ -71,10 +73,12 @@ export default function Recurring() {
   function resetForm() {
     setForm(emptyForm)
     setEditingId(null)
+    setFormOpen(false)
   }
 
   function startEdit(item) {
     setEditingId(item.id)
+    setFormOpen(true)
     const lastDoneDate = item.nextDueDate && item.intervalDays
       ? new Date(new Date(item.nextDueDate).getTime() - item.intervalDays * 86400000).toISOString().slice(0, 10)
       : today
@@ -117,7 +121,8 @@ export default function Recurring() {
       <h1 className="text-2xl font-bold mb-2">{t('Recurring transactions')}</h1>
       <p className="text-sm text-slate-500 mb-6">{t('Mobile recharge, sending money to parents, rent, subscriptions, salary — anything that repeats monthly gets auto-logged on its day.')}</p>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+      <CollapsibleSection title={t('Add recurring transaction')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Field label={t('Account')}>
           <select required value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="w-full">
             <option value="">{t('Account...')}</option>
@@ -196,12 +201,11 @@ export default function Recurring() {
           <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
             {editingId ? t('Update recurring transaction') : t('Add recurring transaction')}
           </button>
-          {editingId && (
-            <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
-          )}
+          <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+      </CollapsibleSection>
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {items.length === 0 && <div className="p-4 text-sm text-slate-500">{t('Nothing set up yet.')}</div>}

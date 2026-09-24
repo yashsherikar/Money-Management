@@ -3,6 +3,7 @@ import client from '../api/client'
 import { categoryIcon } from '../utils/categoryIcon.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import Field from '../components/Field.jsx'
+import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
@@ -18,6 +19,7 @@ export default function Transactions() {
   const [error, setError] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
 
   async function loadAll() {
     const [txnRes, accRes, catRes] = await Promise.all([
@@ -39,6 +41,7 @@ export default function Transactions() {
   function resetForm() {
     setForm(emptyForm)
     setEditingId(null)
+    setFormOpen(false)
   }
 
   async function handleSubmit(e) {
@@ -67,6 +70,7 @@ export default function Transactions() {
 
   function startEdit(txn) {
     setEditingId(txn.id)
+    setFormOpen(true)
     setForm({
       accountId: String(txn.accountId),
       categoryId: txn.categoryId ? String(txn.categoryId) : '',
@@ -97,7 +101,8 @@ export default function Transactions() {
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Transactions (this month)')}</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+      <CollapsibleSection title={t('Add transaction')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Field label={t('Account')}>
           <select required value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="w-full">
             <option value="">{t('Account...')}</option>
@@ -176,12 +181,11 @@ export default function Transactions() {
           <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
             {editingId ? t('Update') : t('Add')}
           </button>
-          {editingId && (
-            <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
-          )}
+          <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+      </CollapsibleSection>
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {transactions.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No transactions this month.')}</div>}

@@ -4,6 +4,7 @@ import StatCard from '../components/StatCard.jsx'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
+import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -32,6 +33,10 @@ export default function Obligations() {
   const [editingEmiId, setEditingEmiId] = useState(null)
   const [editingFdId, setEditingFdId] = useState(null)
   const [editingInsId, setEditingInsId] = useState(null)
+  const [emiFormOpen, setEmiFormOpen] = useState(false)
+  const [fdFormOpen, setFdFormOpen] = useState(false)
+  const [insFormOpen, setInsFormOpen] = useState(false)
+  const [efFormOpen, setEfFormOpen] = useState(false)
 
   async function load() {
     const [obRes, accRes, efRes] = await Promise.all([
@@ -72,6 +77,7 @@ export default function Obligations() {
       }
       setEmiForm(emiEmpty)
       setEditingEmiId(null)
+      setEmiFormOpen(false)
       load()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
@@ -80,6 +86,7 @@ export default function Obligations() {
 
   function startEditEmi(e) {
     setEditingEmiId(e.id)
+    setEmiFormOpen(true)
     setEmiForm({
       accountId: String(e.accountId),
       loanName: e.loanName,
@@ -111,6 +118,7 @@ export default function Obligations() {
       }
       setFdForm(fdEmpty)
       setEditingFdId(null)
+      setFdFormOpen(false)
       load()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
@@ -119,6 +127,7 @@ export default function Obligations() {
 
   function startEditFd(fd) {
     setEditingFdId(fd.id)
+    setFdFormOpen(true)
     setFdForm({
       bankName: fd.bankName,
       principal: String(fd.principal),
@@ -147,6 +156,7 @@ export default function Obligations() {
       }
       setInsForm(insEmpty)
       setEditingInsId(null)
+      setInsFormOpen(false)
       load()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
@@ -155,6 +165,7 @@ export default function Obligations() {
 
   function startEditIns(p) {
     setEditingInsId(p.id)
+    setInsFormOpen(true)
     setInsForm({
       type: p.type,
       policyName: p.policyName,
@@ -180,6 +191,7 @@ export default function Obligations() {
         dayOfMonth: Number(efForm.dayOfMonth),
       })
       setEfForm((f) => ({ ...efEmpty, sourceAccountId: f.sourceAccountId }))
+      setEfFormOpen(false)
       load()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
@@ -225,7 +237,8 @@ export default function Obligations() {
 
       {tab === 'EMI' && (
         <div>
-          <form onSubmit={submitEmi} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+          <CollapsibleSection title={t('Add EMI')} addLabel={t('+ Add')} open={emiFormOpen} onOpen={() => setEmiFormOpen(true)}>
+          <form onSubmit={submitEmi} className="flex flex-col gap-4">
             <Field label={t('Debit from')}>
               <select required value={emiForm.accountId} onChange={(e) => setEmiForm({ ...emiForm, accountId: e.target.value })} className="w-full">
                 <option value="">{t('Debit from account...')}</option>
@@ -255,11 +268,10 @@ export default function Obligations() {
             </Field>
             <div className="flex gap-2">
               <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingEmiId ? t('Update EMI') : t('Add EMI')}</button>
-              {editingEmiId && (
-                <button type="button" onClick={() => { setEmiForm(emiEmpty); setEditingEmiId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
-              )}
+              <button type="button" onClick={() => { setEmiForm(emiEmpty); setEditingEmiId(null); setEmiFormOpen(false) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
             </div>
           </form>
+          </CollapsibleSection>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {summary.emis.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No EMIs tracked.')}</div>}
             {summary.emis.map((e) => (
@@ -282,7 +294,8 @@ export default function Obligations() {
 
       {tab === 'Fixed Deposits' && (
         <div>
-          <form onSubmit={submitFd} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+          <CollapsibleSection title={t('Add FD')} addLabel={t('+ Add')} open={fdFormOpen} onOpen={() => setFdFormOpen(true)}>
+          <form onSubmit={submitFd} className="flex flex-col gap-4">
             <Field label={t('Bank name')}>
               <input required placeholder={t('Bank name')} value={fdForm.bankName} onChange={(e) => setFdForm({ ...fdForm, bankName: e.target.value })} className="w-full" />
             </Field>
@@ -303,11 +316,10 @@ export default function Obligations() {
             </Field>
             <div className="flex gap-2">
               <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingFdId ? t('Update FD') : t('Add FD')}</button>
-              {editingFdId && (
-                <button type="button" onClick={() => { setFdForm(fdEmpty); setEditingFdId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
-              )}
+              <button type="button" onClick={() => { setFdForm(fdEmpty); setEditingFdId(null); setFdFormOpen(false) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
             </div>
           </form>
+          </CollapsibleSection>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {summary.fixedDeposits.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No fixed deposits tracked.')}</div>}
             {summary.fixedDeposits.map((fd) => (
@@ -329,7 +341,8 @@ export default function Obligations() {
 
       {tab === 'Insurance' && (
         <div>
-          <form onSubmit={submitIns} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+          <CollapsibleSection title={t('Add policy')} addLabel={t('+ Add')} open={insFormOpen} onOpen={() => setInsFormOpen(true)}>
+          <form onSubmit={submitIns} className="flex flex-col gap-4">
             <Field label={t('Type')}>
               <select value={insForm.type} onChange={(e) => setInsForm({ ...insForm, type: e.target.value })} className="w-full">
                 <option value="HEALTH">{t('HEALTH')}</option>
@@ -356,11 +369,10 @@ export default function Obligations() {
             </Field>
             <div className="flex gap-2">
               <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingInsId ? t('Update policy') : t('Add policy')}</button>
-              {editingInsId && (
-                <button type="button" onClick={() => { setInsForm(insEmpty); setEditingInsId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
-              )}
+              <button type="button" onClick={() => { setInsForm(insEmpty); setEditingInsId(null); setInsFormOpen(false) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
             </div>
           </form>
+          </CollapsibleSection>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {summary.insurancePolicies.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No policies tracked.')}</div>}
             {summary.insurancePolicies.map((p) => (
@@ -386,7 +398,8 @@ export default function Obligations() {
               {t('Create an account with type "Emergency fund" first (Profile → Accounts), then set up a monthly contribution here.')}
             </div>
           ) : (
-            <form onSubmit={submitEf} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+            <CollapsibleSection title={t('Add monthly contribution')} addLabel={t('+ Add')} open={efFormOpen} onOpen={() => setEfFormOpen(true)}>
+            <form onSubmit={submitEf} className="flex flex-col gap-4">
               <Field label={t('From account')}>
                 <select required value={efForm.sourceAccountId} onChange={(e) => setEfForm({ ...efForm, sourceAccountId: e.target.value })} className="w-full">
                   <option value="">{t('From account...')}</option>
@@ -405,8 +418,12 @@ export default function Obligations() {
               <Field label={t('Day of month')}>
                 <DayOfMonthSelect value={efForm.dayOfMonth} onChange={(e) => setEfForm({ ...efForm, dayOfMonth: e.target.value })} className="w-full" />
               </Field>
-              <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add monthly contribution')}</button>
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add monthly contribution')}</button>
+                <button type="button" onClick={() => setEfFormOpen(false)} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+              </div>
             </form>
+            </CollapsibleSection>
           )}
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {emergencyPlans.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No emergency fund contributions set up.')}</div>}

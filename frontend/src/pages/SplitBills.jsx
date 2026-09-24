@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import Field from '../components/Field.jsx'
+import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -22,6 +23,7 @@ export default function SplitBills() {
   const [accounts, setAccounts] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
 
   async function loadAll() {
     const [billsRes, accountsRes] = await Promise.all([client.get('/split-bills'), client.get('/accounts')])
@@ -63,6 +65,7 @@ export default function SplitBills() {
           .map((p) => ({ name: p.name, shareAmount: Number(p.shareAmount), email: p.email || null })),
       })
       setForm(emptyForm)
+      setFormOpen(false)
       loadAll()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
@@ -84,7 +87,8 @@ export default function SplitBills() {
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Split a bill')}</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+      <CollapsibleSection title={t('Split a bill')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Field label={t('What was it for')}>
           <input required placeholder={t('What was it for')} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full" />
         </Field>
@@ -120,9 +124,13 @@ export default function SplitBills() {
         <Field label={t('Note (optional)')}>
           <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="w-full" />
         </Field>
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Save split')}</button>
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Save split')}</button>
+          <button type="button" onClick={() => setFormOpen(false)} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+        </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+      </CollapsibleSection>
 
       <div className="space-y-4">
         {bills.length === 0 && <div className="text-sm text-slate-500">{t('No split bills yet.')}</div>}

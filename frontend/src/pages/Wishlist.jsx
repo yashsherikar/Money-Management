@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import Field from '../components/Field.jsx'
+import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -14,6 +15,7 @@ export default function Wishlist() {
   const [items, setItems] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
   const [affordability, setAffordability] = useState({}) // itemId -> data
   const [requestOpenFor, setRequestOpenFor] = useState(null)
   const [requestRows, setRequestRows] = useState([{ email: '', amount: '' }])
@@ -92,6 +94,7 @@ export default function Wishlist() {
         productUrl: form.productUrl || null,
       })
       setForm(emptyForm)
+      setFormOpen(false)
       loadAll()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
@@ -199,7 +202,8 @@ export default function Wishlist() {
         {wishroomError && <div className="mt-2 text-sm text-red-600">{wishroomError}</div>}
       </div>
 
-      <form onSubmit={handleAdd} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+      <CollapsibleSection title={t('Add to wishlist')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
+      <form onSubmit={handleAdd} className="flex flex-col gap-4">
         <Field label={t('Item name')}>
           <input required placeholder={t('Item name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full" />
         </Field>
@@ -209,9 +213,13 @@ export default function Wishlist() {
         <Field label={t('Product link (optional)')}>
           <input placeholder={t('Product link (optional)')} value={form.productUrl} onChange={(e) => setForm({ ...form, productUrl: e.target.value })} className="w-full" />
         </Field>
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add to wishlist')}</button>
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add to wishlist')}</button>
+          <button type="button" onClick={() => setFormOpen(false)} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+        </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+      </CollapsibleSection>
 
       <div className="space-y-4">
         {items.length === 0 && <div className="text-sm text-slate-500">{t('Nothing on your wishlist yet.')}</div>}

@@ -14,6 +14,8 @@ export default function Settings() {
   const [pinForm, setPinForm] = useState({ currentPassword: '', pin: '', confirm: '' })
   const [pinError, setPinError] = useState('')
   const [pinSaved, setPinSaved] = useState(false)
+  const [pinFormOpen, setPinFormOpen] = useState(false)
+  const [pwFormOpen, setPwFormOpen] = useState(false)
 
   const [pushOn, setPushOn] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
@@ -76,6 +78,7 @@ export default function Settings() {
       })
       setPwSaved(true)
       setPwForm({ currentPassword: '', newPassword: '', confirm: '' })
+      setPwFormOpen(false)
     } catch (err) {
       setPwError(err.response?.data?.message || t('Save failed'))
     }
@@ -93,6 +96,7 @@ export default function Settings() {
       await client.put('/profile/pin', { currentPassword: pinForm.currentPassword, pin: pinForm.pin })
       setPinSaved(true)
       setPinForm({ currentPassword: '', pin: '', confirm: '' })
+      setPinFormOpen(false)
       load()
     } catch (err) {
       setPinError(err.response?.data?.message || t('Save failed'))
@@ -144,54 +148,78 @@ export default function Settings() {
           )}
         </div>
 
-        <form onSubmit={handlePinSubmit} className="bg-white rounded-xl p-6">
-          <h2 className="font-semibold mb-1">{pinSet ? t('Change secret PIN') : t('Set a secret PIN')}</h2>
-          <p className="text-xs text-slate-500 mb-4">{t('A 4-6 digit PIN just for revealing your total balance — separate from your login password.')}</p>
-          <input
-            type="password" required placeholder={t('Current password')}
-            value={pinForm.currentPassword} onChange={(e) => setPinForm({ ...pinForm, currentPassword: e.target.value })}
-            className="w-full mb-3"
-          />
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <input
-              type="password" required inputMode="numeric" pattern="\d{4,6}" placeholder={t('New PIN (4-6 digits)')}
-              value={pinForm.pin} onChange={(e) => setPinForm({ ...pinForm, pin: e.target.value })}
-            />
-            <input
-              type="password" required inputMode="numeric" placeholder={t('Confirm PIN')}
-              value={pinForm.confirm} onChange={(e) => setPinForm({ ...pinForm, confirm: e.target.value })}
-            />
+        <div className="bg-white rounded-xl p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">{pinSet ? t('Change secret PIN') : t('Set a secret PIN')}</h2>
+            {!pinFormOpen && (
+              <button onClick={() => setPinFormOpen(true)} className="text-sm text-brand-600 font-medium">{t('Change')}</button>
+            )}
           </div>
-          {pinError && <div className="mb-3 text-sm text-red-600">{pinError}</div>}
-          {pinSaved && <div className="mb-3 text-sm text-emerald-600">{t('Saved.')}</div>}
-          <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">
-            {t('Save PIN')}
-          </button>
-        </form>
+          {pinFormOpen && (
+            <form onSubmit={handlePinSubmit} className="mt-3">
+              <p className="text-xs text-slate-500 mb-4">{t('A 4-6 digit PIN just for revealing your total balance — separate from your login password.')}</p>
+              <input
+                type="password" required placeholder={t('Current password')}
+                value={pinForm.currentPassword} onChange={(e) => setPinForm({ ...pinForm, currentPassword: e.target.value })}
+                className="w-full mb-3"
+              />
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <input
+                  type="password" required inputMode="numeric" pattern="\d{4,6}" placeholder={t('New PIN (4-6 digits)')}
+                  value={pinForm.pin} onChange={(e) => setPinForm({ ...pinForm, pin: e.target.value })}
+                />
+                <input
+                  type="password" required inputMode="numeric" placeholder={t('Confirm PIN')}
+                  value={pinForm.confirm} onChange={(e) => setPinForm({ ...pinForm, confirm: e.target.value })}
+                />
+              </div>
+              {pinError && <div className="mb-3 text-sm text-red-600">{pinError}</div>}
+              {pinSaved && <div className="mb-3 text-sm text-emerald-600">{t('Saved.')}</div>}
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
+                  {t('Save PIN')}
+                </button>
+                <button type="button" onClick={() => setPinFormOpen(false)} className="px-3 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+              </div>
+            </form>
+          )}
+        </div>
 
-        <form onSubmit={handlePasswordSubmit} className="bg-white rounded-xl p-6">
-          <h2 className="font-semibold mb-4">{t('Change password')}</h2>
-          <input
-            type="password" required placeholder={t('Current password')}
-            value={pwForm.currentPassword} onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })}
-            className="w-full mb-3"
-          />
-          <input
-            type="password" required minLength={6} placeholder={t('New password')}
-            value={pwForm.newPassword} onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
-            className="w-full mb-3"
-          />
-          <input
-            type="password" required minLength={6} placeholder={t('Confirm new password')}
-            value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
-            className="w-full mb-3"
-          />
-          {pwError && <div className="mb-3 text-sm text-red-600">{pwError}</div>}
-          {pwSaved && <div className="mb-3 text-sm text-emerald-600">{t('Saved.')}</div>}
-          <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">
-            {t('Change password')}
-          </button>
-        </form>
+        <div className="bg-white rounded-xl p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">{t('Change password')}</h2>
+            {!pwFormOpen && (
+              <button onClick={() => setPwFormOpen(true)} className="text-sm text-brand-600 font-medium">{t('Change')}</button>
+            )}
+          </div>
+          {pwFormOpen && (
+            <form onSubmit={handlePasswordSubmit} className="mt-3">
+              <input
+                type="password" required placeholder={t('Current password')}
+                value={pwForm.currentPassword} onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })}
+                className="w-full mb-3"
+              />
+              <input
+                type="password" required minLength={6} placeholder={t('New password')}
+                value={pwForm.newPassword} onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
+                className="w-full mb-3"
+              />
+              <input
+                type="password" required minLength={6} placeholder={t('Confirm new password')}
+                value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
+                className="w-full mb-3"
+              />
+              {pwError && <div className="mb-3 text-sm text-red-600">{pwError}</div>}
+              {pwSaved && <div className="mb-3 text-sm text-emerald-600">{t('Saved.')}</div>}
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
+                  {t('Change password')}
+                </button>
+                <button type="button" onClick={() => setPwFormOpen(false)} className="px-3 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   )
