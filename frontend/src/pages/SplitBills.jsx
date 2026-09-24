@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
+import Field from '../components/Field.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -83,35 +84,43 @@ export default function SplitBills() {
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Split a bill')}</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input required placeholder={t('What was it for')} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-          <input required type="number" step="0.01" min="0.01" placeholder={t('Total amount')} value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-          <select value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+        <Field label={t('What was it for')}>
+          <input required placeholder={t('What was it for')} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Total amount')}>
+          <input required type="number" step="0.01" min="0.01" placeholder={t('Total amount')} value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Account')}>
+          <select value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="w-full">
             <option value="">{t("Don't touch any account balance")}</option>
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
-          <input type="date" required value={form.billDate} onChange={(e) => setForm({ ...form, billDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        </div>
+        </Field>
+        <Field label={t('Bill date')}>
+          <input type="date" required value={form.billDate} onChange={(e) => setForm({ ...form, billDate: e.target.value })} className="w-full" />
+        </Field>
 
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-700">{t('Who owes what')}</div>
+        <div className="flex flex-col gap-3">
+          <div className="text-[13px] font-bold text-muted">{t('Who owes what')}</div>
           {form.participants.map((p, i) => (
-            <div key={i} className="flex items-center gap-2 flex-wrap">
-              <input placeholder={t('Name')} value={p.name} onChange={(e) => updateParticipant(i, 'name', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md flex-1 min-w-[120px]" />
-              <input type="number" step="0.01" min="0.01" placeholder={t('Their share')} value={p.shareAmount} onChange={(e) => updateParticipant(i, 'shareAmount', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md w-32" />
-              <input type="email" placeholder={t('Their email (optional, if they use this app)')} value={p.email} onChange={(e) => updateParticipant(i, 'email', e.target.value)} className="px-3 py-2 border border-slate-300 rounded-md flex-1 min-w-[180px]" />
+            <div key={i} className="bg-slate-50 rounded-2xl p-3 flex flex-col gap-2">
+              <input placeholder={t('Name')} value={p.name} onChange={(e) => updateParticipant(i, 'name', e.target.value)} className="w-full" />
+              <input type="number" step="0.01" min="0.01" placeholder={t('Their share')} value={p.shareAmount} onChange={(e) => updateParticipant(i, 'shareAmount', e.target.value)} className="w-full" />
+              <input type="email" placeholder={t('Their email (optional, if they use this app)')} value={p.email} onChange={(e) => updateParticipant(i, 'email', e.target.value)} className="w-full" />
               {form.participants.length > 1 && (
-                <button type="button" onClick={() => removeParticipantRow(i)} className="text-sm text-red-600">{t('Remove')}</button>
+                <button type="button" onClick={() => removeParticipantRow(i)} className="self-start text-sm text-red-600">{t('Remove')}</button>
               )}
             </div>
           ))}
-          <button type="button" onClick={addParticipantRow} className="text-sm text-brand-600">{t('+ Add another person')}</button>
+          <button type="button" onClick={addParticipantRow} className="self-start text-sm text-brand-600">{t('+ Add another person')}</button>
           <p className="text-xs text-slate-500">{t("If their email matches a Money Manager account, this bill shows up on their Requests page too.")}</p>
         </div>
 
-        <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md w-full" />
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{t('Save split')}</button>
+        <Field label={t('Note (optional)')}>
+          <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="w-full" />
+        </Field>
+        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Save split')}</button>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
 

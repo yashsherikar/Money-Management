@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import StatCard from '../components/StatCard.jsx'
+import Field from '../components/Field.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -89,18 +90,24 @@ export default function Investments() {
         </div>
       )}
 
-      <form onSubmit={handleAdd} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input required placeholder={t('Name (fund / stock / SIP)')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="MUTUAL_FUND">{t('MUTUAL_FUND')}</option>
-          <option value="STOCK">{t('STOCK')}</option>
-          <option value="SIP">{t('SIP')}</option>
-          <option value="RD">{t('RD')}</option>
-          <option value="OTHER">{t('OTHER')}</option>
-        </select>
-        <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{t('Add investment')}</button>
-        {error && <div className="md:col-span-4 text-sm text-red-600">{error}</div>}
+      <form onSubmit={handleAdd} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+        <Field label={t('Name (fund / stock / SIP)')}>
+          <input required placeholder={t('Name (fund / stock / SIP)')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Type')}>
+          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full">
+            <option value="MUTUAL_FUND">{t('MUTUAL_FUND')}</option>
+            <option value="STOCK">{t('STOCK')}</option>
+            <option value="SIP">{t('SIP')}</option>
+            <option value="RD">{t('RD')}</option>
+            <option value="OTHER">{t('OTHER')}</option>
+          </select>
+        </Field>
+        <Field label={t('Note (optional)')}>
+          <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="w-full" />
+        </Field>
+        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add investment')}</button>
+        {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
 
       <div className="space-y-4">

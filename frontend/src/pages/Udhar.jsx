@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import client from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
+import Field from '../components/Field.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -114,34 +115,50 @@ export default function Udhar() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="LENT">{t('I gave (lent)')}</option>
-          <option value="BORROWED">{t('I took (borrowed)')}</option>
-        </select>
-        <input required placeholder={t('Contact name')} value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <select value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="">{t("Don't touch any account balance")}</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        <input type="date" required value={form.txnDate} onChange={(e) => setForm({ ...form, txnDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <input type="date" placeholder={t('Due date (optional)')} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md md:col-span-2" />
-        <input
-          type="email"
-          placeholder={t("Their Money Manager email (optional, to send a repayment reminder)")}
-          value={form.contactEmail}
-          onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
-          className="px-3 py-2 border border-slate-300 rounded-md"
-        />
-        <div className="flex gap-2 md:col-span-3">
-          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingId ? t('Update entry') : t('Add entry')}</button>
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+        <Field label={t('Type')}>
+          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full">
+            <option value="LENT">{t('I gave (lent)')}</option>
+            <option value="BORROWED">{t('I took (borrowed)')}</option>
+          </select>
+        </Field>
+        <Field label={t('Contact name')}>
+          <input required placeholder={t('Contact name')} value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Amount')}>
+          <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Account')}>
+          <select value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="w-full">
+            <option value="">{t("Don't touch any account balance")}</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </Field>
+        <Field label={t('Date')}>
+          <input type="date" required value={form.txnDate} onChange={(e) => setForm({ ...form, txnDate: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Due date (optional)')}>
+          <input type="date" placeholder={t('Due date (optional)')} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Note (optional)')}>
+          <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t("Their Money Manager email (optional, to send a repayment reminder)")}>
+          <input
+            type="email"
+            placeholder={t("Their Money Manager email (optional, to send a repayment reminder)")}
+            value={form.contactEmail}
+            onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+            className="w-full"
+          />
+        </Field>
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingId ? t('Update entry') : t('Add entry')}</button>
           {editingId && (
             <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
           )}
         </div>
-        {error && <div className="md:col-span-3 text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">

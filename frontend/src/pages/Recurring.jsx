@@ -3,6 +3,7 @@ import client from '../api/client'
 import { categoryIcon } from '../utils/categoryIcon.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
+import Field from '../components/Field.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -116,71 +117,90 @@ export default function Recurring() {
       <h1 className="text-2xl font-bold mb-2">{t('Recurring transactions')}</h1>
       <p className="text-sm text-slate-500 mb-6">{t('Mobile recharge, sending money to parents, rent, subscriptions, salary — anything that repeats monthly gets auto-logged on its day.')}</p>
 
-      <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <select required value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="">{t('Account...')}</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        {addingCategory ? (
-          <div className="flex gap-2">
-            <input
-              autoFocus
-              placeholder={t('New category name')}
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory(e))}
-              className="px-3 py-2 border border-slate-300 rounded-md flex-1"
-            />
-            <button type="button" onClick={handleAddCategory} className="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium">{t('Add')}</button>
-            <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
-          </div>
-        ) : (
-          <select
-            value={form.categoryId}
-            onChange={(e) => {
-              const picked = categories.find((c) => String(c.id) === e.target.value)
-              if (picked?.name === 'Other') setAddingCategory(true)
-              else setForm({ ...form, categoryId: e.target.value })
-            }}
-            className="px-3 py-2 border border-slate-300 rounded-md"
-          >
-            <option value="">{t('No category')}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name === 'Other' ? t('Other (add new)') : c.name}</option>)}
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+        <Field label={t('Account')}>
+          <select required value={form.accountId} onChange={(e) => setForm({ ...form, accountId: e.target.value })} className="w-full">
+            <option value="">{t('Account...')}</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
-        )}
-        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="EXPENSE">{t('Expense (recharge, rent, sending to parents...)')}</option>
-          <option value="INCOME">{t('Income (salary...)')}</option>
-        </select>
-        <input required placeholder={t('Description (e.g. Mobile recharge, Money to parents)')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md md:col-span-2" />
-        <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <select value={form.recurrenceType} onChange={(e) => setForm({ ...form, recurrenceType: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-          <option value="MONTHLY">{t('Same day every month')}</option>
-          <option value="INTERVAL_DAYS">{t('Every N days (e.g. 28-day recharge)')}</option>
-        </select>
+        </Field>
+
+        <Field label={t('Category')}>
+          {addingCategory ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                placeholder={t('New category name')}
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory(e))}
+                className="flex-1"
+              />
+              <button type="button" onClick={handleAddCategory} className="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium">{t('Add')}</button>
+              <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
+            </div>
+          ) : (
+            <select
+              value={form.categoryId}
+              onChange={(e) => {
+                const picked = categories.find((c) => String(c.id) === e.target.value)
+                if (picked?.name === 'Other') setAddingCategory(true)
+                else setForm({ ...form, categoryId: e.target.value })
+              }}
+              className="w-full"
+            >
+              <option value="">{t('No category')}</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name === 'Other' ? t('Other (add new)') : c.name}</option>)}
+            </select>
+          )}
+        </Field>
+
+        <Field label={t('Type')}>
+          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full">
+            <option value="EXPENSE">{t('Expense (recharge, rent, sending to parents...)')}</option>
+            <option value="INCOME">{t('Income (salary...)')}</option>
+          </select>
+        </Field>
+
+        <Field label={t('Description')}>
+          <input required placeholder={t('Description (e.g. Mobile recharge, Money to parents)')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full" />
+        </Field>
+
+        <Field label={t('Amount')}>
+          <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full" />
+        </Field>
+
+        <Field label={t('Repeats')}>
+          <select value={form.recurrenceType} onChange={(e) => setForm({ ...form, recurrenceType: e.target.value })} className="w-full">
+            <option value="MONTHLY">{t('Same day every month')}</option>
+            <option value="INTERVAL_DAYS">{t('Every N days (e.g. 28-day recharge)')}</option>
+          </select>
+        </Field>
+
         {form.recurrenceType === 'MONTHLY' ? (
-          <DayOfMonthSelect value={form.dayOfMonth} onChange={(e) => setForm({ ...form, dayOfMonth: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
+          <Field label={t('Day of month')}>
+            <DayOfMonthSelect value={form.dayOfMonth} onChange={(e) => setForm({ ...form, dayOfMonth: e.target.value })} className="w-full" />
+          </Field>
         ) : (
           <>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">{t('Last done on')}</label>
-              <input required type="date" value={form.lastDoneDate} onChange={(e) => setForm({ ...form, lastDoneDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">{t('Next due date')}</label>
-              <input required type="date" min={form.lastDoneDate} value={form.nextDueDate} onChange={(e) => setForm({ ...form, nextDueDate: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md" />
-            </div>
+            <Field label={t('Last done on')}>
+              <input required type="date" value={form.lastDoneDate} onChange={(e) => setForm({ ...form, lastDoneDate: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Next due date')}>
+              <input required type="date" min={form.lastDoneDate} value={form.nextDueDate} onChange={(e) => setForm({ ...form, nextDueDate: e.target.value })} className="w-full" />
+            </Field>
           </>
         )}
-        <div className="flex gap-2 md:col-span-2">
-          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">
+
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
             {editingId ? t('Update recurring transaction') : t('Add recurring transaction')}
           </button>
           {editingId && (
             <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
           )}
         </div>
-        {error && <div className="md:col-span-3 text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
