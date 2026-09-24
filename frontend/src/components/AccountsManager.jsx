@@ -12,6 +12,7 @@ export default function AccountsManager() {
   const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '' })
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
 
   const [balancesRevealed, setBalancesRevealed] = useState(false)
   const [askingPin, setAskingPin] = useState(false)
@@ -30,6 +31,7 @@ export default function AccountsManager() {
   function resetForm() {
     setForm({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '' })
     setEditingId(null)
+    setFormOpen(false)
   }
 
   async function handleSubmit(e) {
@@ -58,6 +60,7 @@ export default function AccountsManager() {
   function startEdit(acc) {
     setEditingId(acc.id)
     setForm({ name: acc.name, type: acc.type, balance: acc.balance, isPrimary: acc.isPrimary, minimumBalance: acc.minimumBalance })
+    setFormOpen(true)
   }
 
   async function handleDelete(id) {
@@ -90,8 +93,16 @@ export default function AccountsManager() {
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6">
-      <h2 className="font-semibold mb-4">{t('Accounts')}</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold">{t('Accounts')}</h2>
+        {!formOpen && (
+          <button onClick={() => setFormOpen(true)} className="text-sm text-brand-600 font-medium">
+            {t('+ Add account')}
+          </button>
+        )}
+      </div>
 
+      {formOpen && (
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 mb-4">
         <Field label={t('Account name')}>
           <input
@@ -148,14 +159,13 @@ export default function AccountsManager() {
           <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
             {editingId ? t('Update') : t('Add')}
           </button>
-          {editingId && (
-            <button type="button" onClick={resetForm} className="px-3 py-2 rounded-md border border-slate-300">
-              {t('Cancel')}
-            </button>
-          )}
+          <button type="button" onClick={resetForm} className="px-3 py-2 rounded-md border border-slate-300">
+            {t('Cancel')}
+          </button>
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+      )}
 
       {askingPin && (
         <form onSubmit={submitReveal} className="flex items-center gap-2 mb-3">
@@ -181,9 +191,14 @@ export default function AccountsManager() {
         {accounts.map((acc) => (
           <div key={acc.id} className="p-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="min-w-0 flex-1">
-              <div className="font-medium truncate">
-                {acc.name}
-                {acc.isPrimary && <span className="ml-2 text-xs text-brand-600 font-medium whitespace-nowrap">{t('PRIMARY')}</span>}
+              <div className="font-medium truncate flex items-center gap-1.5">
+                {acc.isPrimary && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#00F5D4" stroke="#00F5D4" className="shrink-0" title={t('Primary account')}>
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                )}
+                <span className="truncate">{acc.name}</span>
+                {acc.isPrimary && <span className="text-xs text-teal font-medium whitespace-nowrap">{t('PRIMARY')}</span>}
               </div>
               <div className="text-xs text-slate-500 truncate">
                 {t(acc.type)}

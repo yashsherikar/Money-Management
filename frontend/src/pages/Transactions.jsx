@@ -188,7 +188,7 @@ export default function Transactions() {
         {transactions.map((txn) => (
           <div key={txn.id} className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-xl">{categoryIcon(txn.categoryName, txn.type)}</span>
+              <span className="text-xl">{categoryIcon(`${txn.description || ''} ${txn.categoryName || ''}`, txn.type)}</span>
               <div>
                 <div className="font-medium">{txn.description || txn.categoryName || t('Transaction')}</div>
                 <div className="text-xs text-slate-500">{txn.txnDate} · {txn.accountName}{txn.categoryName ? ` · ${txn.categoryName}` : ''}</div>
