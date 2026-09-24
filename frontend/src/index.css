@@ -19,9 +19,13 @@ body {
   100% { transform: translateX(300%); }
 }
 
+/* Fade only (no transform) — a transform on this element (even translateY(0) at
+   animation end) would make it a new positioning container for fixed descendants,
+   breaking the bottom nav bar's position:fixed (it would scroll with the page
+   instead of staying pinned to the viewport). */
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 #root > div {
   animation: fade-in-up 0.25s ease both;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
 import Field from './Field.jsx'
+import { EditIcon, DeleteIcon } from './icons.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const TYPES = ['BANK', 'CASH', 'CARD', 'EMERGENCY_FUND']
@@ -178,29 +179,29 @@ export default function AccountsManager() {
       <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
         {accounts.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No accounts yet.')}</div>}
         {accounts.map((acc) => (
-          <div key={acc.id} className="p-4 flex items-center justify-between">
-            <div>
-              <div className="font-medium">
+          <div key={acc.id} className="p-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div className="min-w-0 flex-1">
+              <div className="font-medium truncate">
                 {acc.name}
-                {acc.isPrimary && <span className="ml-2 text-xs text-brand-600 font-medium">{t('PRIMARY')}</span>}
+                {acc.isPrimary && <span className="ml-2 text-xs text-brand-600 font-medium whitespace-nowrap">{t('PRIMARY')}</span>}
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-500 truncate">
                 {t(acc.type)}
                 {Number(acc.minimumBalance) > 0 && ` · ${t('min balance')} ₹${Number(acc.minimumBalance).toLocaleString('en-IN')}`}
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 shrink-0">
               {balancesRevealed ? (
-                <div className={`font-semibold ${acc.balance < 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                <div className={`font-semibold whitespace-nowrap ${acc.balance < 0 ? 'text-red-600' : 'text-slate-900'}`}>
                   ₹{Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
               ) : (
-                <button onClick={openReveal} className="font-semibold text-slate-300 tracking-widest select-none" title={t('Tap to reveal')}>
+                <button onClick={openReveal} className="font-semibold text-slate-300 tracking-widest select-none whitespace-nowrap" title={t('Tap to reveal')}>
                   ₹ • • • •
                 </button>
               )}
-              <button onClick={() => startEdit(acc)} className="text-sm text-brand-600">{t('Edit')}</button>
-              <button onClick={() => handleDelete(acc.id)} className="text-sm text-red-600">{t('Delete')}</button>
+              <button onClick={() => startEdit(acc)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+              <button onClick={() => handleDelete(acc.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
             </div>
           </div>
         ))}
