@@ -76,7 +76,7 @@ export default function Dashboard() {
               {summary.unwantedExpenses.map((u) => (
                 <div key={u.transactionId} className="py-2 flex justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{categoryIcon(u.categoryName, 'EXPENSE')}</span>
+                    <span className="text-lg">{categoryIcon(`${u.description || ''} ${u.categoryName || ''}`, 'EXPENSE')}</span>
                     <div>
                       <div className="font-medium">{u.description || u.categoryName}</div>
                       <div className="text-xs text-slate-500">{u.categoryName}</div>
