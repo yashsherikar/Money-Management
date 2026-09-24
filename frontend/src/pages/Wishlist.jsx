@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
+import Field from '../components/Field.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -185,21 +186,31 @@ export default function Wishlist() {
             )}
           </div>
         ) : (
-          <form onSubmit={handleWishroomConnect} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <input required type="email" placeholder={t('WishRoom email')} value={wishroomForm.email} onChange={(e) => setWishroomForm({ ...wishroomForm, email: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="password" placeholder={t('WishRoom password')} value={wishroomForm.password} onChange={(e) => setWishroomForm({ ...wishroomForm, password: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{t('Connect WishRoom')}</button>
+          <form onSubmit={handleWishroomConnect} className="flex flex-col gap-4">
+            <Field label={t('WishRoom email')}>
+              <input required type="email" placeholder={t('WishRoom email')} value={wishroomForm.email} onChange={(e) => setWishroomForm({ ...wishroomForm, email: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('WishRoom password')}>
+              <input required type="password" placeholder={t('WishRoom password')} value={wishroomForm.password} onChange={(e) => setWishroomForm({ ...wishroomForm, password: e.target.value })} className="w-full" />
+            </Field>
+            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Connect WishRoom')}</button>
           </form>
         )}
         {wishroomError && <div className="mt-2 text-sm text-red-600">{wishroomError}</div>}
       </div>
 
-      <form onSubmit={handleAdd} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <input required placeholder={t('Item name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <input required type="number" step="0.01" min="0.01" placeholder={t('Price')} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <input placeholder={t('Product link (optional)')} value={form.productUrl} onChange={(e) => setForm({ ...form, productUrl: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-4">{t('Add to wishlist')}</button>
-        {error && <div className="md:col-span-4 text-sm text-red-600">{error}</div>}
+      <form onSubmit={handleAdd} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+        <Field label={t('Item name')}>
+          <input required placeholder={t('Item name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Price')}>
+          <input required type="number" step="0.01" min="0.01" placeholder={t('Price')} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full" />
+        </Field>
+        <Field label={t('Product link (optional)')}>
+          <input placeholder={t('Product link (optional)')} value={form.productUrl} onChange={(e) => setForm({ ...form, productUrl: e.target.value })} className="w-full" />
+        </Field>
+        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add to wishlist')}</button>
+        {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
 
       <div className="space-y-4">

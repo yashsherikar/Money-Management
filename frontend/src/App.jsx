@@ -16,6 +16,7 @@ import SplitBills from './pages/SplitBills.jsx'
 import Wishlist from './pages/Wishlist.jsx'
 import Requests from './pages/Requests.jsx'
 import Profile from './pages/Profile.jsx'
+import Settings from './pages/Settings.jsx'
 
 function Protected({ children }) {
   return (
@@ -44,6 +45,7 @@ export default function App() {
       <Route path="/wishlist" element={<Protected><Wishlist /></Protected>} />
       <Route path="/requests" element={<Protected><Requests /></Protected>} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
+      <Route path="/settings" element={<Protected><Settings /></Protected>} />
     </Routes>
     </>
   )

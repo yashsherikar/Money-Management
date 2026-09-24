@@ -41,6 +41,7 @@ const moreLinks = [
   { to: '/wishlist', label: 'Wishlist' },
   { to: '/requests', label: 'Requests' },
   { to: '/profile', label: 'Profile' },
+  { to: '/settings', label: 'Settings' },
 ]
 
 export default function Layout({ children }) {
@@ -74,7 +75,7 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      <main className="flex-1 p-4 md:p-8 pb-24 max-w-6xl mx-auto w-full">{children}</main>
+      <main className="flex-1 px-4 pt-4 md:px-8 md:pt-8 pb-28 max-w-6xl mx-auto w-full">{children}</main>
 
       {moreOpen && (
         <div className="fixed inset-0 z-50 flex items-end">

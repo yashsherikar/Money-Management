@@ -3,6 +3,7 @@ import client from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
+import Field from '../components/Field.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -224,20 +225,36 @@ export default function Obligations() {
 
       {tab === 'EMI' && (
         <div>
-          <form onSubmit={submitEmi} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <select required value={emiForm.accountId} onChange={(e) => setEmiForm({ ...emiForm, accountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-              <option value="">{t('Debit from account...')}</option>
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-            <input required placeholder={t('Loan name')} value={emiForm.loanName} onChange={(e) => setEmiForm({ ...emiForm, loanName: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" step="0.01" placeholder={t('Principal')} value={emiForm.principal} onChange={(e) => setEmiForm({ ...emiForm, principal: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" step="0.01" placeholder={t('Interest rate %')} value={emiForm.interestRate} onChange={(e) => setEmiForm({ ...emiForm, interestRate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" placeholder={t('Tenure (months)')} value={emiForm.tenureMonths} onChange={(e) => setEmiForm({ ...emiForm, tenureMonths: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" step="0.01" placeholder={t('EMI amount')} value={emiForm.emiAmount} onChange={(e) => setEmiForm({ ...emiForm, emiAmount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="date" value={emiForm.startDate} onChange={(e) => setEmiForm({ ...emiForm, startDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <DayOfMonthSelect value={emiForm.dueDay} onChange={(e) => setEmiForm({ ...emiForm, dueDay: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <div className="flex gap-2 md:col-span-4">
-              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingEmiId ? t('Update EMI') : t('Add EMI')}</button>
+          <form onSubmit={submitEmi} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+            <Field label={t('Debit from')}>
+              <select required value={emiForm.accountId} onChange={(e) => setEmiForm({ ...emiForm, accountId: e.target.value })} className="w-full">
+                <option value="">{t('Debit from account...')}</option>
+                {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </Field>
+            <Field label={t('Loan name')}>
+              <input required placeholder={t('Loan name')} value={emiForm.loanName} onChange={(e) => setEmiForm({ ...emiForm, loanName: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Principal')}>
+              <input required type="number" step="0.01" placeholder={t('Principal')} value={emiForm.principal} onChange={(e) => setEmiForm({ ...emiForm, principal: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Interest rate %')}>
+              <input required type="number" step="0.01" placeholder={t('Interest rate %')} value={emiForm.interestRate} onChange={(e) => setEmiForm({ ...emiForm, interestRate: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Tenure (months)')}>
+              <input required type="number" placeholder={t('Tenure (months)')} value={emiForm.tenureMonths} onChange={(e) => setEmiForm({ ...emiForm, tenureMonths: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('EMI amount')}>
+              <input required type="number" step="0.01" placeholder={t('EMI amount')} value={emiForm.emiAmount} onChange={(e) => setEmiForm({ ...emiForm, emiAmount: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Start date')}>
+              <input required type="date" value={emiForm.startDate} onChange={(e) => setEmiForm({ ...emiForm, startDate: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Due day')}>
+              <DayOfMonthSelect value={emiForm.dueDay} onChange={(e) => setEmiForm({ ...emiForm, dueDay: e.target.value })} className="w-full" />
+            </Field>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingEmiId ? t('Update EMI') : t('Add EMI')}</button>
               {editingEmiId && (
                 <button type="button" onClick={() => { setEmiForm(emiEmpty); setEditingEmiId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
               )}
@@ -265,15 +282,27 @@ export default function Obligations() {
 
       {tab === 'Fixed Deposits' && (
         <div>
-          <form onSubmit={submitFd} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <input required placeholder={t('Bank name')} value={fdForm.bankName} onChange={(e) => setFdForm({ ...fdForm, bankName: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" step="0.01" placeholder={t('Principal')} value={fdForm.principal} onChange={(e) => setFdForm({ ...fdForm, principal: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" step="0.01" placeholder={t('Interest rate %')} value={fdForm.interestRate} onChange={(e) => setFdForm({ ...fdForm, interestRate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="date" value={fdForm.startDate} onChange={(e) => setFdForm({ ...fdForm, startDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="date" placeholder={t('Maturity date')} value={fdForm.maturityDate} onChange={(e) => setFdForm({ ...fdForm, maturityDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" step="0.01" placeholder={t('Maturity amount')} value={fdForm.maturityAmount} onChange={(e) => setFdForm({ ...fdForm, maturityAmount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <div className="flex gap-2 md:col-span-3">
-              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingFdId ? t('Update FD') : t('Add FD')}</button>
+          <form onSubmit={submitFd} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+            <Field label={t('Bank name')}>
+              <input required placeholder={t('Bank name')} value={fdForm.bankName} onChange={(e) => setFdForm({ ...fdForm, bankName: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Principal')}>
+              <input required type="number" step="0.01" placeholder={t('Principal')} value={fdForm.principal} onChange={(e) => setFdForm({ ...fdForm, principal: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Interest rate %')}>
+              <input required type="number" step="0.01" placeholder={t('Interest rate %')} value={fdForm.interestRate} onChange={(e) => setFdForm({ ...fdForm, interestRate: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Start date')}>
+              <input required type="date" value={fdForm.startDate} onChange={(e) => setFdForm({ ...fdForm, startDate: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Maturity date')}>
+              <input required type="date" placeholder={t('Maturity date')} value={fdForm.maturityDate} onChange={(e) => setFdForm({ ...fdForm, maturityDate: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Maturity amount')}>
+              <input required type="number" step="0.01" placeholder={t('Maturity amount')} value={fdForm.maturityAmount} onChange={(e) => setFdForm({ ...fdForm, maturityAmount: e.target.value })} className="w-full" />
+            </Field>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingFdId ? t('Update FD') : t('Add FD')}</button>
               {editingFdId && (
                 <button type="button" onClick={() => { setFdForm(fdEmpty); setEditingFdId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
               )}
@@ -300,23 +329,33 @@ export default function Obligations() {
 
       {tab === 'Insurance' && (
         <div>
-          <form onSubmit={submitIns} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <select value={insForm.type} onChange={(e) => setInsForm({ ...insForm, type: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-              <option value="HEALTH">{t('HEALTH')}</option>
-              <option value="LIFE">{t('LIFE')}</option>
-              <option value="VEHICLE">{t('VEHICLE')}</option>
-            </select>
-            <input required placeholder={t('Policy name')} value={insForm.policyName} onChange={(e) => setInsForm({ ...insForm, policyName: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="number" step="0.01" placeholder={t('Premium amount')} value={insForm.premiumAmount} onChange={(e) => setInsForm({ ...insForm, premiumAmount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <input required type="date" placeholder={t('Due date')} value={insForm.dueDate} onChange={(e) => setInsForm({ ...insForm, dueDate: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-            <select value={insForm.frequency} onChange={(e) => setInsForm({ ...insForm, frequency: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-              <option value="MONTHLY">{t('MONTHLY')}</option>
-              <option value="QUARTERLY">{t('QUARTERLY')}</option>
-              <option value="HALF_YEARLY">{t('HALF_YEARLY')}</option>
-              <option value="YEARLY">{t('YEARLY')}</option>
-            </select>
+          <form onSubmit={submitIns} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+            <Field label={t('Type')}>
+              <select value={insForm.type} onChange={(e) => setInsForm({ ...insForm, type: e.target.value })} className="w-full">
+                <option value="HEALTH">{t('HEALTH')}</option>
+                <option value="LIFE">{t('LIFE')}</option>
+                <option value="VEHICLE">{t('VEHICLE')}</option>
+              </select>
+            </Field>
+            <Field label={t('Policy name')}>
+              <input required placeholder={t('Policy name')} value={insForm.policyName} onChange={(e) => setInsForm({ ...insForm, policyName: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Premium amount')}>
+              <input required type="number" step="0.01" placeholder={t('Premium amount')} value={insForm.premiumAmount} onChange={(e) => setInsForm({ ...insForm, premiumAmount: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Due date')}>
+              <input required type="date" placeholder={t('Due date')} value={insForm.dueDate} onChange={(e) => setInsForm({ ...insForm, dueDate: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Frequency')}>
+              <select value={insForm.frequency} onChange={(e) => setInsForm({ ...insForm, frequency: e.target.value })} className="w-full">
+                <option value="MONTHLY">{t('MONTHLY')}</option>
+                <option value="QUARTERLY">{t('QUARTERLY')}</option>
+                <option value="HALF_YEARLY">{t('HALF_YEARLY')}</option>
+                <option value="YEARLY">{t('YEARLY')}</option>
+              </select>
+            </Field>
             <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium">{editingInsId ? t('Update policy') : t('Add policy')}</button>
+              <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingInsId ? t('Update policy') : t('Add policy')}</button>
               {editingInsId && (
                 <button type="button" onClick={() => { setInsForm(insEmpty); setEditingInsId(null) }} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
               )}
@@ -347,18 +386,26 @@ export default function Obligations() {
               {t('Create an account with type "Emergency fund" first (Profile → Accounts), then set up a monthly contribution here.')}
             </div>
           ) : (
-            <form onSubmit={submitEf} className="bg-white border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-              <select required value={efForm.sourceAccountId} onChange={(e) => setEfForm({ ...efForm, sourceAccountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-                <option value="">{t('From account...')}</option>
-                {accounts.filter((a) => a.type !== 'EMERGENCY_FUND').map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-              <select required value={efForm.targetAccountId} onChange={(e) => setEfForm({ ...efForm, targetAccountId: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md">
-                <option value="">{t('To emergency fund...')}</option>
-                {emergencyFundAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-              <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={efForm.amount} onChange={(e) => setEfForm({ ...efForm, amount: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-              <DayOfMonthSelect value={efForm.dayOfMonth} onChange={(e) => setEfForm({ ...efForm, dayOfMonth: e.target.value })} className="px-3 py-2 border border-slate-300 rounded-md" />
-              <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-4 py-2 font-medium md:col-span-4">{t('Add monthly contribution')}</button>
+            <form onSubmit={submitEf} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+              <Field label={t('From account')}>
+                <select required value={efForm.sourceAccountId} onChange={(e) => setEfForm({ ...efForm, sourceAccountId: e.target.value })} className="w-full">
+                  <option value="">{t('From account...')}</option>
+                  {accounts.filter((a) => a.type !== 'EMERGENCY_FUND').map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </Field>
+              <Field label={t('To emergency fund')}>
+                <select required value={efForm.targetAccountId} onChange={(e) => setEfForm({ ...efForm, targetAccountId: e.target.value })} className="w-full">
+                  <option value="">{t('To emergency fund...')}</option>
+                  {emergencyFundAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </Field>
+              <Field label={t('Amount')}>
+                <input required type="number" step="0.01" min="0.01" placeholder={t('Amount')} value={efForm.amount} onChange={(e) => setEfForm({ ...efForm, amount: e.target.value })} className="w-full" />
+              </Field>
+              <Field label={t('Day of month')}>
+                <DayOfMonthSelect value={efForm.dayOfMonth} onChange={(e) => setEfForm({ ...efForm, dayOfMonth: e.target.value })} className="w-full" />
+              </Field>
+              <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add monthly contribution')}</button>
             </form>
           )}
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">

@@ -66,14 +66,19 @@ body {
 .bg-emerald-500 { background-color: #00C9AE !important; }
 .bg-red-500 { background-color: #FF5376 !important; }
 
-/* Inputs — flat field surface, no visible border, matching the pill-field style */
+/* Inputs — flat field surface, no visible border, pill-shaped, matching the reference design */
 input, select, textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   font-size: 0.9375rem;
   background-color: #1F293A !important;
   color: #F1F5F9 !important;
   border-color: transparent !important;
+  border-radius: 26px !important;
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+  padding-left: 1.1rem !important;
 }
+textarea { border-radius: 20px !important; }
 input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
   background-color: #26314A !important;
 }
@@ -111,8 +116,7 @@ button:active:not(:disabled) {
 .bg-emerald-500.text-white:active {
   transform: translateY(0);
 }
-.bg-brand-500.text-white.rounded-md,
-.bg-emerald-500.text-white.rounded-md {
+button.rounded-md {
   border-radius: 26px !important;
 }
 

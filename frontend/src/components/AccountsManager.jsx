@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
+import Field from './Field.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const TYPES = ['BANK', 'CASH', 'CARD', 'EMERGENCY_FUND']
@@ -10,6 +11,11 @@ export default function AccountsManager() {
   const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '' })
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
+
+  const [balancesRevealed, setBalancesRevealed] = useState(false)
+  const [askingPin, setAskingPin] = useState(false)
+  const [pin, setPin] = useState('')
+  const [revealError, setRevealError] = useState('')
 
   async function load() {
     const { data } = await client.get('/accounts')
@@ -59,46 +65,86 @@ export default function AccountsManager() {
     load()
   }
 
+  function openReveal() {
+    setRevealError('')
+    setPin('')
+    setAskingPin(true)
+  }
+
+  async function submitReveal(e) {
+    e.preventDefault()
+    setRevealError('')
+    try {
+      await client.post('/profile/reveal-balance', { pin })
+      setBalancesRevealed(true)
+      setAskingPin(false)
+    } catch (err) {
+      setRevealError(err.response?.data?.message || t('Incorrect PIN'))
+    }
+  }
+
+  function hideBalances() {
+    setBalancesRevealed(false)
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6">
       <h2 className="font-semibold mb-4">{t('Accounts')}</h2>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-        <input
-          placeholder={t('Account name')}
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          className="px-3 py-2 border border-slate-300 rounded-md"
-        />
-        <select
-          value={form.type}
-          onChange={(e) => setForm({ ...form, type: e.target.value })}
-          className="px-3 py-2 border border-slate-300 rounded-md"
-        >
-          {TYPES.map((ty) => (
-            <option key={ty} value={ty}>{t(ty)}</option>
-          ))}
-        </select>
-        <input
-          type="number"
-          step="0.01"
-          placeholder={t('Opening balance')}
-          value={form.balance}
-          onChange={(e) => setForm({ ...form, balance: e.target.value })}
-          className="px-3 py-2 border border-slate-300 rounded-md"
-        />
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder={t('Minimum balance to maintain (optional)')}
-          value={form.minimumBalance}
-          onChange={(e) => setForm({ ...form, minimumBalance: e.target.value })}
-          className="px-3 py-2 border border-slate-300 rounded-md"
-        />
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 mb-4">
+        <Field label={t('Account name')}>
+          <input
+            placeholder={t('Account name')}
+            required
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full"
+          />
+        </Field>
+        <Field label={t('Type')}>
+          <select
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value })}
+            className="w-full"
+          >
+            {TYPES.map((ty) => (
+              <option key={ty} value={ty}>{t(ty)}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('Opening balance')}>
+          <input
+            type="number"
+            step="0.01"
+            placeholder={t('Opening balance')}
+            value={form.balance}
+            onChange={(e) => setForm({ ...form, balance: e.target.value })}
+            className="w-full"
+          />
+        </Field>
+        <Field label={t('Minimum balance to maintain (optional)')}>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder={t('Minimum balance to maintain (optional)')}
+            value={form.minimumBalance}
+            onChange={(e) => setForm({ ...form, minimumBalance: e.target.value })}
+            className="w-full"
+          />
+        </Field>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input type="checkbox" checked={form.isPrimary} onChange={(e) => setForm({ ...form, isPrimary: e.target.checked })} />
+          {t('Primary account — default for daily spending, EMIs, and everything else you log')}
+        </label>
+        <p className="text-xs text-slate-500 -mt-2">
+          {t('Minimum balance is excluded from affordability checks and your "Total across all accounts" figure — it never counts as spendable.')}
+        </p>
+        {form.type === 'EMERGENCY_FUND' && (
+          <p className="text-xs text-amber-600">{t('Emergency fund money is excluded from affordability checks — it never counts as spendable.')}</p>
+        )}
         <div className="flex gap-2">
-          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-2 font-medium">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
             {editingId ? t('Update') : t('Add')}
           </button>
           {editingId && (
@@ -107,18 +153,27 @@ export default function AccountsManager() {
             </button>
           )}
         </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600 md:col-span-4">
-          <input type="checkbox" checked={form.isPrimary} onChange={(e) => setForm({ ...form, isPrimary: e.target.checked })} />
-          {t('Primary account — default for daily spending, EMIs, and everything else you log')}
-        </label>
-        <p className="text-xs text-slate-500 md:col-span-4 -mt-2">
-          {t('Minimum balance is excluded from affordability checks and your "Total across all accounts" figure — it never counts as spendable.')}
-        </p>
-        {form.type === 'EMERGENCY_FUND' && (
-          <p className="text-xs text-amber-600 md:col-span-4">{t('Emergency fund money is excluded from affordability checks — it never counts as spendable.')}</p>
-        )}
-        {error && <div className="md:col-span-4 text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+
+      {askingPin && (
+        <form onSubmit={submitReveal} className="flex items-center gap-2 mb-3">
+          <input
+            type="password" inputMode="numeric" autoFocus placeholder={t('Enter PIN')}
+            value={pin} onChange={(e) => setPin(e.target.value)}
+            className="w-32"
+          />
+          <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-2 text-sm font-medium">{t('Unlock')}</button>
+          <button type="button" onClick={() => setAskingPin(false)} className="text-sm text-slate-500">{t('Cancel')}</button>
+          {revealError && <span className="text-sm text-red-600">{revealError}</span>}
+        </form>
+      )}
+
+      {balancesRevealed && (
+        <div className="flex justify-end mb-2">
+          <button onClick={hideBalances} className="text-xs text-slate-500">{t('Hide balances')}</button>
+        </div>
+      )}
 
       <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
         {accounts.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No accounts yet.')}</div>}
@@ -135,9 +190,15 @@ export default function AccountsManager() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className={`font-semibold ${acc.balance < 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                ₹{Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
+              {balancesRevealed ? (
+                <div className={`font-semibold ${acc.balance < 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                  ₹{Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </div>
+              ) : (
+                <button onClick={openReveal} className="font-semibold text-slate-300 tracking-widest select-none" title={t('Tap to reveal')}>
+                  ₹ • • • •
+                </button>
+              )}
               <button onClick={() => startEdit(acc)} className="text-sm text-brand-600">{t('Edit')}</button>
               <button onClick={() => handleDelete(acc.id)} className="text-sm text-red-600">{t('Delete')}</button>
             </div>
