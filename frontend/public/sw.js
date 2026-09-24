@@ -1,3 +1,13 @@
+// Force this version to take over immediately instead of waiting for every open
+// tab to close — without this, an old (possibly broken) push handler can keep
+// running indefinitely on a phone that never fully closes the app.
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 self.addEventListener('push', (event) => {
   let data = { title: 'Money Manager', body: 'You have a new notification', url: '/' }
   try {
