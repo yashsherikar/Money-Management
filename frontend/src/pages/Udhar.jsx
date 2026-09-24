@@ -3,6 +3,7 @@ import client from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import Field from '../components/Field.jsx'
+import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -19,6 +20,7 @@ export default function Udhar() {
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
 
   async function loadAll() {
     const [entriesRes, summaryRes, accountsRes] = await Promise.all([
@@ -66,10 +68,12 @@ export default function Udhar() {
   function resetForm() {
     setForm(emptyForm)
     setEditingId(null)
+    setFormOpen(false)
   }
 
   function startEdit(entry) {
     setEditingId(entry.id)
+    setFormOpen(true)
     setForm({
       accountId: entry.accountId ? String(entry.accountId) : '',
       contactName: entry.contactName,
@@ -115,7 +119,8 @@ export default function Udhar() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+      <CollapsibleSection title={t('Add entry')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <Field label={t('Type')}>
           <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full">
             <option value="LENT">{t('I gave (lent)')}</option>
@@ -154,12 +159,11 @@ export default function Udhar() {
         </Field>
         <div className="flex gap-2">
           <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{editingId ? t('Update entry') : t('Add entry')}</button>
-          {editingId && (
-            <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
-          )}
+          <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+      </CollapsibleSection>
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {entries.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No udhar entries yet.')}</div>}

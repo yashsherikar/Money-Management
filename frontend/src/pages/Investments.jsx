@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import client from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import Field from '../components/Field.jsx'
+import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -21,6 +22,7 @@ export default function Investments() {
   const [summary, setSummary] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
+  const [formOpen, setFormOpen] = useState(false)
   const [txnForms, setTxnForms] = useState({}) // investmentId -> form
   const [valueDrafts, setValueDrafts] = useState({}) // investmentId -> string
 
@@ -40,6 +42,7 @@ export default function Investments() {
     try {
       await client.post('/investments', { name: form.name, type: form.type, note: form.note || null })
       setForm(emptyForm)
+      setFormOpen(false)
       loadAll()
     } catch (err) {
       setError(err.response?.data?.message || t('Save failed'))
@@ -90,7 +93,8 @@ export default function Investments() {
         </div>
       )}
 
-      <form onSubmit={handleAdd} className="bg-white rounded-xl p-5 mb-6 flex flex-col gap-4">
+      <CollapsibleSection title={t('Add investment')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
+      <form onSubmit={handleAdd} className="flex flex-col gap-4">
         <Field label={t('Name (fund / stock / SIP)')}>
           <input required placeholder={t('Name (fund / stock / SIP)')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full" />
         </Field>
@@ -106,9 +110,13 @@ export default function Investments() {
         <Field label={t('Note (optional)')}>
           <input placeholder={t('Note (optional)')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="w-full" />
         </Field>
-        <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add investment')}</button>
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">{t('Add investment')}</button>
+          <button type="button" onClick={() => setFormOpen(false)} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
+        </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
       </form>
+      </CollapsibleSection>
 
       <div className="space-y-4">
         {investments.length === 0 && <div className="text-sm text-slate-500">{t('No investments tracked yet.')}</div>}

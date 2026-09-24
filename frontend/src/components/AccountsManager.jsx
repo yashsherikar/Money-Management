@@ -198,7 +198,6 @@ export default function AccountsManager() {
                   </svg>
                 )}
                 <span className="truncate">{acc.name}</span>
-                {acc.isPrimary && <span className="text-xs text-teal font-medium whitespace-nowrap">{t('PRIMARY')}</span>}
               </div>
               <div className="text-xs text-slate-500 truncate">
                 {t(acc.type)}
