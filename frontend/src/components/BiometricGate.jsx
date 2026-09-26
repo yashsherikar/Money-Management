@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { App as CapApp } from '@capacitor/app'
 import { useAuth } from '../context/AuthContext.jsx'
 import { isNativePlatform, isBiometricEnabled, authenticateWithBiometric } from '../biometricLock.js'
@@ -11,8 +11,15 @@ export default function BiometricGate({ children }) {
   const [checking, setChecking] = useState(false)
 
   const needsGate = isNativePlatform() && isBiometricEnabled() && !!user
+  // The biometric prompt opens its own Android activity; MainActivity's onResume fires
+  // when that activity closes, which re-fires appStateChange below. Without this guard,
+  // that resume event calls tryUnlock again while the first check is still finishing,
+  // reopening the prompt in a loop.
+  const inFlightRef = useRef(false)
 
   const tryUnlock = useCallback(async () => {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     setChecking(true)
     try {
       await authenticateWithBiometric()
@@ -21,6 +28,7 @@ export default function BiometricGate({ children }) {
       setLocked(true)
     } finally {
       setChecking(false)
+      inFlightRef.current = false
     }
   }, [])
 
