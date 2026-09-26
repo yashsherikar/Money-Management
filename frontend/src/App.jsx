@@ -1,4 +1,6 @@
-import { Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, useNavigate } from 'react-router-dom'
+import { listenForNativeNotificationTaps } from './nativePush.js'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
@@ -27,6 +29,12 @@ function Protected({ children }) {
 }
 
 export default function App() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    listenForNativeNotificationTaps(navigate)
+  }, [navigate])
+
   return (
     <>
     <LoadingBar />

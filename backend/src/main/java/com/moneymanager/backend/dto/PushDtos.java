@@ -16,6 +16,8 @@ public class PushDtos {
 
     public record UnsubscribeRequest(@NotBlank String endpoint) {}
 
+    public record FcmTokenRequest(@NotBlank String token) {}
+
     public record PushStatusResponse(boolean available) {}
 
     public record TestPushResponse(boolean vapidConfigured, int subscriptionCount, List<String> results) {}

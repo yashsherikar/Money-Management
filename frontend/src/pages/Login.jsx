@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { EyeIcon, EyeOffIcon } from '../components/icons.jsx'
+import client from '../api/client'
+import { promptNativePushIfNeeded } from '../nativePush.js'
 
 export default function Login() {
   const { login } = useAuth()
@@ -20,6 +22,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
+      await promptNativePushIfNeeded(client)
       navigate('/')
     } catch (err) {
       setError(err.response?.data?.message || t('Login failed'))
