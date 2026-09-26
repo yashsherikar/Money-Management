@@ -11,6 +11,18 @@ export async function isNativePushEnabled() {
   return status.receive === 'granted'
 }
 
+/** Call after signup/login on native: asks for push permission if not already decided, silently. */
+export async function promptNativePushIfNeeded(client) {
+  if (!isNativePlatform()) return
+  const status = await PushNotifications.checkPermissions()
+  if (status.receive === 'granted') return
+  try {
+    await enableNativePush(client)
+  } catch {
+    // user declined or registration failed — they can retry from Settings
+  }
+}
+
 /** Registers this device for FCM push and sends the resulting token to the backend. */
 export function enableNativePush(client) {
   return new Promise((resolve, reject) => {
