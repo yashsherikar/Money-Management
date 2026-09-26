@@ -130,3 +130,31 @@ button.rounded-md {
   fill: #8A99AD !important;
 }
 
+/* Page transition — applied to a div inside <main>, never to an ancestor of the
+   fixed bottom nav (which is a sibling of main, not a descendant), so this is
+   safe to give a transform without breaking position:fixed. */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-page-in {
+  animation: page-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* "More" bottom sheet */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes sheet-down {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-sheet-up { animation: sheet-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-sheet-down { animation: sheet-down 0.2s ease-in both; }
+.animate-backdrop-in { animation: backdrop-in 0.2s ease-out both; }
+
