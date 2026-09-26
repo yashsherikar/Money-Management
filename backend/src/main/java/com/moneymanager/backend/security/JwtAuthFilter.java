@@ -2,6 +2,7 @@ package com.moneymanager.backend.security;
 
 import com.moneymanager.backend.entity.User;
 import com.moneymanager.backend.repository.UserRepository;
+import com.moneymanager.backend.repository.UserSessionRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,10 +29,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final UserSessionRepository sessionRepository;
 
-    public JwtAuthFilter(JwtService jwtService, UserRepository userRepository) {
+    public JwtAuthFilter(JwtService jwtService, UserRepository userRepository, UserSessionRepository sessionRepository) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
+        this.sessionRepository = sessionRepository;
     }
 
     @Override
@@ -51,6 +54,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (rejection != null) {
                 request.setAttribute(FAILURE_REASON, "token rejected — " + rejection);
                 log.warn("{} {}: token rejected — {}", request.getMethod(), path, rejection);
+            } else if (!sessionRepository.existsByJti(jwtService.extractJti(token))) {
+                request.setAttribute(FAILURE_REASON, "session revoked — logged in from another device");
+                log.warn("{} {}: session revoked (evicted by a newer login elsewhere)", request.getMethod(), path);
             } else {
                 Long userId = jwtService.extractUserId(token);
                 Optional<User> user = userRepository.findById(userId);
