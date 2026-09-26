@@ -1,5 +1,7 @@
 import { createContext, useContext, useState } from 'react'
 import client from '../api/client'
+import { isNativePlatform } from '../nativePush.js'
+import { disablePush, isPushSupported } from '../push.js'
 
 const AuthContext = createContext(null)
 
@@ -25,8 +27,15 @@ export function AuthProvider({ children }) {
     persist(data)
   }
 
-  function logout() {
-    client.post('/auth/logout').catch(() => {})
+  async function logout() {
+    // Native app: keep receiving push after logout (re-engagement). Web: stop it,
+    // since a shared/public browser shouldn't keep notifying a logged-out session.
+    // Awaited before clearing the token so these requests still go out authenticated.
+    const cleanup = [client.post('/auth/logout').catch(() => {})]
+    if (!isNativePlatform() && isPushSupported()) {
+      cleanup.push(disablePush(client).catch(() => {}))
+    }
+    await Promise.allSettled(cleanup)
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setUser(null)
