@@ -12,10 +12,12 @@ export default function BiometricGate({ children }) {
 
   const needsGate = isNativePlatform() && isBiometricEnabled() && !!user
   // The biometric prompt opens its own Android activity; MainActivity's onResume fires
-  // when that activity closes, which re-fires appStateChange below. Without this guard,
-  // that resume event calls tryUnlock again while the first check is still finishing,
-  // reopening the prompt in a loop.
+  // when that activity closes, which re-fires appStateChange below — sometimes while
+  // the first check is still finishing (inFlightRef guards that), sometimes a moment
+  // AFTER it already succeeded (the cooldown below guards that trailing case, which
+  // is what was still causing an endless reprompt loop even after a successful scan).
   const inFlightRef = useRef(false)
+  const lastUnlockedAtRef = useRef(0)
 
   const tryUnlock = useCallback(async () => {
     if (inFlightRef.current) return
@@ -23,6 +25,7 @@ export default function BiometricGate({ children }) {
     setChecking(true)
     try {
       await authenticateWithBiometric()
+      lastUnlockedAtRef.current = Date.now()
       setLocked(false)
     } catch {
       setLocked(true)
@@ -44,7 +47,9 @@ export default function BiometricGate({ children }) {
     if (!isNativePlatform()) return undefined
     let handle
     CapApp.addListener('appStateChange', ({ isActive }) => {
-      if (isActive && needsGate) tryUnlock()
+      if (!isActive || !needsGate) return
+      if (Date.now() - lastUnlockedAtRef.current < 2000) return
+      tryUnlock()
     }).then((h) => { handle = h })
     return () => handle?.remove()
     // eslint-disable-next-line react-hooks/exhaustive-deps
