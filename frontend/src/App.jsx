@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
-import { listenForNativeNotificationTaps } from './nativePush.js'
+import { listenForNativeNotificationTaps, listenForNativeForegroundPush } from './nativePush.js'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
@@ -33,6 +33,7 @@ export default function App() {
 
   useEffect(() => {
     listenForNativeNotificationTaps(navigate)
+    listenForNativeForegroundPush()
   }, [navigate])
 
   return (
