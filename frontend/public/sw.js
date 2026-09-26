@@ -8,6 +8,15 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+// Chrome/Android only treats an "Add to Home Screen" icon as a real installed
+// app (WebAPK) — not just a bookmark shortcut — if the service worker has a
+// fetch handler. Without this, notifications can render as a generic bookmark
+// card instead of the app's own rich notification (this is likely why Chrome
+// behaved differently from Firefox, which doesn't gate on this).
+self.addEventListener('fetch', (event) => {
+  event.respondWith(fetch(event.request))
+})
+
 self.addEventListener('push', (event) => {
   let data = { title: 'Money Manager', body: 'You have a new notification', url: '/' }
   try {

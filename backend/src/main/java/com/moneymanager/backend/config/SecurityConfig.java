@@ -53,11 +53,17 @@ public class SecurityConfig {
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
         return (request, response, authException) -> {
-            log.warn("401 on {} {}: {}", request.getMethod(), request.getRequestURI(), authException.getMessage());
+            Object reason = request.getAttribute(JwtAuthFilter.FAILURE_REASON);
+            String detail = reason == null ? "authentication required" : "authentication required — " + reason;
+            log.warn("401 on {} {}: {}", request.getMethod(), request.getRequestURI(), detail);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"authentication required\"}");
+            response.getWriter().write("{\"message\":" + jsonString(detail) + "}");
         };
+    }
+
+    private static String jsonString(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
     @Bean

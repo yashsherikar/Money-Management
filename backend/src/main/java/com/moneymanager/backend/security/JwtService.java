@@ -51,12 +51,19 @@ public class JwtService {
     }
 
     public boolean isValid(String token) {
+        return rejectionReason(token) == null;
+    }
+
+    /** @return null when the token is good, otherwise a human-readable reason it was rejected. */
+    public String rejectionReason(String token) {
         try {
             Claims claims = parseClaims(token);
-            return claims.getExpiration().after(new Date());
+            if (!claims.getExpiration().after(new Date())) {
+                return "expired at " + claims.getExpiration();
+            }
+            return null;
         } catch (Exception e) {
-            log.warn("JWT rejected: {}: {}", e.getClass().getSimpleName(), e.getMessage());
-            return false;
+            return e.getClass().getSimpleName() + ": " + e.getMessage();
         }
     }
 }
