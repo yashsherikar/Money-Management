@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { enablePush, disablePush, isPushEnabled, isPushSupported } from '../push.js'
+import { isNativePlatform, isNativePushEnabled, enableNativePush, disableNativePush } from '../nativePush.js'
 
 export default function Settings() {
   const { t } = useLanguage()
@@ -27,9 +28,11 @@ export default function Settings() {
     client.get('/profile').then((res) => setPinSet(res.data.pinSet))
   }
 
+  const native = isNativePlatform()
+
   useEffect(() => {
     load()
-    isPushEnabled().then(setPushOn)
+    ;(native ? isNativePushEnabled() : isPushEnabled()).then(setPushOn)
   }, [])
 
   async function togglePush() {
@@ -37,10 +40,10 @@ export default function Settings() {
     setPushBusy(true)
     try {
       if (pushOn) {
-        await disablePush(client)
+        await (native ? disableNativePush(client) : disablePush(client))
         setPushOn(false)
       } else {
-        await enablePush(client)
+        await (native ? enableNativePush(client) : enablePush(client))
         setPushOn(true)
       }
     } catch (err) {
@@ -114,7 +117,7 @@ export default function Settings() {
               <h2 className="font-semibold">{t('Push notifications')}</h2>
               <p className="text-xs text-slate-500 mt-1">{t('Get notified on this device when someone requests money from you.')}</p>
             </div>
-            {isPushSupported() ? (
+            {native || isPushSupported() ? (
               <button
                 onClick={togglePush}
                 disabled={pushBusy}

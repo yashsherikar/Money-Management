@@ -22,14 +22,17 @@ public class PushSubscription {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, unique = true, length = 1000)
+    /** Web push subscription (browser). Null for a native Android FCM subscription. */
+    @Column(unique = true, length = 1000)
     private String endpoint;
 
-    @Column(nullable = false)
     private String p256dh;
 
-    @Column(nullable = false)
     private String auth;
+
+    /** Native app FCM registration token (Capacitor/Android). Null for a browser web-push subscription. */
+    @Column(name = "fcm_token", unique = true, length = 500)
+    private String fcmToken;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();

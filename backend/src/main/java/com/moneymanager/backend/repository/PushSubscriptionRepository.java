@@ -10,4 +10,5 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
     List<PushSubscription> findByUserId(Long userId);
     Optional<PushSubscription> findByEndpoint(String endpoint);
     Optional<PushSubscription> findByEndpointAndUserId(String endpoint, Long userId);
+    Optional<PushSubscription> findByFcmToken(String fcmToken);
 }

@@ -35,3 +35,6 @@ push:
     public-key: ${VAPID_PUBLIC_KEY:}
     private-key: ${VAPID_PRIVATE_KEY:}
     subject: ${VAPID_SUBJECT:mailto:admin@example.com}
+
+firebase:
+  service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}

@@ -69,6 +69,13 @@
             <version>0.7.9</version>
         </dependency>
         <dependency>
+            <!-- for native app (Capacitor/Android) push via FCM tokens, alongside the
+                 browser web-push flow above -->
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.11.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>

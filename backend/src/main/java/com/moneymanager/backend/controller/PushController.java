@@ -41,4 +41,14 @@ public class PushController {
     public TestPushResponse test(@AuthenticationPrincipal User user) {
         return pushService.sendTest(user);
     }
+
+    @PostMapping("/register-fcm-token")
+    public void registerFcmToken(@AuthenticationPrincipal User user, @Valid @RequestBody FcmTokenRequest request) {
+        pushService.registerFcmToken(user, request.token());
+    }
+
+    @PostMapping("/unregister-fcm-token")
+    public void unregisterFcmToken(@Valid @RequestBody FcmTokenRequest request) {
+        pushService.unregisterFcmToken(request.token());
+    }
 }
