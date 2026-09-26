@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { listenForNativeNotificationTaps, listenForNativeForegroundPush } from './nativePush.js'
+import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
@@ -37,7 +38,7 @@ export default function App() {
   }, [navigate])
 
   return (
-    <>
+    <BiometricGate>
     <LoadingBar />
     <DueReminders />
     <InstallPrompt />
@@ -56,6 +57,6 @@ export default function App() {
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
     </Routes>
-    </>
+    </BiometricGate>
   )
 }
