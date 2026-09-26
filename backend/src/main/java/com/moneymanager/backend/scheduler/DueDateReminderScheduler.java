@@ -17,9 +17,8 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 
 /**
- * Sends a push notification the day before something is due — rent tomorrow, EMI tomorrow,
- * insurance premium tomorrow, FD maturing tomorrow — so there's a heads-up before the actual
- * due-day auto-log/flag fires.
+ * Sends a push notification 2 days before something is due — rent, EMI, insurance premium,
+ * FD maturing — so there's a heads-up well before the actual due-day auto-log/flag fires.
  */
 @Component
 public class DueDateReminderScheduler {
@@ -47,11 +46,13 @@ public class DueDateReminderScheduler {
         this.pushService = pushService;
     }
 
+    private static final int REMINDER_LEAD_DAYS = 2;
+
     @Scheduled(cron = "0 0 8 * * *")
     @Transactional
     public void sendDueTomorrowReminders() {
         LocalDate today = LocalDate.now();
-        LocalDate tomorrow = today.plusDays(1);
+        LocalDate target = today.plusDays(REMINDER_LEAD_DAYS);
         String currentMonth = YearMonth.from(today).toString();
 
         for (RecurringTransaction rt : recurringTransactionRepository.findByActiveTrue()) {
@@ -59,54 +60,54 @@ public class DueDateReminderScheduler {
                 LocalDate anchor = rt.getLastLoggedDate() != null
                         ? rt.getLastLoggedDate()
                         : rt.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate();
-                if (tomorrow.equals(anchor.plusDays(rt.getIntervalDays()))) {
-                    pushService.notifyUser(rt.getUser(), "Expiring tomorrow",
-                            rt.getDescription() + " (" + money(rt.getAmount()) + ") expires/renews tomorrow", "/recurring");
+                if (target.equals(anchor.plusDays(rt.getIntervalDays()))) {
+                    pushService.notifyUser(rt.getUser(), "Expiring in 2 days",
+                            rt.getDescription() + " (" + money(rt.getAmount()) + ") expires/renews in 2 days", "/recurring");
                 }
                 continue;
             }
             if (currentMonth.equals(rt.getLastLoggedMonth())) continue;
-            int effectiveDay = Math.min(rt.getDayOfMonth(), tomorrow.lengthOfMonth());
-            if (tomorrow.getDayOfMonth() == effectiveDay) {
-                pushService.notifyUser(rt.getUser(), "Due tomorrow",
-                        rt.getDescription() + " (" + money(rt.getAmount()) + ") is due tomorrow", "/recurring");
+            int effectiveDay = Math.min(rt.getDayOfMonth(), target.lengthOfMonth());
+            if (target.getDayOfMonth() == effectiveDay) {
+                pushService.notifyUser(rt.getUser(), "Due in 2 days",
+                        rt.getDescription() + " (" + money(rt.getAmount()) + ") is due in 2 days", "/recurring");
             }
         }
 
         for (Emi emi : emiRepository.findByActiveTrue()) {
             if (currentMonth.equals(emi.getLastLoggedMonth())) continue;
-            int effectiveDay = Math.min(emi.getDueDay(), tomorrow.lengthOfMonth());
-            if (tomorrow.getDayOfMonth() == effectiveDay) {
-                pushService.notifyUser(emi.getUser(), "EMI due tomorrow",
-                        emi.getLoanName() + " EMI (" + money(emi.getEmiAmount()) + ") is due tomorrow", "/obligations");
+            int effectiveDay = Math.min(emi.getDueDay(), target.lengthOfMonth());
+            if (target.getDayOfMonth() == effectiveDay) {
+                pushService.notifyUser(emi.getUser(), "EMI due in 2 days",
+                        emi.getLoanName() + " EMI (" + money(emi.getEmiAmount()) + ") is due in 2 days", "/obligations");
             }
         }
 
         for (InsurancePolicy policy : insurancePolicyRepository.findAll()) {
-            if (policy.isActive() && tomorrow.equals(policy.getDueDate())) {
-                pushService.notifyUser(policy.getUser(), "Premium due tomorrow",
-                        policy.getPolicyName() + " premium (" + money(policy.getPremiumAmount()) + ") is due tomorrow", "/obligations");
+            if (policy.isActive() && target.equals(policy.getDueDate())) {
+                pushService.notifyUser(policy.getUser(), "Premium due in 2 days",
+                        policy.getPolicyName() + " premium (" + money(policy.getPremiumAmount()) + ") is due in 2 days", "/obligations");
             }
         }
 
         for (FixedDeposit fd : fixedDepositRepository.findAll()) {
-            if (tomorrow.equals(fd.getMaturityDate())) {
-                pushService.notifyUser(fd.getUser(), "FD maturing tomorrow",
-                        fd.getBankName() + " FD (" + money(fd.getMaturityAmount()) + ") matures tomorrow", "/obligations");
+            if (target.equals(fd.getMaturityDate())) {
+                pushService.notifyUser(fd.getUser(), "FD maturing in 2 days",
+                        fd.getBankName() + " FD (" + money(fd.getMaturityAmount()) + ") matures in 2 days", "/obligations");
             }
         }
 
         for (EmergencyFundPlan plan : emergencyFundPlanRepository.findByActiveTrue()) {
             if (currentMonth.equals(plan.getLastLoggedMonth())) continue;
-            int effectiveDay = Math.min(plan.getDayOfMonth(), tomorrow.lengthOfMonth());
-            if (tomorrow.getDayOfMonth() == effectiveDay) {
-                pushService.notifyUser(plan.getUser(), "Emergency fund contribution tomorrow",
+            int effectiveDay = Math.min(plan.getDayOfMonth(), target.lengthOfMonth());
+            if (target.getDayOfMonth() == effectiveDay) {
+                pushService.notifyUser(plan.getUser(), "Emergency fund contribution in 2 days",
                         money(plan.getAmount()) + " moves from " + plan.getSourceAccount().getName()
-                                + " to " + plan.getTargetAccount().getName() + " tomorrow", "/obligations");
+                                + " to " + plan.getTargetAccount().getName() + " in 2 days", "/obligations");
             }
         }
 
-        log.info("Due-tomorrow reminder pass complete for {}", tomorrow);
+        log.info("Due-in-2-days reminder pass complete for {}", target);
     }
 
     private String money(java.math.BigDecimal amount) {
