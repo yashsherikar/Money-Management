@@ -51,10 +51,12 @@ client.interceptors.response.use(
     notifyLoading()
     const status = err.response?.status
     const isAuthEndpoint = err.config?.url?.includes('/auth/')
+    const sessionRevoked = err.response?.data?.message?.includes('session revoked')
     if (!isAuthEndpoint && (status === 401 || status === 403)) {
-      // Only log out when the token is actually gone or expired. Otherwise surface
+      // Only log out when the token is actually gone/expired, or the server explicitly
+      // revoked this session (e.g. evicted by a 4th-device login). Otherwise surface
       // the error on the page instead of wiping the session and reloading.
-      if (!tokenStillValid()) {
+      if (!tokenStillValid() || sessionRevoked) {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
         window.location.href = '/login'
