@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
+import { LocalNotifications } from '@capacitor/local-notifications'
 
 export function isNativePlatform() {
   return Capacitor.isNativePlatform()
@@ -74,5 +75,28 @@ export function listenForNativeNotificationTaps(navigate) {
   PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
     const url = action.notification?.data?.url
     if (url) navigate(url)
+  })
+}
+
+/** Call once at app startup (native only). Android only auto-shows a push in the
+ *  tray when the app is backgrounded/killed — while it's open, we have to display
+ *  it ourselves or the user never sees it. */
+export function listenForNativeForegroundPush() {
+  if (!isNativePlatform()) return
+  PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: Date.now() % 2147483647,
+          title: notification.title || 'Money Manager',
+          body: notification.body || '',
+          smallIcon: 'ic_stat_notify',
+          iconColor: '#226DFF',
+          extra: notification.data,
+        }],
+      })
+    } catch {
+      // no-op — worst case the user just doesn't see this one
+    }
   })
 }
