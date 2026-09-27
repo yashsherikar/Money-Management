@@ -21,7 +21,7 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(email.trim(), password)
       await promptNativePushIfNeeded(client)
       navigate('/')
     } catch (err) {
@@ -47,7 +47,10 @@ export default function Login() {
         {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
         <label className="block text-sm font-medium text-slate-700 mb-1">{t('Email')}</label>
         <input
-          type="email"
+          type="text"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
