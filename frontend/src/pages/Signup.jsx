@@ -22,7 +22,7 @@ export default function Signup() {
     setError('')
     setLoading(true)
     try {
-      await signup(email, password, name)
+      await signup(email.trim(), password, name.trim())
       await promptNativePushIfNeeded(client)
       navigate('/')
     } catch (err) {
@@ -55,7 +55,10 @@ export default function Signup() {
         />
         <label className="block text-sm font-medium text-slate-700 mb-1">{t('Email')}</label>
         <input
-          type="email"
+          type="text"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
