@@ -1,16 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PinPad from '../components/PinPad.jsx'
+import { LockIconStage } from '../components/LockAnimations.jsx'
 import { setAppLockPin } from '../appLock.js'
 import { isBiometricAvailable, setBiometricEnabled, authenticateWithBiometric } from '../biometricLock.js'
-
-const FingerprintIcon = (
-  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#226DFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2a4 4 0 0 0-4 4v3a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z" />
-    <path d="M6 10v1a6 6 0 0 0 12 0v-1" />
-    <path d="M12 17v5" />
-  </svg>
-)
 
 export default function Onboarding() {
   const navigate = useNavigate()
@@ -70,13 +63,16 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-navy px-4 py-10 gap-10">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-lock-gradient px-4 py-10 gap-8">
       {step !== 'biometric' ? (
-        <div key={step} className="animate-page-in">
+        <div key={step} className="flex flex-col items-center gap-8 animate-page-in">
+          <LockIconStage variant="pin" phase="idle" />
+          <div className="text-center">
+            <h2 className="text-lg font-bold">{step === 'create' ? 'Create a PIN' : 'Confirm your PIN'}</h2>
+            <p className="text-sm text-muted mt-1">{step === 'create' ? 'You’ll use this to unlock Money Manager' : 'Enter it again to confirm'}</p>
+          </div>
           <PinPad
             key={step === 'confirm' ? `confirm-${pinAttempt}` : 'create'}
-            title={step === 'create' ? 'Create a PIN' : 'Confirm your PIN'}
-            subtitle={step === 'create' ? 'You’ll use this to unlock Money Manager' : 'Enter it again to confirm'}
             error={pinError}
             onErrorShown={() => {
               setPinError(false)
@@ -88,9 +84,11 @@ export default function Onboarding() {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-6 text-center max-w-xs animate-page-in">
-          <div className="w-16 h-16 rounded-full bg-brand-50 flex items-center justify-center">{FingerprintIcon}</div>
-          <h2 className="text-lg font-bold">Enable biometric unlock?</h2>
-          <p className="text-sm text-muted">Use your fingerprint or face for quicker access. Your PIN still works as a backup, including after a few failed scans.</p>
+          <LockIconStage variant="fingerprint" phase="idle" />
+          <div>
+            <h2 className="text-lg font-bold">Enable biometric unlock?</h2>
+            <p className="text-sm text-muted mt-1">Use your fingerprint or face for quicker access. Your PIN still works as a backup, including after a few failed scans.</p>
+          </div>
           {bioError && <div className="text-sm text-red-600">{bioError}</div>}
           <button
             onClick={enableBiometric}

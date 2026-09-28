@@ -5,9 +5,12 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { isNativePlatform, isBiometricEnabled, authenticateWithBiometric } from '../biometricLock.js'
 import { isPinSet, verifyAppLockPin } from '../appLock.js'
 import PinPad from './PinPad.jsx'
+import { LockIconStage, UnlockFlash } from './LockAnimations.jsx'
 
 const MAX_BIOMETRIC_FAILS = 3
 const JUST_ONBOARDED_WINDOW_MS = 5000
+const SUCCESS_HOLD_MS = 550
+const BURST_HOLD_MS = 500
 
 export default function BiometricGate({ children }) {
   const { user, logout } = useAuth()
@@ -15,7 +18,8 @@ export default function BiometricGate({ children }) {
   const location = useLocation()
   const [locked, setLocked] = useState(false)
   const [mode, setMode] = useState('biometric')
-  const [checking, setChecking] = useState(false)
+  const [phase, setPhase] = useState('idle')
+  const [flash, setFlash] = useState(false)
   const [pinError, setPinError] = useState(false)
   const [pinAttempt, setPinAttempt] = useState(0)
 
@@ -28,29 +32,38 @@ export default function BiometricGate({ children }) {
   const lastUnlockedAtRef = useRef(0)
   const failCountRef = useRef(0)
 
+  const celebrate = useCallback((onDone) => {
+    setPhase('success')
+    setFlash(true)
+    setTimeout(() => setFlash(false), 700)
+    setTimeout(() => {
+      setPhase('burst')
+      setTimeout(onDone, BURST_HOLD_MS)
+    }, SUCCESS_HOLD_MS)
+  }, [])
+
   const tryBiometric = useCallback(async () => {
     if (inFlightRef.current) return
     inFlightRef.current = true
-    setChecking(true)
+    setPhase('scanning')
     try {
       await authenticateWithBiometric()
       lastUnlockedAtRef.current = Date.now()
       failCountRef.current = 0
-      setLocked(false)
+      celebrate(() => { setLocked(false); setPhase('idle') })
     } catch {
       failCountRef.current += 1
-      if (failCountRef.current >= MAX_BIOMETRIC_FAILS) {
-        setMode('pin')
-      }
-      setLocked(true)
+      if (failCountRef.current >= MAX_BIOMETRIC_FAILS) setMode('pin')
+      setPhase('idle')
     } finally {
-      setChecking(false)
       inFlightRef.current = false
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebrate])
 
   const startLock = useCallback(() => {
     failCountRef.current = 0
+    setPhase('idle')
     setLocked(true)
     if (bioEnabled) {
       setMode('biometric')
@@ -62,9 +75,7 @@ export default function BiometricGate({ children }) {
   }, [bioEnabled])
 
   useEffect(() => {
-    if (needsOnboarding) {
-      navigate('/onboarding', { replace: true })
-    }
+    if (needsOnboarding) navigate('/onboarding', { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsOnboarding])
 
@@ -96,7 +107,7 @@ export default function BiometricGate({ children }) {
     if (ok) {
       failCountRef.current = 0
       lastUnlockedAtRef.current = Date.now()
-      setLocked(false)
+      celebrate(() => { setLocked(false); setPhase('idle') })
     } else {
       setPinError(true)
     }
@@ -104,41 +115,49 @@ export default function BiometricGate({ children }) {
 
   if (!needsGate || !locked) return children
 
+  const celebrating = phase === 'success' || phase === 'burst'
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-navy px-4 text-center gap-6 animate-page-in">
-      {mode === 'pin' ? (
-        <>
-          <PinPad
-            key={pinAttempt}
-            title="Enter your PIN"
-            subtitle="Unlock Money Manager"
-            error={pinError}
-            onErrorShown={() => {
-              setPinError(false)
-              setPinAttempt((n) => n + 1)
-            }}
-            onComplete={handlePinComplete}
-          />
-          {bioEnabled && (
-            <button onClick={() => { setMode('biometric'); tryBiometric() }} className="text-sm text-muted underline">
-              Try biometric instead
+    <div className="min-h-screen flex flex-col items-center justify-center bg-lock-gradient px-4 text-center gap-8 animate-page-in">
+      <UnlockFlash visible={flash} />
+      <LockIconStage
+        variant={mode === 'biometric' ? 'fingerprint' : 'pin'}
+        phase={phase}
+        onClick={mode === 'biometric' && phase === 'idle' ? tryBiometric : undefined}
+      />
+      <div>
+        <h2 className="text-lg font-bold">
+          {celebrating ? 'Unlocked!' : mode === 'biometric' ? (phase === 'scanning' ? 'Verifying…' : 'Unlock with biometrics') : 'Enter your PIN'}
+        </h2>
+        <p className="text-sm text-muted mt-1">
+          {celebrating ? 'Welcome back.' : mode === 'biometric' ? 'Tap the icon or use your fingerprint sensor.' : 'Unlock Money Manager to continue'}
+        </p>
+      </div>
+
+      {!celebrating && mode === 'pin' && (
+        <PinPad
+          key={pinAttempt}
+          error={pinError}
+          onErrorShown={() => { setPinError(false); setPinAttempt((n) => n + 1) }}
+          onComplete={handlePinComplete}
+        />
+      )}
+
+      {!celebrating && (
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          {mode === 'biometric' && (
+            <button onClick={tryBiometric} disabled={phase === 'scanning'} className="bg-brand-500 text-white rounded-full px-6 py-3 font-bold disabled:opacity-60">
+              {phase === 'scanning' ? 'Verifying…' : 'Unlock'}
             </button>
           )}
-        </>
-      ) : (
-        <>
-          <p className="text-muted">Unlock Money Manager to continue</p>
-          <button
-            onClick={tryBiometric}
-            disabled={checking}
-            className="bg-brand-500 text-white rounded-full px-6 py-3 font-bold disabled:opacity-60"
-          >
-            {checking ? 'Checking...' : 'Unlock'}
-          </button>
-          <button onClick={() => setMode('pin')} className="text-sm text-muted underline">Use PIN instead</button>
-        </>
+          {bioEnabled && (
+            <button onClick={() => setMode(mode === 'biometric' ? 'pin' : 'biometric')} className="text-sm text-muted underline">
+              {mode === 'biometric' ? 'Use PIN instead' : 'Use biometric instead'}
+            </button>
+          )}
+          <button onClick={logout} className="text-sm text-muted underline">Log out instead</button>
+        </div>
       )}
-      <button onClick={logout} className="text-sm text-muted underline">Log out instead</button>
     </div>
   )
 }
