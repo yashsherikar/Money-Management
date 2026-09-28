@@ -20,6 +20,7 @@ import Wishlist from './pages/Wishlist.jsx'
 import Requests from './pages/Requests.jsx'
 import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
+import Onboarding from './pages/Onboarding.jsx'
 
 function Protected({ children }) {
   return (
@@ -45,6 +46,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/" element={<Protected><Dashboard /></Protected>} />
       <Route path="/transactions" element={<Protected><Transactions /></Protected>} />
       <Route path="/recurring" element={<Protected><Recurring /></Protected>} />
