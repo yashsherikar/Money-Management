@@ -65,12 +65,11 @@ export default function BiometricGate({ children }) {
     failCountRef.current = 0
     setPhase('idle')
     setLocked(true)
-    if (bioEnabled) {
-      setMode('biometric')
-      tryBiometric()
-    } else {
-      setMode('pin')
-    }
+    // Don't auto-launch the native biometric prompt here: it can't be dismissed
+    // from JS, so if the user taps "Use PIN instead" while it's still open, the
+    // dialog just lingers on top even though we've switched to PIN underneath.
+    // Show the icon idle instead — tapping it is what opens the prompt.
+    setMode(bioEnabled ? 'biometric' : 'pin')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bioEnabled])
 
