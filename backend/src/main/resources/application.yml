@@ -38,3 +38,6 @@ push:
 
 firebase:
   service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
+
+internal:
+  cron-secret: ${INTERNAL_CRON_SECRET:}

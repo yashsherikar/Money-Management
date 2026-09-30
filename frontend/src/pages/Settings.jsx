@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { enablePush, disablePush, isPushEnabled, isPushSupported } from '../push.js'
 import { isNativePlatform, isNativePushEnabled, enableNativePush, disableNativePush } from '../nativePush.js'
-import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled, authenticateWithBiometric } from '../biometricLock.js'
+import { isBiometricEnabled } from '../biometricLock.js'
+import { isPinSet as isAppLockSet } from '../appLock.js'
 
 export default function Settings() {
   const { t } = useLanguage()
+  const navigate = useNavigate()
   const [pinSet, setPinSet] = useState(false)
 
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' })
@@ -25,11 +28,6 @@ export default function Settings() {
   const [testResults, setTestResults] = useState(null)
   const [testBusy, setTestBusy] = useState(false)
 
-  const [bioAvailable, setBioAvailable] = useState(false)
-  const [bioOn, setBioOn] = useState(isBiometricEnabled())
-  const [bioBusy, setBioBusy] = useState(false)
-  const [bioError, setBioError] = useState('')
-
   function load() {
     client.get('/profile').then((res) => setPinSet(res.data.pinSet))
   }
@@ -39,23 +37,7 @@ export default function Settings() {
   useEffect(() => {
     load()
     ;(native ? isNativePushEnabled() : isPushEnabled()).then(setPushOn)
-    if (native) isBiometricAvailable().then(setBioAvailable)
   }, [])
-
-  async function toggleBiometric() {
-    setBioError('')
-    setBioBusy(true)
-    try {
-      await authenticateWithBiometric()
-      const next = !bioOn
-      setBiometricEnabled(next)
-      setBioOn(next)
-    } catch (err) {
-      setBioError(err.message || t('Biometric check failed'))
-    } finally {
-      setBioBusy(false)
-    }
-  }
 
   async function togglePush() {
     setPushError('')
@@ -173,22 +155,19 @@ export default function Settings() {
           )}
         </div>
 
-        {native && bioAvailable && (
+        {native && (
           <div className="bg-white rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-semibold">{t('Biometric login')}</h2>
-                <p className="text-xs text-slate-500 mt-1">{t('Unlock the app with your fingerprint or face instead of re-entering your password.')}</p>
+                <h2 className="font-semibold">{t('App lock')}</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  {isAppLockSet()
+                    ? (isBiometricEnabled() ? t('PIN + biometric unlock enabled') : t('PIN unlock enabled'))
+                    : t('Not set up yet')}
+                </p>
               </div>
-              <button
-                onClick={toggleBiometric}
-                disabled={bioBusy}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${bioOn ? 'border border-slate-300' : 'bg-brand-500 hover:bg-brand-600 text-white'}`}
-              >
-                {bioOn ? t('Disable') : t('Enable')}
-              </button>
+              <button onClick={() => navigate('/onboarding')} className="text-sm text-brand-600 font-medium">{t('Change')}</button>
             </div>
-            {bioError && <div className="mt-2 text-sm text-red-600">{bioError}</div>}
           </div>
         )}
 

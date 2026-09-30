@@ -1,45 +1,92 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { App as CapApp } from '@capacitor/app'
 import { useAuth } from '../context/AuthContext.jsx'
 import { isNativePlatform, isBiometricEnabled, authenticateWithBiometric } from '../biometricLock.js'
+import { isPinSet, verifyAppLockPin } from '../appLock.js'
+import PinPad from './PinPad.jsx'
+import { LockIconStage, UnlockFlash } from './LockAnimations.jsx'
 
-/** Native-only lock screen: requires a fingerprint/face check to view the app
- *  once logged in, and again whenever the app returns from the background. */
+const MAX_BIOMETRIC_FAILS = 3
+const JUST_ONBOARDED_WINDOW_MS = 5000
+const SUCCESS_HOLD_MS = 550
+const BURST_HOLD_MS = 500
+
 export default function BiometricGate({ children }) {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [locked, setLocked] = useState(false)
-  const [checking, setChecking] = useState(false)
+  const [mode, setMode] = useState('biometric')
+  const [phase, setPhase] = useState('idle')
+  const [flash, setFlash] = useState(false)
+  const [pinError, setPinError] = useState(false)
+  const [pinAttempt, setPinAttempt] = useState(0)
 
-  const needsGate = isNativePlatform() && isBiometricEnabled() && !!user
-  // The biometric prompt opens its own Android activity; MainActivity's onResume fires
-  // when that activity closes, which re-fires appStateChange below — sometimes while
-  // the first check is still finishing (inFlightRef guards that), sometimes a moment
-  // AFTER it already succeeded (the cooldown below guards that trailing case, which
-  // is what was still causing an endless reprompt loop even after a successful scan).
+  const onOnboarding = location.pathname === '/onboarding'
+  const needsGate = isNativePlatform() && isPinSet() && !!user && !onOnboarding
+  const needsOnboarding = isNativePlatform() && !!user && !isPinSet() && !onOnboarding
+  const bioEnabled = isBiometricEnabled()
+
   const inFlightRef = useRef(false)
   const lastUnlockedAtRef = useRef(0)
+  const failCountRef = useRef(0)
 
-  const tryUnlock = useCallback(async () => {
+  const celebrate = useCallback((onDone) => {
+    setPhase('success')
+    setFlash(true)
+    setTimeout(() => setFlash(false), 700)
+    setTimeout(() => {
+      setPhase('burst')
+      setTimeout(onDone, BURST_HOLD_MS)
+    }, SUCCESS_HOLD_MS)
+  }, [])
+
+  const tryBiometric = useCallback(async () => {
     if (inFlightRef.current) return
     inFlightRef.current = true
-    setChecking(true)
+    setPhase('scanning')
     try {
       await authenticateWithBiometric()
       lastUnlockedAtRef.current = Date.now()
-      setLocked(false)
+      failCountRef.current = 0
+      celebrate(() => { setLocked(false); setPhase('idle') })
     } catch {
-      setLocked(true)
+      failCountRef.current += 1
+      if (failCountRef.current >= MAX_BIOMETRIC_FAILS) setMode('pin')
+      setPhase('idle')
     } finally {
-      setChecking(false)
       inFlightRef.current = false
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [celebrate])
+
+  const startLock = useCallback(() => {
+    failCountRef.current = 0
+    setPhase('idle')
+    setLocked(true)
+    if (bioEnabled) {
+      setMode('biometric')
+      tryBiometric()
+    } else {
+      setMode('pin')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bioEnabled])
 
   useEffect(() => {
-    if (needsGate) {
-      setLocked(true)
-      tryUnlock()
+    if (needsOnboarding) navigate('/onboarding', { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsOnboarding])
+
+  useEffect(() => {
+    if (!needsGate) return
+    const justOnboarded = Date.now() - Number(localStorage.getItem('justOnboardedAt') || 0) < JUST_ONBOARDED_WINDOW_MS
+    if (justOnboarded) {
+      setLocked(false)
+      return
     }
+    startLock()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsGate])
 
@@ -49,25 +96,68 @@ export default function BiometricGate({ children }) {
     CapApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive || !needsGate) return
       if (Date.now() - lastUnlockedAtRef.current < 2000) return
-      tryUnlock()
+      startLock()
     }).then((h) => { handle = h })
     return () => handle?.remove()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsGate])
 
+  async function handlePinComplete(pin) {
+    const ok = await verifyAppLockPin(pin)
+    if (ok) {
+      failCountRef.current = 0
+      lastUnlockedAtRef.current = Date.now()
+      celebrate(() => { setLocked(false); setPhase('idle') })
+    } else {
+      setPinError(true)
+    }
+  }
+
   if (!needsGate || !locked) return children
 
+  const celebrating = phase === 'success' || phase === 'burst'
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-navy px-4 text-center gap-4">
-      <p className="text-muted">Unlock Money Manager to continue</p>
-      <button
-        onClick={tryUnlock}
-        disabled={checking}
-        className="bg-brand-500 text-white rounded-full px-6 py-3 font-bold disabled:opacity-60"
-      >
-        {checking ? 'Checking...' : 'Unlock'}
-      </button>
-      <button onClick={logout} className="text-sm text-muted underline">Log out instead</button>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-lock-gradient px-4 text-center gap-8 animate-page-in">
+      <UnlockFlash visible={flash} />
+      <LockIconStage
+        variant={mode === 'biometric' ? 'fingerprint' : 'pin'}
+        phase={phase}
+        onClick={mode === 'biometric' && phase === 'idle' ? tryBiometric : undefined}
+      />
+      <div>
+        <h2 className="text-lg font-bold">
+          {celebrating ? 'Unlocked!' : mode === 'biometric' ? (phase === 'scanning' ? 'Verifying…' : 'Unlock with biometrics') : 'Enter your PIN'}
+        </h2>
+        <p className="text-sm text-muted mt-1">
+          {celebrating ? 'Welcome back.' : mode === 'biometric' ? 'Tap the icon or use your fingerprint sensor.' : 'Unlock Money Manager to continue'}
+        </p>
+      </div>
+
+      {!celebrating && mode === 'pin' && (
+        <PinPad
+          key={pinAttempt}
+          error={pinError}
+          onErrorShown={() => { setPinError(false); setPinAttempt((n) => n + 1) }}
+          onComplete={handlePinComplete}
+        />
+      )}
+
+      {!celebrating && (
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          {mode === 'biometric' && (
+            <button onClick={tryBiometric} disabled={phase === 'scanning'} className="bg-brand-500 text-white rounded-full px-6 py-3 font-bold disabled:opacity-60">
+              {phase === 'scanning' ? 'Verifying…' : 'Unlock'}
+            </button>
+          )}
+          {bioEnabled && (
+            <button onClick={() => setMode(mode === 'biometric' ? 'pin' : 'biometric')} className="text-sm text-muted underline">
+              {mode === 'biometric' ? 'Use PIN instead' : 'Use biometric instead'}
+            </button>
+          )}
+          <button onClick={logout} className="text-sm text-muted underline">Log out instead</button>
+        </div>
+      )}
     </div>
   )
 }
