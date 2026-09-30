@@ -59,13 +59,13 @@ export default function PinPad({ length = 4, onComplete, error, onErrorShown, su
   return (
     <div className="flex flex-col items-center gap-8">
       <PinDots length={length} value={digits.length} success={success} error={error} />
-      <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+      <div className="grid grid-cols-3 gap-4 w-full max-w-sm">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
           <button
             key={d}
             type="button"
             onClick={() => press(d)}
-            className="h-16 rounded-2xl bg-field text-xl font-semibold text-slate-900"
+            className="h-20 rounded-2xl bg-field text-2xl font-semibold text-slate-900"
             style={{
               transform: tapped === d ? 'scale(0.9)' : 'scale(1)',
               background: tapped === d ? 'rgba(34,109,255,0.18)' : undefined,
@@ -80,7 +80,7 @@ export default function PinPad({ length = 4, onComplete, error, onErrorShown, su
         <button
           type="button"
           onClick={() => press('0')}
-          className="h-16 rounded-2xl bg-field text-xl font-semibold text-slate-900"
+          className="h-20 rounded-2xl bg-field text-2xl font-semibold text-slate-900"
           style={{
             transform: tapped === '0' ? 'scale(0.9)' : 'scale(1)',
             background: tapped === '0' ? 'rgba(34,109,255,0.18)' : undefined,
@@ -93,7 +93,7 @@ export default function PinPad({ length = 4, onComplete, error, onErrorShown, su
         <button
           type="button"
           onClick={() => setDigits((v) => v.slice(0, -1))}
-          className="h-16 rounded-2xl flex items-center justify-center text-muted"
+          className="h-20 rounded-2xl flex items-center justify-center text-muted"
           aria-label="Backspace"
         >
           {BACKSPACE}
