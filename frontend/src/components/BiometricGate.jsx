@@ -11,6 +11,10 @@ const MAX_BIOMETRIC_FAILS = 3
 const JUST_ONBOARDED_WINDOW_MS = 5000
 const SUCCESS_HOLD_MS = 550
 const BURST_HOLD_MS = 500
+// The native biometric prompt closing can itself fire Android's onResume, which looks
+// identical to the user switching back from another app. Without this cooldown, that
+// resume re-triggers startLock() -> tryBiometric() -> reopens the prompt -> loops forever.
+const BIOMETRIC_DISMISS_COOLDOWN_MS = 3000
 
 export default function BiometricGate({ children }) {
   const { user, logout } = useAuth()
@@ -30,6 +34,7 @@ export default function BiometricGate({ children }) {
 
   const inFlightRef = useRef(false)
   const lastUnlockedAtRef = useRef(0)
+  const lastBiometricAttemptEndedAtRef = useRef(0)
   const failCountRef = useRef(0)
 
   const celebrate = useCallback((onDone) => {
@@ -57,6 +62,7 @@ export default function BiometricGate({ children }) {
       setPhase('idle')
     } finally {
       inFlightRef.current = false
+      lastBiometricAttemptEndedAtRef.current = Date.now()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celebrate])
@@ -96,6 +102,7 @@ export default function BiometricGate({ children }) {
     CapApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive || !needsGate) return
       if (Date.now() - lastUnlockedAtRef.current < 2000) return
+      if (Date.now() - lastBiometricAttemptEndedAtRef.current < BIOMETRIC_DISMISS_COOLDOWN_MS) return
       startLock()
     }).then((h) => { handle = h })
     return () => handle?.remove()
