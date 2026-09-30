@@ -57,9 +57,9 @@ export default function PinPad({ length = 4, onComplete, error, onErrorShown, su
   }
 
   return (
-    <div className="flex flex-col items-center gap-8">
+    <div className="flex flex-col items-center gap-8 w-full">
       <PinDots length={length} value={digits.length} success={success} error={error} />
-      <div className="grid grid-cols-3 gap-4 w-full max-w-sm">
+      <div className="grid grid-cols-3 gap-4 w-full">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
           <button
             key={d}
