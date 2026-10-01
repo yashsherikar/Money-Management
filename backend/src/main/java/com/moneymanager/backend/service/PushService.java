@@ -113,17 +113,33 @@ public class PushService {
         subscriptionRepository.findByFcmToken(token).ifPresent(subscriptionRepository::delete);
     }
 
+    /** Which action buttons the native notification shows: PAID_VIEW ("Paid"/"View") for things
+     *  you confirm you did, PAY_VIEW ("Pay now"/"View") for requests where someone owes money
+     *  and "Pay now" opens a UPI link directly, VIEW_ONLY for plain informational pushes. */
+    public static final String ACTION_PAID_VIEW = "PAID_VIEW";
+    public static final String ACTION_PAY_VIEW = "PAY_VIEW";
+    public static final String ACTION_VIEW_ONLY = "VIEW_ONLY";
+
     /** Best-effort: a push failure never blocks the action that triggered it (e.g. creating a request). */
     public void notifyUser(User user, String title, String body) {
-        notifyUser(user, title, body, "/");
+        notifyUser(user, title, body, "/", ACTION_VIEW_ONLY, null);
     }
 
     /** @param url in-app page to open when the notification (or its View action) is tapped. */
     public void notifyUser(User user, String title, String body, String url) {
+        notifyUser(user, title, body, url, ACTION_VIEW_ONLY, null);
+    }
+
+    public void notifyUser(User user, String title, String body, String url, String actionType) {
+        notifyUser(user, title, body, url, actionType, null);
+    }
+
+    /** @param payUrl only used with ACTION_PAY_VIEW — the upi://pay link "Pay now" opens directly. */
+    public void notifyUser(User user, String title, String body, String url, String actionType, String payUrl) {
         List<PushSubscription> subs = subscriptionRepository.findByUserId(user.getId());
         for (PushSubscription sub : subs) {
             if (sub.getFcmToken() != null) {
-                sendFcm(sub, title, body, url);
+                sendFcm(sub, title, body, url, actionType, payUrl);
             } else if (webPushEnabled) {
                 sendWebPush(sub, webPushPayload(title, body, url));
             }
@@ -144,19 +160,23 @@ public class PushService {
         }
     }
 
-    private void sendFcm(PushSubscription sub, String title, String body, String url) {
+    /** Data-only message (no .setNotification()) so the app's own FirebaseMessagingService always
+     *  runs — even with the app killed — and can build a notification with action buttons itself.
+     *  A "notification" message would get auto-displayed by the OS instead, with no way to add
+     *  custom actions to it. */
+    private void sendFcm(PushSubscription sub, String title, String body, String url, String actionType, String payUrl) {
         if (!firebaseEnabled) return;
         try {
-            com.google.firebase.messaging.Notification notification = com.google.firebase.messaging.Notification.builder()
-                    .setTitle(title)
-                    .setBody(body)
-                    .build();
-            Message message = Message.builder()
+            Message.Builder message = Message.builder()
                     .setToken(sub.getFcmToken())
-                    .setNotification(notification)
+                    .putData("title", title)
+                    .putData("body", body)
                     .putData("url", url)
-                    .build();
-            FirebaseMessaging.getInstance().send(message);
+                    .putData("actionType", actionType);
+            if (StringUtils.hasText(payUrl)) {
+                message.putData("payUrl", payUrl);
+            }
+            FirebaseMessaging.getInstance().send(message.build());
         } catch (FirebaseMessagingException e) {
             if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
                 subscriptionRepository.delete(sub);
@@ -182,14 +202,12 @@ public class PushService {
                     continue;
                 }
                 try {
-                    com.google.firebase.messaging.Notification notification = com.google.firebase.messaging.Notification.builder()
-                            .setTitle("Test notification")
-                            .setBody("If you see this, native push notifications work.")
-                            .build();
                     Message message = Message.builder()
                             .setToken(sub.getFcmToken())
-                            .setNotification(notification)
+                            .putData("title", "Test notification")
+                            .putData("body", "If you see this, native push notifications work.")
                             .putData("url", "/")
+                            .putData("actionType", ACTION_VIEW_ONLY)
                             .build();
                     String response = FirebaseMessaging.getInstance().send(message);
                     results.add("Subscription " + sub.getId() + " (native app): sent, id " + response);

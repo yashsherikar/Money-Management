@@ -62,7 +62,8 @@ public class DueDateReminderScheduler {
                         : rt.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate();
                 if (target.equals(anchor.plusDays(rt.getIntervalDays()))) {
                     pushService.notifyUser(rt.getUser(), "Expiring in 2 days",
-                            rt.getDescription() + " (" + money(rt.getAmount()) + ") expires/renews in 2 days", "/recurring");
+                            rt.getDescription() + " (" + money(rt.getAmount()) + ") expires/renews in 2 days",
+                            "/recurring", PushService.ACTION_PAID_VIEW);
                 }
                 continue;
             }
@@ -70,7 +71,8 @@ public class DueDateReminderScheduler {
             int effectiveDay = Math.min(rt.getDayOfMonth(), target.lengthOfMonth());
             if (target.getDayOfMonth() == effectiveDay) {
                 pushService.notifyUser(rt.getUser(), "Due in 2 days",
-                        rt.getDescription() + " (" + money(rt.getAmount()) + ") is due in 2 days", "/recurring");
+                        rt.getDescription() + " (" + money(rt.getAmount()) + ") is due in 2 days",
+                        "/recurring", PushService.ACTION_PAID_VIEW);
             }
         }
 
@@ -79,21 +81,24 @@ public class DueDateReminderScheduler {
             int effectiveDay = Math.min(emi.getDueDay(), target.lengthOfMonth());
             if (target.getDayOfMonth() == effectiveDay) {
                 pushService.notifyUser(emi.getUser(), "EMI due in 2 days",
-                        emi.getLoanName() + " EMI (" + money(emi.getEmiAmount()) + ") is due in 2 days", "/obligations");
+                        emi.getLoanName() + " EMI (" + money(emi.getEmiAmount()) + ") is due in 2 days",
+                        "/obligations", PushService.ACTION_PAID_VIEW);
             }
         }
 
         for (InsurancePolicy policy : insurancePolicyRepository.findAll()) {
             if (policy.isActive() && target.equals(policy.getDueDate())) {
                 pushService.notifyUser(policy.getUser(), "Premium due in 2 days",
-                        policy.getPolicyName() + " premium (" + money(policy.getPremiumAmount()) + ") is due in 2 days", "/obligations");
+                        policy.getPolicyName() + " premium (" + money(policy.getPremiumAmount()) + ") is due in 2 days",
+                        "/obligations", PushService.ACTION_PAID_VIEW);
             }
         }
 
         for (FixedDeposit fd : fixedDepositRepository.findAll()) {
             if (target.equals(fd.getMaturityDate())) {
                 pushService.notifyUser(fd.getUser(), "FD maturing in 2 days",
-                        fd.getBankName() + " FD (" + money(fd.getMaturityAmount()) + ") matures in 2 days", "/obligations");
+                        fd.getBankName() + " FD (" + money(fd.getMaturityAmount()) + ") matures in 2 days",
+                        "/obligations", PushService.ACTION_VIEW_ONLY);
             }
         }
 
@@ -103,7 +108,8 @@ public class DueDateReminderScheduler {
             if (target.getDayOfMonth() == effectiveDay) {
                 pushService.notifyUser(plan.getUser(), "Emergency fund contribution in 2 days",
                         money(plan.getAmount()) + " moves from " + plan.getSourceAccount().getName()
-                                + " to " + plan.getTargetAccount().getName() + " in 2 days", "/obligations");
+                                + " to " + plan.getTargetAccount().getName() + " in 2 days",
+                        "/obligations", PushService.ACTION_PAID_VIEW);
             }
         }
 

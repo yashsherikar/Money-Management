@@ -109,8 +109,17 @@ public class SplitBillService {
         SplitBillResponse response = toResponse(splitBillRepository.save(bill));
         for (SplitBillParticipant participant : bill.getParticipants()) {
             if (participant.getUser() != null) {
+                String payUrl = null;
+                if (StringUtils.hasText(user.getUpiId())) {
+                    payUrl = "upi://pay?pa=" + encode(user.getUpiId())
+                            + "&pn=" + encode(user.getName())
+                            + "&am=" + participant.getShareAmount().toPlainString()
+                            + "&cu=INR"
+                            + "&tn=" + encode(bill.getTitle());
+                }
                 pushService.notifyUser(participant.getUser(), "Split bill",
-                        user.getName() + " added you to \"" + bill.getTitle() + "\" — you owe ₹" + participant.getShareAmount(), "/split-bills");
+                        user.getName() + " added you to \"" + bill.getTitle() + "\" — you owe ₹" + participant.getShareAmount(),
+                        "/split-bills", PushService.ACTION_PAY_VIEW, payUrl);
             }
         }
         return response;

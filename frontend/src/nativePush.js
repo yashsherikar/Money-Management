@@ -1,6 +1,5 @@
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
-import { LocalNotifications } from '@capacitor/local-notifications'
 
 export function isNativePlatform() {
   return Capacitor.isNativePlatform()
@@ -83,34 +82,15 @@ export async function disableNativePush(client) {
   await PushNotifications.removeAllListeners()
 }
 
-/** Call once at app startup (native only) so tapping a notification navigates to the right page. */
-export function listenForNativeNotificationTaps(navigate) {
+/** Call once at app startup (native only) so tapping a notification — its body, or the "Paid"/
+ *  "View" buttons — navigates to the right page. The notification itself (including its action
+ *  buttons) is built natively in MyFirebaseMessagingService.java, which runs in every app state
+ *  (foreground, background, killed); tapping it launches MainActivity, which fires this DOM event
+ *  once the page has had a moment to load (see MainActivity.deliverNotificationUrl). */
+export function listenForNotificationTaps(navigate) {
   if (!isNativePlatform()) return
-  PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-    const url = action.notification?.data?.url
+  window.addEventListener('mm-notification-tap', (e) => {
+    const url = e.detail?.url
     if (url) navigate(url)
-  })
-}
-
-/** Call once at app startup (native only). Android only auto-shows a push in the
- *  tray when the app is backgrounded/killed — while it's open, we have to display
- *  it ourselves or the user never sees it. */
-export function listenForNativeForegroundPush() {
-  if (!isNativePlatform()) return
-  PushNotifications.addListener('pushNotificationReceived', async (notification) => {
-    try {
-      await LocalNotifications.schedule({
-        notifications: [{
-          id: Date.now() % 2147483647,
-          title: notification.title || 'Money Manager',
-          body: notification.body || '',
-          smallIcon: 'ic_stat_notify',
-          iconColor: '#226DFF',
-          extra: notification.data,
-        }],
-      })
-    } catch {
-      // no-op — worst case the user just doesn't see this one
-    }
   })
 }

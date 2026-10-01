@@ -119,8 +119,17 @@ public class WishlistService {
             cr.setMember(member);
             cr.setAmount(r.amount());
             contributionRequestRepository.save(cr);
+            String payUrl = null;
+            if (org.springframework.util.StringUtils.hasText(user.getUpiId())) {
+                payUrl = "upi://pay?pa=" + encode(user.getUpiId())
+                        + "&pn=" + encode(user.getName())
+                        + "&am=" + r.amount().toPlainString()
+                        + "&cu=INR"
+                        + "&tn=" + encode(item.getName());
+            }
             pushService.notifyUser(member, "Money request",
-                    user.getName() + " is asking for ₹" + r.amount() + " for \"" + item.getName() + "\"", "/requests");
+                    user.getName() + " is asking for ₹" + r.amount() + " for \"" + item.getName() + "\"",
+                    "/requests", PushService.ACTION_PAY_VIEW, payUrl);
             return toResponse(cr);
         }).toList();
     }

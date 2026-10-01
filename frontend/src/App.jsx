@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
-import { listenForNativeNotificationTaps, listenForNativeForegroundPush } from './nativePush.js'
+import { listenForNotificationTaps } from './nativePush.js'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
@@ -34,8 +34,7 @@ export default function App() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    listenForNativeNotificationTaps(navigate)
-    listenForNativeForegroundPush()
+    listenForNotificationTaps(navigate)
   }, [navigate])
 
   return (
