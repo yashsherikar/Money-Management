@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { App as CapApp } from '@capacitor/app'
 import { useAuth } from '../context/AuthContext.jsx'
-import { isNativePlatform, isBiometricEnabled, authenticateWithBiometric } from '../biometricLock.js'
-import { isPinSet, verifyAppLockPin } from '../appLock.js'
+import { isNativePlatform, isBiometricEnabled, authenticateWithBiometric, setBiometricEnabled } from '../biometricLock.js'
+import { isPinSet, verifyAppLockPin, getLockoutRemainingMs, clearAppLockPin } from '../appLock.js'
 import PinPad from './PinPad.jsx'
 import { LockIconStage, UnlockFlash } from './LockAnimations.jsx'
 
@@ -16,8 +16,15 @@ const BURST_HOLD_MS = 500
 // resume re-triggers startLock() -> tryBiometric() -> reopens the prompt -> loops forever.
 const BIOMETRIC_DISMISS_COOLDOWN_MS = 3000
 
+function formatCountdown(ms) {
+  const totalSeconds = Math.ceil(ms / 1000)
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
+
 export default function BiometricGate({ children }) {
-  const { user, logout } = useAuth()
+  const { user, logout, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [locked, setLocked] = useState(false)
@@ -26,6 +33,11 @@ export default function BiometricGate({ children }) {
   const [flash, setFlash] = useState(false)
   const [pinError, setPinError] = useState(false)
   const [pinAttempt, setPinAttempt] = useState(0)
+  const [lockoutMsLeft, setLockoutMsLeft] = useState(0)
+  const [showForgotPin, setShowForgotPin] = useState(false)
+  const [forgotPassword, setForgotPassword] = useState('')
+  const [forgotError, setForgotError] = useState('')
+  const [forgotBusy, setForgotBusy] = useState(false)
 
   const onOnboarding = location.pathname === '/onboarding'
   const needsGate = isNativePlatform() && isPinSet() && !!user && !onOnboarding
@@ -71,6 +83,9 @@ export default function BiometricGate({ children }) {
     failCountRef.current = 0
     setPhase('idle')
     setLocked(true)
+    setShowForgotPin(false)
+    setForgotPassword('')
+    setForgotError('')
     if (bioEnabled) {
       setMode('biometric')
       tryBiometric()
@@ -97,6 +112,14 @@ export default function BiometricGate({ children }) {
   }, [needsGate])
 
   useEffect(() => {
+    if (!locked) return undefined
+    const tick = () => setLockoutMsLeft(getLockoutRemainingMs())
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [locked])
+
+  useEffect(() => {
     if (!isNativePlatform()) return undefined
     let handle
     CapApp.addListener('appStateChange', ({ isActive }) => {
@@ -114,15 +137,35 @@ export default function BiometricGate({ children }) {
     if (ok) {
       failCountRef.current = 0
       lastUnlockedAtRef.current = Date.now()
+      setLockoutMsLeft(0)
       celebrate(() => { setLocked(false); setPhase('idle') })
     } else {
       setPinError(true)
+      setLockoutMsLeft(getLockoutRemainingMs())
+    }
+  }
+
+  async function handleForgotPin(e) {
+    e.preventDefault()
+    setForgotBusy(true)
+    setForgotError('')
+    try {
+      await login(user.email, forgotPassword)
+      clearAppLockPin()
+      setBiometricEnabled(false)
+      setLocked(false)
+      navigate('/onboarding', { replace: true })
+    } catch {
+      setForgotError('Incorrect password.')
+    } finally {
+      setForgotBusy(false)
     }
   }
 
   if (!needsGate || !locked) return children
 
   const celebrating = phase === 'success' || phase === 'burst'
+  const pinLockedOut = mode === 'pin' && lockoutMsLeft > 0
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-lock-gradient px-4 text-center gap-8 animate-page-in">
@@ -134,14 +177,20 @@ export default function BiometricGate({ children }) {
       />
       <div>
         <h2 className="text-lg font-bold">
-          {celebrating ? 'Unlocked!' : mode === 'biometric' ? (phase === 'scanning' ? 'Verifying…' : 'Unlock with biometrics') : 'Enter your PIN'}
+          {celebrating ? 'Unlocked!' : pinLockedOut ? 'Too many attempts' : mode === 'biometric' ? (phase === 'scanning' ? 'Verifying…' : 'Unlock with biometrics') : 'Enter your PIN'}
         </h2>
         <p className="text-sm text-muted mt-1">
-          {celebrating ? 'Welcome back.' : mode === 'biometric' ? 'Tap the icon or use your fingerprint sensor.' : 'Unlock Money Manager to continue'}
+          {celebrating
+            ? 'Welcome back.'
+            : pinLockedOut
+            ? `Try again in ${formatCountdown(lockoutMsLeft)}`
+            : mode === 'biometric'
+            ? 'Tap the icon or use your fingerprint sensor.'
+            : 'Unlock Money Manager to continue'}
         </p>
       </div>
 
-      {!celebrating && mode === 'pin' && (
+      {!celebrating && mode === 'pin' && !pinLockedOut && !showForgotPin && (
         <PinPad
           key={pinAttempt}
           error={pinError}
@@ -150,7 +199,29 @@ export default function BiometricGate({ children }) {
         />
       )}
 
-      {!celebrating && (
+      {!celebrating && showForgotPin && (
+        <form onSubmit={handleForgotPin} className="flex flex-col gap-3 w-full max-w-xs text-left">
+          <p className="text-sm text-muted text-center">Enter your account password to reset your PIN.</p>
+          <input
+            type="password"
+            autoFocus
+            required
+            placeholder="Password"
+            value={forgotPassword}
+            onChange={(e) => setForgotPassword(e.target.value)}
+            className="px-3 py-2 rounded-md bg-field text-slate-900"
+          />
+          {forgotError && <div className="text-sm text-red-500 text-center">{forgotError}</div>}
+          <button type="submit" disabled={forgotBusy} className="bg-brand-500 text-white rounded-full px-6 py-3 font-bold disabled:opacity-60">
+            {forgotBusy ? 'Verifying…' : 'Verify & reset PIN'}
+          </button>
+          <button type="button" onClick={() => { setShowForgotPin(false); setForgotError(''); setForgotPassword('') }} className="text-sm text-muted underline">
+            Cancel
+          </button>
+        </form>
+      )}
+
+      {!celebrating && !showForgotPin && (
         <div className="flex flex-col gap-3 w-full max-w-xs">
           {mode === 'biometric' && (
             <button onClick={tryBiometric} disabled={phase === 'scanning'} className="bg-brand-500 text-white rounded-full px-6 py-3 font-bold disabled:opacity-60">
@@ -165,6 +236,9 @@ export default function BiometricGate({ children }) {
             >
               {mode === 'biometric' ? 'Use PIN instead' : 'Use biometric instead'}
             </button>
+          )}
+          {mode === 'pin' && (
+            <button onClick={() => setShowForgotPin(true)} className="text-sm text-muted underline">Forgot PIN?</button>
           )}
           <button onClick={logout} className="text-sm text-muted underline">Log out instead</button>
         </div>
