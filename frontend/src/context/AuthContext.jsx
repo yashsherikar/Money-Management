@@ -18,12 +18,12 @@ export function AuthProvider({ children }) {
   }
 
   async function login(email, password) {
-    const { data } = await client.post('/auth/login', { email, password })
+    const { data } = await client.post('/auth/login', { email, password, platform: isNativePlatform() ? 'NATIVE' : 'WEB' })
     persist(data)
   }
 
   async function signup(email, password, name) {
-    const { data } = await client.post('/auth/signup', { email, password, name })
+    const { data } = await client.post('/auth/signup', { email, password, name, platform: isNativePlatform() ? 'NATIVE' : 'WEB' })
     persist(data)
   }
 

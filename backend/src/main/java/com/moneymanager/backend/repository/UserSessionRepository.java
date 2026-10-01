@@ -9,4 +9,5 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     List<UserSession> findByUserIdOrderByCreatedAtAsc(Long userId);
     boolean existsByJti(String jti);
     void deleteByJti(String jti);
+    void deleteByUserIdAndPlatform(Long userId, String platform);
 }

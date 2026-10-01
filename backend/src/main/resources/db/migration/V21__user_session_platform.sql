@@ -1,0 +1,1 @@
+ALTER TABLE user_sessions ADD COLUMN platform VARCHAR(10) NOT NULL DEFAULT 'WEB';

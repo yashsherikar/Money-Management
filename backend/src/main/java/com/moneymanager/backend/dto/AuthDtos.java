@@ -9,12 +9,14 @@ public class AuthDtos {
     public record SignupRequest(
             @NotBlank @Email String email,
             @NotBlank @Size(min = 6, message = "password must be at least 6 characters") String password,
-            @NotBlank String name
+            @NotBlank String name,
+            String platform
     ) {}
 
     public record LoginRequest(
             @NotBlank @Email String email,
-            @NotBlank String password
+            @NotBlank String password,
+            String platform
     ) {}
 
     public record AuthResponse(

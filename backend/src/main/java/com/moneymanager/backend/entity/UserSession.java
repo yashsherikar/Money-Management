@@ -25,11 +25,17 @@ public class UserSession {
     @Column(nullable = false, unique = true, length = 64)
     private String jti;
 
+    /** "WEB" or "NATIVE" — which client logged in. Lets a native-app login force-logout
+     *  any web sessions for the account and drop their browser push subscriptions. */
+    @Column(nullable = false, length = 10)
+    private String platform = "WEB";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
-    public UserSession(User user, String jti) {
+    public UserSession(User user, String jti, String platform) {
         this.user = user;
         this.jti = jti;
+        this.platform = platform;
     }
 }
