@@ -9,6 +9,15 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
 
+/** Alphabetical, but "Other" always last regardless of where it sorts. */
+function sortCategories(categories) {
+  return [...categories].sort((a, b) => {
+    if (a.name === 'Other') return 1
+    if (b.name === 'Other') return -1
+    return a.name.localeCompare(b.name)
+  })
+}
+
 export default function Transactions() {
   const { t } = useLanguage()
   const [transactions, setTransactions] = useState([])
@@ -19,6 +28,7 @@ export default function Transactions() {
   const [error, setError] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryQuery, setCategoryQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
 
   async function loadAll() {
@@ -42,6 +52,8 @@ export default function Transactions() {
     setForm(emptyForm)
     setEditingId(null)
     setFormOpen(false)
+    setCategoryQuery('')
+    setAddingCategory(false)
   }
 
   async function handleSubmit(e) {
@@ -79,6 +91,7 @@ export default function Transactions() {
       description: txn.description || '',
       txnDate: txn.txnDate,
     })
+    setCategoryQuery(txn.categoryId ? categories.find((c) => c.id === txn.categoryId)?.name || '' : '')
   }
 
   async function handleDelete(id) {
@@ -93,8 +106,26 @@ export default function Transactions() {
     const { data } = await client.post('/categories', { name: newCategoryName.trim(), essential: false })
     setCategories((prev) => [...prev, data])
     setForm((f) => ({ ...f, categoryId: String(data.id) }))
+    setCategoryQuery(data.name)
     setNewCategoryName('')
     setAddingCategory(false)
+  }
+
+  function handleCategoryInput(value) {
+    setCategoryQuery(value)
+    const match = categories.find((c) => c.name.toLowerCase() === value.trim().toLowerCase())
+    setForm((f) => ({ ...f, categoryId: match ? String(match.id) : '' }))
+  }
+
+  function handleCategoryBlur() {
+    const typed = categoryQuery.trim()
+    if (!typed) return
+    const match = categories.find((c) => c.name.toLowerCase() === typed.toLowerCase())
+    if (!match) {
+      setNewCategoryName(typed)
+      setAddingCategory(true)
+      setCategoryQuery('')
+    }
   }
 
   return (
@@ -137,18 +168,21 @@ export default function Transactions() {
               <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
             </div>
           ) : (
-            <select
-              value={form.categoryId}
-              onChange={(e) => {
-                const picked = categories.find((c) => String(c.id) === e.target.value)
-                if (picked?.name === 'Other') setAddingCategory(true)
-                else setForm({ ...form, categoryId: e.target.value })
-              }}
-              className="w-full"
-            >
-              <option value="">{t('No category')}</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name === 'Other' ? t('Other (add new)') : c.name}{!c.essential ? ` ${t('(non-essential)')}` : ''}</option>)}
-            </select>
+            <>
+              <input
+                list="expense-category-options"
+                placeholder={t('Search or type a new category')}
+                value={categoryQuery}
+                onChange={(e) => handleCategoryInput(e.target.value)}
+                onBlur={handleCategoryBlur}
+                className="w-full"
+              />
+              <datalist id="expense-category-options">
+                {sortCategories(categories.filter((c) => c.name !== 'Other')).map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+              </datalist>
+            </>
           )}
         </Field>
 

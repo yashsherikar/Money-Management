@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import NotificationBell from './NotificationBell.jsx'
 
 const tabs = [
   {
@@ -15,7 +16,7 @@ const tabs = [
   },
   {
     to: '/transactions',
-    label: 'History',
+    label: 'Transactions',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 7v5l3 3" />
@@ -73,6 +74,7 @@ export default function Layout({ children }) {
           <span className="font-bold text-brand-700 tracking-tight">Money Manager</span>
         </div>
         <div className="flex items-center gap-1">
+          <NotificationBell />
           <button onClick={() => setLang(lang === 'mr' ? 'en' : 'mr')} className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" title={lang === 'mr' ? 'English' : 'मराठी'}>
             {lang === 'mr' ? 'EN' : 'मर'}
           </button>

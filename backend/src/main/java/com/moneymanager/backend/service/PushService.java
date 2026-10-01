@@ -5,8 +5,10 @@ import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import com.moneymanager.backend.dto.PushDtos.*;
+import com.moneymanager.backend.entity.AppNotification;
 import com.moneymanager.backend.entity.PushSubscription;
 import com.moneymanager.backend.entity.User;
+import com.moneymanager.backend.repository.AppNotificationRepository;
 import com.moneymanager.backend.repository.PushSubscriptionRepository;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.Subscription;
@@ -33,17 +35,20 @@ public class PushService {
     private static final int MAX_SUBSCRIPTIONS_PER_USER = 3;
 
     private final PushSubscriptionRepository subscriptionRepository;
+    private final AppNotificationRepository notificationRepository;
     private final nl.martijndwars.webpush.PushService webPush;
     private final String publicKey;
     private final boolean webPushEnabled;
     private final boolean firebaseEnabled;
 
     public PushService(PushSubscriptionRepository subscriptionRepository,
+                        AppNotificationRepository notificationRepository,
                         @Value("${push.vapid.public-key}") String publicKey,
                         @Value("${push.vapid.private-key}") String privateKey,
                         @Value("${push.vapid.subject}") String subject,
                         boolean firebaseInitialized) throws Exception {
         this.subscriptionRepository = subscriptionRepository;
+        this.notificationRepository = notificationRepository;
         this.publicKey = publicKey;
         this.webPushEnabled = StringUtils.hasText(publicKey) && StringUtils.hasText(privateKey);
         this.firebaseEnabled = firebaseInitialized;
@@ -136,6 +141,15 @@ public class PushService {
 
     /** @param payUrl only used with ACTION_PAY_VIEW — the upi://pay link "Pay now" opens directly. */
     public void notifyUser(User user, String title, String body, String url, String actionType, String payUrl) {
+        AppNotification record = new AppNotification();
+        record.setUser(user);
+        record.setTitle(title);
+        record.setBody(body);
+        record.setUrl(url);
+        record.setActionType(actionType);
+        record.setPayUrl(payUrl);
+        notificationRepository.save(record);
+
         List<PushSubscription> subs = subscriptionRepository.findByUserId(user.getId());
         for (PushSubscription sub : subs) {
             if (sub.getFcmToken() != null) {
