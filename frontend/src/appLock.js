@@ -15,14 +15,57 @@ export function isPinSet() {
 
 export async function setAppLockPin(pin) {
   localStorage.setItem('appLockPinHash', await sha256Hex(pin))
-}
-
-export async function verifyAppLockPin(pin) {
-  const stored = localStorage.getItem('appLockPinHash')
-  if (!stored) return false
-  return (await sha256Hex(pin)) === stored
+  resetPinAttempts()
 }
 
 export function clearAppLockPin() {
   localStorage.removeItem('appLockPinHash')
+  resetPinAttempts()
+}
+
+// Rate limiting: 5 wrong PINs locks entry out for an escalating cooldown (30s, 1m, 5m,
+// 15m, then stays at 15m), persisted in localStorage so killing/reopening the app
+// doesn't reset it. Resets fully on a correct PIN or a new PIN being set.
+const MAX_ATTEMPTS = 5
+const LOCKOUT_STAGES_MS = [30_000, 60_000, 5 * 60_000, 15 * 60_000]
+
+function readNum(key) {
+  return Number(localStorage.getItem(key) || 0)
+}
+
+function resetPinAttempts() {
+  localStorage.removeItem('appLockFailCount')
+  localStorage.removeItem('appLockLockoutStage')
+  localStorage.removeItem('appLockLockoutUntil')
+}
+
+export function getLockoutRemainingMs() {
+  return Math.max(0, readNum('appLockLockoutUntil') - Date.now())
+}
+
+export function isLockedOut() {
+  return getLockoutRemainingMs() > 0
+}
+
+export async function verifyAppLockPin(pin) {
+  if (isLockedOut()) return false
+  const stored = localStorage.getItem('appLockPinHash')
+  if (!stored) return false
+
+  if ((await sha256Hex(pin)) === stored) {
+    resetPinAttempts()
+    return true
+  }
+
+  const fails = readNum('appLockFailCount') + 1
+  if (fails >= MAX_ATTEMPTS) {
+    const stage = readNum('appLockLockoutStage')
+    const duration = LOCKOUT_STAGES_MS[Math.min(stage, LOCKOUT_STAGES_MS.length - 1)]
+    localStorage.setItem('appLockLockoutUntil', String(Date.now() + duration))
+    localStorage.setItem('appLockLockoutStage', String(stage + 1))
+    localStorage.setItem('appLockFailCount', '0')
+  } else {
+    localStorage.setItem('appLockFailCount', String(fails))
+  }
+  return false
 }
