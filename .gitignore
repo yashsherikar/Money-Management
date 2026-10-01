@@ -10,6 +10,7 @@ frontend/dist/
 frontend/.env
 
 frontend/android/local.properties
+frontend/android/app/google-services.json
 frontend/android/.gradle/
 frontend/android/build/
 frontend/android/app/build/
