@@ -19,6 +19,7 @@ export default function AccountsManager() {
   const [askingPin, setAskingPin] = useState(false)
   const [pin, setPin] = useState('')
   const [revealError, setRevealError] = useState('')
+  const [pendingEditAccount, setPendingEditAccount] = useState(null)
 
   async function load() {
     const { data } = await client.get('/accounts')
@@ -69,6 +70,17 @@ export default function AccountsManager() {
     setFormOpen(true)
   }
 
+  /** Edit opens with the real opening/minimum balance pre-filled, so it must sit behind the
+   *  same PIN gate as the dots in the list — otherwise Edit would be a bypass for revealing them. */
+  function handleEditClick(acc) {
+    if (balancesRevealed) {
+      startEdit(acc)
+    } else {
+      setPendingEditAccount(acc)
+      openReveal()
+    }
+  }
+
   async function handleDelete(id) {
     if (!confirm(t('Delete this account? Its transactions stay recorded but lose this link.'))) return
     await client.delete(`/accounts/${id}`)
@@ -81,6 +93,11 @@ export default function AccountsManager() {
     setAskingPin(true)
   }
 
+  function cancelReveal() {
+    setAskingPin(false)
+    setPendingEditAccount(null)
+  }
+
   async function submitReveal(e) {
     e.preventDefault()
     setRevealError('')
@@ -88,6 +105,10 @@ export default function AccountsManager() {
       await client.post('/profile/reveal-balance', { pin })
       setBalancesRevealed(true)
       setAskingPin(false)
+      if (pendingEditAccount) {
+        startEdit(pendingEditAccount)
+        setPendingEditAccount(null)
+      }
     } catch (err) {
       setRevealError(err.response?.data?.message || t('Incorrect PIN'))
     }
@@ -187,15 +208,20 @@ export default function AccountsManager() {
       )}
 
       {askingPin && (
-        <form onSubmit={submitReveal} className="flex items-center gap-2 mb-3">
-          <input
-            type="password" inputMode="numeric" autoFocus placeholder={t('Enter PIN')}
-            value={pin} onChange={(e) => setPin(e.target.value)}
-            className="w-32"
-          />
-          <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-2 text-sm font-medium">{t('Unlock')}</button>
-          <button type="button" onClick={() => setAskingPin(false)} className="text-sm text-slate-500">{t('Cancel')}</button>
-          {revealError && <span className="text-sm text-red-600">{revealError}</span>}
+        <form onSubmit={submitReveal} className="flex flex-col gap-2 mb-3">
+          {pendingEditAccount && (
+            <p className="text-xs text-slate-500">{t('Enter your PIN to edit')} {pendingEditAccount.name}</p>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="password" inputMode="numeric" autoFocus placeholder={t('Enter PIN')}
+              value={pin} onChange={(e) => setPin(e.target.value)}
+              className="w-32"
+            />
+            <button type="submit" className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-2 text-sm font-medium">{t('Unlock')}</button>
+            <button type="button" onClick={cancelReveal} className="text-sm text-slate-500">{t('Cancel')}</button>
+            {revealError && <span className="text-sm text-red-600">{revealError}</span>}
+          </div>
         </form>
       )}
 
@@ -220,7 +246,7 @@ export default function AccountsManager() {
               </div>
               <div className="text-xs text-slate-500 truncate">
                 {t(acc.type)}
-                {Number(acc.minimumBalance) > 0 && ` · ${t('min balance')} ₹${Number(acc.minimumBalance).toLocaleString('en-IN')}`}
+                {Number(acc.minimumBalance) > 0 && ` · ${t('min balance')} ${balancesRevealed ? `₹${Number(acc.minimumBalance).toLocaleString('en-IN')}` : '₹••••'}`}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -233,7 +259,7 @@ export default function AccountsManager() {
                   ₹ • • • •
                 </button>
               )}
-              <button onClick={() => startEdit(acc)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
+              <button onClick={() => handleEditClick(acc)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
               <button onClick={() => handleDelete(acc.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
             </div>
           </div>
