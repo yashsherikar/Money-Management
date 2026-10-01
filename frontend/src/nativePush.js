@@ -6,6 +6,17 @@ export function isNativePlatform() {
   return Capacitor.isNativePlatform()
 }
 
+/** Stable per-install id, generated once and kept in localStorage — survives logout/login and
+ *  FCM token rotation, so the backend can tell "same device, new token" from "a new device". */
+function getDeviceId() {
+  let id = localStorage.getItem('deviceId')
+  if (!id) {
+    id = crypto.randomUUID()
+    localStorage.setItem('deviceId', id)
+  }
+  return id
+}
+
 export async function isNativePushEnabled() {
   if (!isNativePlatform()) return false
   const status = await PushNotifications.checkPermissions()
@@ -34,7 +45,7 @@ export function enableNativePush(client) {
 
     PushNotifications.addListener('registration', async (token) => {
       try {
-        await client.post('/push/register-fcm-token', { token: token.value })
+        await client.post('/push/register-fcm-token', { token: token.value, deviceId: getDeviceId() })
         localStorage.setItem('fcmToken', token.value)
         settled = true
         resolve()

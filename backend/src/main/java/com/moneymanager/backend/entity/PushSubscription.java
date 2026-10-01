@@ -34,6 +34,12 @@ public class PushSubscription {
     @Column(name = "fcm_token", unique = true, length = 500)
     private String fcmToken;
 
+    /** Stable per-install id generated client-side (native only). FCM tokens rotate on their
+     *  own even without a reinstall; keying on this instead lets a rotation update this row
+     *  in place instead of leaving the old token's row behind as a duplicate-notification ghost. */
+    @Column(name = "device_id", length = 100)
+    private String deviceId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 }

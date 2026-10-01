@@ -16,7 +16,7 @@ public class PushDtos {
 
     public record UnsubscribeRequest(@NotBlank String endpoint) {}
 
-    public record FcmTokenRequest(@NotBlank String token) {}
+    public record FcmTokenRequest(@NotBlank String token, String deviceId) {}
 
     public record PushStatusResponse(boolean available) {}
 

@@ -44,7 +44,7 @@ public class PushController {
 
     @PostMapping("/register-fcm-token")
     public void registerFcmToken(@AuthenticationPrincipal User user, @Valid @RequestBody FcmTokenRequest request) {
-        pushService.registerFcmToken(user, request.token());
+        pushService.registerFcmToken(user, request.token(), request.deviceId());
     }
 
     @PostMapping("/unregister-fcm-token")

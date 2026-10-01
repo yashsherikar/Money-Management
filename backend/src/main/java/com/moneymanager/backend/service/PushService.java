@@ -80,11 +80,23 @@ public class PushService {
                 .ifPresent(subscriptionRepository::delete);
     }
 
-    /** Native app (Capacitor/Android) registers its FCM token here instead of a web-push subscription. */
-    public void registerFcmToken(User user, String token) {
-        PushSubscription sub = subscriptionRepository.findByFcmToken(token).orElseGet(PushSubscription::new);
+    /** Native app (Capacitor/Android) registers its FCM token here instead of a web-push subscription.
+     *  Looked up by deviceId first (a stable id the client generates once per install) so a token
+     *  rotation — which FCM does on its own, not just on reinstall — updates this row in place
+     *  instead of leaving the old token behind as a second row that still gets notified. */
+    public void registerFcmToken(User user, String token, String deviceId) {
+        PushSubscription sub = null;
+        if (StringUtils.hasText(deviceId)) {
+            sub = subscriptionRepository.findByDeviceId(deviceId).orElse(null);
+        }
+        if (sub == null) {
+            sub = subscriptionRepository.findByFcmToken(token).orElseGet(PushSubscription::new);
+        }
         sub.setUser(user);
         sub.setFcmToken(token);
+        if (StringUtils.hasText(deviceId)) {
+            sub.setDeviceId(deviceId);
+        }
         subscriptionRepository.save(sub);
         enforceSubscriptionLimit(user);
     }
