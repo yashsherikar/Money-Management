@@ -27,6 +27,10 @@ import java.util.List;
 public class PushService {
 
     private static final Logger log = LoggerFactory.getLogger(PushService.class);
+    /** Caps stale/duplicate device registrations (e.g. a reinstalled app getting a new FCM
+     *  token each time) from piling up and causing the same notification to fire once per
+     *  stale row. FIFO: the oldest subscription is evicted when a new one pushes past this. */
+    private static final int MAX_SUBSCRIPTIONS_PER_USER = 3;
 
     private final PushSubscriptionRepository subscriptionRepository;
     private final nl.martijndwars.webpush.PushService webPush;
@@ -68,6 +72,7 @@ public class PushService {
         sub.setP256dh(request.p256dh());
         sub.setAuth(request.auth());
         subscriptionRepository.save(sub);
+        enforceSubscriptionLimit(user);
     }
 
     public void unsubscribe(User user, UnsubscribeRequest request) {
@@ -81,6 +86,15 @@ public class PushService {
         sub.setUser(user);
         sub.setFcmToken(token);
         subscriptionRepository.save(sub);
+        enforceSubscriptionLimit(user);
+    }
+
+    private void enforceSubscriptionLimit(User user) {
+        List<PushSubscription> subs = subscriptionRepository.findByUserIdOrderByCreatedAtAsc(user.getId());
+        int excess = subs.size() - MAX_SUBSCRIPTIONS_PER_USER;
+        if (excess > 0) {
+            subscriptionRepository.deleteAll(subs.subList(0, excess));
+        }
     }
 
     public void unregisterFcmToken(String token) {
