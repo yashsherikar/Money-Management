@@ -98,19 +98,7 @@ public class ProfileService {
      */
     @Transactional
     public TotalBalanceResponse revealBalance(User user, RevealBalanceRequest request) {
-        if (user.getPinHash() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "set a secret PIN first");
-        }
-        if (user.getPinLockedUntil() != null && user.getPinLockedUntil().isAfter(Instant.now())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "too many wrong attempts — try again later");
-        }
-        if (!passwordEncoder.matches(request.pin(), user.getPinHash())) {
-            registerFailedAttempt(user);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "incorrect PIN");
-        }
-        user.setPinFailedAttempts(0);
-        user.setPinLockedUntil(null);
-        userRepository.save(user);
+        verifySecretPin(user, request.pin());
 
         List<Account> accounts = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId());
         BigDecimal cashOnHand = accounts.stream()
@@ -131,6 +119,25 @@ public class ProfileService {
 
         BigDecimal total = cashOnHand.subtract(udharOwed).subtract(lockedMinimumBalance);
         return new TotalBalanceResponse(total, cashOnHand, udharOwed, lockedMinimumBalance, byAccount);
+    }
+
+    /** Shared by revealing the total balance and editing an account's balance — same PIN, same
+     *  rate limit, so a brute-force attempt against one counts against the other too. */
+    @Transactional
+    public void verifySecretPin(User user, String pin) {
+        if (user.getPinHash() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "set a secret PIN first");
+        }
+        if (user.getPinLockedUntil() != null && user.getPinLockedUntil().isAfter(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "too many wrong attempts — try again later");
+        }
+        if (!StringUtils.hasText(pin) || !passwordEncoder.matches(pin, user.getPinHash())) {
+            registerFailedAttempt(user);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "incorrect PIN");
+        }
+        user.setPinFailedAttempts(0);
+        user.setPinLockedUntil(null);
+        userRepository.save(user);
     }
 
     private void registerFailedAttempt(User user) {

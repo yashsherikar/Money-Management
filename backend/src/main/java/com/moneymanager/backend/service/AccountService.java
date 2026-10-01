@@ -15,9 +15,11 @@ import java.util.List;
 public class AccountService {
 
     private final AccountRepository accountRepository;
+    private final ProfileService profileService;
 
-    public AccountService(AccountRepository accountRepository) {
+    public AccountService(AccountRepository accountRepository, ProfileService profileService) {
         this.accountRepository = accountRepository;
+        this.profileService = profileService;
     }
 
     public List<AccountResponse> list(User user) {
@@ -40,7 +42,10 @@ public class AccountService {
         Account account = get(user, id);
         account.setName(request.name());
         account.setType(request.type());
-        if (request.balance() != null) {
+        if (request.balance() != null && request.balance().compareTo(account.getBalance()) != 0) {
+            // Same secret PIN as revealing the total balance — editing a balance is at least as
+            // sensitive as viewing it, and sharing one PIN/rate-limit avoids a second thing to set up.
+            profileService.verifySecretPin(user, request.pin());
             account.setBalance(request.balance());
         }
         if (request.minimumBalance() != null) {

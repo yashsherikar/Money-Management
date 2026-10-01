@@ -13,7 +13,10 @@ public class AccountDtos {
             @NotNull AccountType type,
             BigDecimal balance,
             boolean isPrimary,
-            BigDecimal minimumBalance
+            BigDecimal minimumBalance,
+            /** Required only when balance is being changed on an existing account — the same
+             *  secret PIN used to reveal the total balance. */
+            String pin
     ) {}
 
     public record AccountResponse(

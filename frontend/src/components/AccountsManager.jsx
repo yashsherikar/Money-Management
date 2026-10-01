@@ -9,8 +9,9 @@ const TYPES = ['BANK', 'CASH', 'CARD', 'EMERGENCY_FUND']
 export default function AccountsManager() {
   const { t } = useLanguage()
   const [accounts, setAccounts] = useState([])
-  const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '' })
+  const [form, setForm] = useState({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '', pin: '' })
   const [editingId, setEditingId] = useState(null)
+  const [originalBalance, setOriginalBalance] = useState(null)
   const [error, setError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
 
@@ -29,10 +30,13 @@ export default function AccountsManager() {
   }, [])
 
   function resetForm() {
-    setForm({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '' })
+    setForm({ name: '', type: 'BANK', balance: '', isPrimary: false, minimumBalance: '', pin: '' })
     setEditingId(null)
+    setOriginalBalance(null)
     setFormOpen(false)
   }
+
+  const balanceChanged = editingId != null && Number(form.balance || 0) !== Number(originalBalance)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -44,6 +48,7 @@ export default function AccountsManager() {
         balance: form.balance === '' ? 0 : Number(form.balance),
         isPrimary: form.isPrimary,
         minimumBalance: form.minimumBalance === '' ? 0 : Number(form.minimumBalance),
+        pin: balanceChanged ? form.pin : undefined,
       }
       if (editingId) {
         await client.put(`/accounts/${editingId}`, payload)
@@ -59,7 +64,8 @@ export default function AccountsManager() {
 
   function startEdit(acc) {
     setEditingId(acc.id)
-    setForm({ name: acc.name, type: acc.type, balance: acc.balance, isPrimary: acc.isPrimary, minimumBalance: acc.minimumBalance })
+    setOriginalBalance(acc.balance)
+    setForm({ name: acc.name, type: acc.type, balance: acc.balance, isPrimary: acc.isPrimary, minimumBalance: acc.minimumBalance, pin: '' })
     setFormOpen(true)
   }
 
@@ -134,6 +140,19 @@ export default function AccountsManager() {
             className="w-full"
           />
         </Field>
+        {balanceChanged && (
+          <Field label={t('Enter your secret PIN to change the balance')}>
+            <input
+              type="password"
+              inputMode="numeric"
+              required
+              placeholder={t('Enter PIN')}
+              value={form.pin}
+              onChange={(e) => setForm({ ...form, pin: e.target.value })}
+              className="w-full"
+            />
+          </Field>
+        )}
         <Field label={t('Minimum balance to maintain (optional)')}>
           <input
             type="number"
