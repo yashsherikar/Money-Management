@@ -46,6 +46,9 @@ export default function Transactions() {
 
   useEffect(() => {
     loadAll()
+    const onRefresh = () => loadAll()
+    window.addEventListener('mm-transactions-changed', onRefresh)
+    return () => window.removeEventListener('mm-transactions-changed', onRefresh)
   }, [])
 
   function resetForm() {
@@ -142,19 +145,7 @@ export default function Transactions() {
         </Field>
 
         <Field label={t('Category')}>
-          {form.type === 'INCOME' ? (
-            <select
-              value={categories.find((c) => String(c.id) === form.categoryId && INCOME_SOURCES.includes(c.name))?.name || 'Other'}
-              onChange={(e) => {
-                const match = categories.find((c) => c.name === e.target.value)
-                setForm({ ...form, categoryId: match ? String(match.id) : '' })
-              }}
-              className="w-full"
-            >
-              {INCOME_SOURCES.map((name) => <option key={name} value={name}>{t(name)}</option>)}
-              <option value="Other">{t('Other')}</option>
-            </select>
-          ) : addingCategory ? (
+          {addingCategory ? (
             <div className="flex gap-2">
               <input
                 autoFocus
@@ -167,6 +158,22 @@ export default function Transactions() {
               <button type="button" onClick={handleAddCategory} className="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium">{t('Add')}</button>
               <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
             </div>
+          ) : form.type === 'INCOME' ? (
+            <select
+              value={categories.find((c) => String(c.id) === form.categoryId && INCOME_SOURCES.includes(c.name))?.name || 'Other'}
+              onChange={(e) => {
+                if (e.target.value === 'Other') {
+                  setAddingCategory(true)
+                  return
+                }
+                const match = categories.find((c) => c.name === e.target.value)
+                setForm({ ...form, categoryId: match ? String(match.id) : '' })
+              }}
+              className="w-full"
+            >
+              {INCOME_SOURCES.map((name) => <option key={name} value={name}>{t(name)}</option>)}
+              <option value="Other">{t('Other (add new)')}</option>
+            </select>
           ) : (
             <>
               <input
@@ -182,12 +189,28 @@ export default function Transactions() {
                   <option key={c.id} value={c.name} />
                 ))}
               </datalist>
+              <button
+                type="button"
+                onClick={() => setAddingCategory(true)}
+                className="mt-2 text-sm text-brand-500 hover:text-brand-400 font-medium"
+              >
+                {t('Other (add new)')}
+              </button>
             </>
           )}
         </Field>
 
         <Field label={t('Type')}>
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, categoryId: '' })} className="w-full">
+          <select
+            value={form.type}
+            onChange={(e) => {
+              setAddingCategory(false)
+              setNewCategoryName('')
+              setCategoryQuery('')
+              setForm({ ...form, type: e.target.value, categoryId: '' })
+            }}
+            className="w-full"
+          >
             <option value="EXPENSE">{t('Expense')}</option>
             <option value="INCOME">{t('Income')}</option>
           </select>

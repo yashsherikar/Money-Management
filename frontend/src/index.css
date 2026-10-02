@@ -213,3 +213,81 @@ body.barcode-scanner-active .barcode-scanner-modal {
   visibility: visible;
 }
 
+@keyframes scannerOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scannerFrameIn {
+  from { transform: scale(0.9); opacity: 0.35; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes scannerFramePulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.02); opacity: 1; }
+}
+@keyframes scannerBeam {
+  from { top: 14%; opacity: 0.95; }
+  to { top: 86%; opacity: 0.35; }
+}
+@keyframes scannerCornerGlow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(0, 201, 174, 0.4)); }
+  50% { filter: drop-shadow(0 0 8px rgba(0, 201, 174, 0.95)); }
+}
+@keyframes scannerTorchWarm {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.55); transform: scale(1); }
+  50% { box-shadow: 0 0 18px 4px rgba(251, 191, 36, 0.75); transform: scale(1.04); }
+}
+@keyframes scannerTorchOffSettle {
+  0% { box-shadow: 0 0 14px 2px rgba(251, 191, 36, 0.5); }
+  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+@keyframes scannerStatusPulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+.scanner-overlay-in {
+  animation: scannerOverlayIn 0.35s ease-out both;
+}
+.scanner-top-bar {
+  animation: fade-in-up 0.4s ease both;
+}
+.scanner-frame-loading {
+  animation: scannerFramePulse 1.1s ease-in-out infinite;
+}
+.scanner-frame-ready {
+  animation: scannerFrameIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.scanner-frame-ready .scanner-corner {
+  animation: scannerCornerGlow 2s ease-in-out infinite;
+}
+.scanner-beam {
+  animation: scannerBeam 1.35s ease-in-out infinite alternate;
+}
+.scanner-status-pulse {
+  animation: scannerStatusPulse 1.2s ease-in-out infinite;
+}
+.scanner-torch-btn {
+  transition: background-color 0.25s ease, color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+}
+.scanner-torch-on {
+  background-color: #fbbf24;
+  color: #0f172a;
+}
+.scanner-torch-off {
+  background-color: rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+.scanner-torch-warming {
+  animation: scannerTorchWarm 0.9s ease-in-out infinite;
+}
+.scanner-torch-off-settle {
+  animation: scannerTorchOffSettle 0.45s ease-out both;
+}
+.scanner-torch-icon {
+  transition: transform 0.25s ease;
+}
+.scanner-torch-on .scanner-torch-icon {
+  transform: scale(1.05);
+}
+

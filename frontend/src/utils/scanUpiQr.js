@@ -20,10 +20,11 @@ async function cleanupScan() {
 }
 
 /**
- * Opens an in-app camera scan (torch on by default for dark rooms).
+ * Opens an in-app camera scan. Torch turns on while the preview is still coming up,
+ * then turns off once the camera is visible (user can toggle flash again in a dark room).
  * Resolves with raw QR string, or rejects on cancel/error.
  */
-export async function scanUpiQrNative({ onTorchAvailable } = {}) {
+export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPreviewReady } = {}) {
   if (!Capacitor.isNativePlatform()) {
     throw new Error('QR camera scan works in the Android app. Paste the UPI link below on web.')
   }
@@ -72,13 +73,32 @@ export async function scanUpiQrNative({ onTorchAvailable } = {}) {
           lensFacing: LensFacing.Back,
         })
 
+        let torchAvailable = false
         try {
           const { available } = await BarcodeScanner.isTorchAvailable()
-          onTorchAvailable?.(!!available)
-          if (available) await BarcodeScanner.enableTorch()
+          torchAvailable = !!available
+          onTorchAvailable?.(torchAvailable)
         } catch {
           onTorchAvailable?.(false)
         }
+
+        // Preview still settling — flash on so dark rooms aren't a black screen.
+        if (torchAvailable) {
+          try {
+            await BarcodeScanner.enableTorch()
+            onTorchChange?.(true)
+          } catch { /* ignore */ }
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 480))
+
+        if (torchAvailable) {
+          try {
+            await BarcodeScanner.disableTorch()
+            onTorchChange?.(false)
+          } catch { /* ignore */ }
+        }
+        onPreviewReady?.()
       } catch (err) {
         await finish(() => reject(err instanceof Error ? err : new Error(String(err))))
       }

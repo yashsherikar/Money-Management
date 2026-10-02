@@ -24,6 +24,8 @@ import java.util.Map;
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String CHANNEL_ID = "money_manager_default";
+    /** Stable local id used with a string tag so a later CANCEL can remove the same tray entry. */
+    private static final int RELATED_NOTIFICATION_ID = 41001;
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
@@ -31,16 +33,28 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         Map<String, String> data = remoteMessage.getData();
         if (data.isEmpty()) return;
 
+        String actionType = data.getOrDefault("actionType", "VIEW_ONLY");
+        String tag = data.get("tag");
+
+        if ("CANCEL".equals(actionType)) {
+            if (tag != null && !tag.isEmpty()) {
+                NotificationManagerCompat.from(this).cancel(tag, RELATED_NOTIFICATION_ID);
+            }
+            return;
+        }
+
         String title = data.getOrDefault("title", "Money Manager");
         String body = data.getOrDefault("body", "");
         String url = data.getOrDefault("url", "/");
-        String actionType = data.getOrDefault("actionType", "VIEW_ONLY");
         String payUrl = data.get("payUrl");
+        String relatedType = data.get("relatedType");
+        String relatedId = data.get("relatedId");
 
         ensureChannel();
 
-        int notificationId = (int) System.currentTimeMillis();
-        PendingIntent openApp = viewPendingIntent(notificationId, url);
+        boolean tagged = tag != null && !tag.isEmpty();
+        int notificationId = tagged ? RELATED_NOTIFICATION_ID : (int) System.currentTimeMillis();
+        PendingIntent openApp = tapPendingIntent(notificationId, url, tag, false, relatedType, relatedId);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_notify)
@@ -52,14 +66,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         switch (actionType) {
             case "PAID_VIEW":
-                // Both open the app — "Paid" lands on a one-tap confirm inside, same as tapping
-                // the notification itself; there's no separate silent background action for it.
-                builder.addAction(0, "Paid", openApp);
+                builder.addAction(0, "Paid", tapPendingIntent(notificationId, url, tag, true, relatedType, relatedId));
                 builder.addAction(0, "View", openApp);
                 break;
             case "PAY_VIEW":
                 if (payUrl != null) {
-                    builder.addAction(0, "Pay now", payPendingIntent(notificationId, payUrl));
+                    builder.addAction(0, "Pay now", payPendingIntent(notificationId, payUrl, tag));
                 }
                 builder.addAction(0, "View", openApp);
                 break;
@@ -67,7 +79,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 builder.addAction(0, "View", openApp);
         }
 
-        NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+        NotificationManagerCompat manager = NotificationManagerCompat.from(this);
+        if (tagged) {
+            manager.notify(tag, RELATED_NOTIFICATION_ID, builder.build());
+        } else {
+            manager.notify(notificationId, builder.build());
+        }
     }
 
     private void ensureChannel() {
@@ -78,21 +95,30 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
-    private PendingIntent viewPendingIntent(int notificationId, String url) {
+    private PendingIntent tapPendingIntent(int notificationId, String url, String tag, boolean markPaid,
+                                           String relatedType, String relatedId) {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         intent.putExtra("notificationUrl", url);
-        return PendingIntent.getActivity(this, notificationId, intent,
+        intent.putExtra("notificationPaid", markPaid);
+        if (relatedType != null) intent.putExtra("relatedType", relatedType);
+        if (relatedId != null) intent.putExtra("relatedId", relatedId);
+        int requestCode = tag != null ? (tag.hashCode() ^ (markPaid ? 0x791 : 0)) : (notificationId ^ (markPaid ? 1 : 0));
+        return PendingIntent.getActivity(this, requestCode, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     /** Opens the user's UPI app directly with the pay link — never opens Money Manager itself. */
-    private PendingIntent payPendingIntent(int notificationId, String payUrl) {
+    private PendingIntent payPendingIntent(int notificationId, String payUrl, String tag) {
         Intent intent = new Intent(this, NotificationActionReceiver.class);
         intent.setAction(NotificationActionReceiver.ACTION_PAY);
         intent.putExtra("notificationId", notificationId);
         intent.putExtra("payUrl", payUrl);
-        return PendingIntent.getBroadcast(this, notificationId, intent,
+        if (tag != null) {
+            intent.putExtra("notificationTag", tag);
+        }
+        int requestCode = tag != null ? (tag.hashCode() ^ 0x5A5A) : notificationId;
+        return PendingIntent.getBroadcast(this, requestCode, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 }

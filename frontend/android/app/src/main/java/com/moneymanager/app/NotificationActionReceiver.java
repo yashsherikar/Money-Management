@@ -17,7 +17,10 @@ public class NotificationActionReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         int notificationId = intent.getIntExtra("notificationId", -1);
-        if (notificationId != -1) {
+        String tag = intent.getStringExtra("notificationTag");
+        if (tag != null && !tag.isEmpty() && notificationId != -1) {
+            NotificationManagerCompat.from(context).cancel(tag, notificationId);
+        } else if (notificationId != -1) {
             NotificationManagerCompat.from(context).cancel(notificationId);
         }
         String payUrl = intent.getStringExtra("payUrl");

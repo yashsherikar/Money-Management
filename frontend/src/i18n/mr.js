@@ -138,6 +138,10 @@ export const mr = {
   'Recurring transactions': 'आवर्ती व्यवहार',
   'Mobile recharge, sending money to parents, rent, subscriptions, salary — anything that repeats monthly gets auto-logged on its day.':
     'मोबाईल रिचार्ज, आई-वडिलांना पैसे पाठवणे, भाडे, सबस्क्रिप्शन, पगार — दर महिन्याला होणारा कोणताही व्यवहार त्याच्या दिवशी आपोआप नोंदवला जातो.',
+  'When something is due, tap Mark paid here — or confirm in the popup when you open the app.':
+    'जेव्हा देय असेल, इथे Mark paid दाबा — किंवा अॅप उघडल्यावर येणाऱ्या पॉपअपमध्ये पुष्टी करा.',
+  'Mark paid': 'भरले म्हणून नोंदवा',
+  'Could not mark as paid': 'भरले म्हणून नोंदवता आले नाही',
   'Expense (recharge, rent, sending to parents...)': 'खर्च (रिचार्ज, भाडे, आई-वडिलांना पाठवणे...)',
   'Income (salary...)': 'उत्पन्न (पगार...)',
   'Description (e.g. Mobile recharge, Money to parents)': 'वर्णन (उदा. मोबाईल रिचार्ज, आई-वडिलांना पैसे)',

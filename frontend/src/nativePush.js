@@ -1,5 +1,11 @@
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
+import {
+  RELATED,
+  confirmDuePaid,
+  parseConfirmIdFromUrl,
+  notifyTransactionsChanged,
+} from './utils/confirmDuePaid.js'
 
 export function isNativePlatform() {
   return Capacitor.isNativePlatform()
@@ -82,15 +88,42 @@ export async function disableNativePush(client) {
   await PushNotifications.removeAllListeners()
 }
 
-/** Call once at app startup (native only) so tapping a notification — its body, or the "Paid"/
- *  "View" buttons — navigates to the right page. The notification itself (including its action
- *  buttons) is built natively in MyFirebaseMessagingService.java, which runs in every app state
- *  (foreground, background, killed); tapping it launches MainActivity, which fires this DOM event
- *  once the page has had a moment to load (see MainActivity.deliverNotificationUrl). */
+async function tryConfirmFromTap(detail) {
+  const relatedType = detail?.relatedType
+  const relatedId = detail?.relatedId != null ? Number(detail.relatedId) : null
+  if (detail?.paid && relatedType && relatedId) {
+    await confirmDuePaid(relatedType, relatedId)
+    notifyTransactionsChanged()
+    return true
+  }
+  if (detail?.paid && detail?.url) {
+    const confirmId = parseConfirmIdFromUrl(detail.url)
+    if (confirmId && detail.url.includes('/recurring')) {
+      await confirmDuePaid(RELATED.RECURRING, confirmId)
+      notifyTransactionsChanged()
+      return true
+    }
+  }
+  return false
+}
+
+/** Call once at app startup (native only) so tapping a notification navigates or logs paid. */
 export function listenForNotificationTaps(navigate) {
   if (!isNativePlatform()) return
-  window.addEventListener('mm-notification-tap', (e) => {
-    const url = e.detail?.url
+  window.addEventListener('mm-notification-tap', async (e) => {
+    const detail = e.detail || {}
+    try {
+      if (detail.paid) {
+        const logged = await tryConfirmFromTap(detail)
+        if (logged) {
+          navigate('/transactions')
+          return
+        }
+      }
+    } catch {
+      // fall through to open the linked page
+    }
+    const url = detail.url?.split('?')[0] || detail.url
     if (url) navigate(url)
   })
 }

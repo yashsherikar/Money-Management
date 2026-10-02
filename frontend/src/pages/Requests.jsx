@@ -177,7 +177,7 @@ export default function Requests() {
               </div>
               <div className={`text-xs font-medium ${statusTone[r.status]}`}>{t(r.status)}</div>
             </div>
-            {r.status === 'ACCEPTED' && (
+            {(r.status === 'ACCEPTED' || r.status === 'PENDING') && (
               <button onClick={() => markPayReceived(r.id)} className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
                 {t('Mark as received')}
               </button>

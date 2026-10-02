@@ -57,9 +57,9 @@ public class SplitBillService {
                     User payer = bill.getUser();
                     String upiLink = null;
                     if (StringUtils.hasText(payer.getUpiId())) {
-                        upiLink = "upi://pay?pa=" + encode(payer.getUpiId())
+                        upiLink = "upi://pay?pa=" + payer.getUpiId().trim()
                                 + "&pn=" + encode(payer.getName())
-                                + "&am=" + p.getShareAmount().toPlainString()
+                                + "&am=" + p.getShareAmount().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
                                 + "&cu=INR"
                                 + "&tn=" + encode(bill.getTitle());
                     }
@@ -70,7 +70,7 @@ public class SplitBillService {
     }
 
     private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     @Transactional
@@ -111,15 +111,16 @@ public class SplitBillService {
             if (participant.getUser() != null) {
                 String payUrl = null;
                 if (StringUtils.hasText(user.getUpiId())) {
-                    payUrl = "upi://pay?pa=" + encode(user.getUpiId())
+                    payUrl = "upi://pay?pa=" + user.getUpiId().trim()
                             + "&pn=" + encode(user.getName())
-                            + "&am=" + participant.getShareAmount().toPlainString()
+                            + "&am=" + participant.getShareAmount().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
                             + "&cu=INR"
                             + "&tn=" + encode(bill.getTitle());
                 }
                 pushService.notifyUser(participant.getUser(), "Split bill",
                         user.getName() + " added you to \"" + bill.getTitle() + "\" — you owe ₹" + participant.getShareAmount(),
-                        "/split-bills", PushService.ACTION_PAY_VIEW, payUrl);
+                        "/split-bills", PushService.ACTION_PAY_VIEW, payUrl,
+                        PushService.RELATED_SPLIT_PARTICIPANT, participant.getId());
             }
         }
         return response;
@@ -141,6 +142,7 @@ public class SplitBillService {
             account.setBalance(account.getBalance().add(participant.getShareAmount()));
             accountRepository.save(account);
         }
+        pushService.resolveRelated(PushService.RELATED_SPLIT_PARTICIPANT, participant.getId());
         return toResponse(bill);
     }
 

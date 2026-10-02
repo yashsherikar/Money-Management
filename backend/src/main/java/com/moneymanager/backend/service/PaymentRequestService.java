@@ -63,7 +63,8 @@ public class PaymentRequestService {
         pushService.notifyUser(payer, "Money request",
                 requester.getName() + " is asking for ₹" + request.amount().toPlainString()
                         + (pr.getNote() != null ? " — " + pr.getNote() : ""),
-                "/requests", PushService.ACTION_PAY_VIEW, payUrl);
+                "/requests", PushService.ACTION_PAY_VIEW, payUrl,
+                PushService.RELATED_PAYMENT_REQUEST, pr.getId());
 
         return toResponse(pr);
     }
@@ -91,6 +92,11 @@ public class PaymentRequestService {
         pr.setRespondedAt(Instant.now());
         paymentRequestRepository.save(pr);
 
+        if (!accept) {
+            pushService.resolveRelated(PushService.RELATED_PAYMENT_REQUEST, pr.getId());
+            pushService.clearPayActionsForUser(payer, "/requests");
+        }
+
         pushService.notifyUser(pr.getRequester(),
                 accept ? "Request accepted" : "Request declined",
                 payer.getName() + (accept ? " accepted" : " declined") + " your request for ₹"
@@ -104,9 +110,10 @@ public class PaymentRequestService {
     public PaymentRequestResponse markPaid(User requester, Long id) {
         PaymentRequest pr = paymentRequestRepository.findByIdAndRequesterId(id, requester.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "request not found"));
-        if (pr.getStatus() != PaymentRequestStatus.ACCEPTED) {
+        if (pr.getStatus() != PaymentRequestStatus.ACCEPTED
+                && pr.getStatus() != PaymentRequestStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "request must be accepted before it can be marked paid");
+                    "only pending or accepted requests can be marked paid");
         }
 
         List<Account> spendable = accountRepository.findByUserIdOrderByCreatedAtAsc(requester.getId()).stream()
@@ -133,7 +140,13 @@ public class PaymentRequestService {
         accountRepository.save(account);
 
         pr.setStatus(PaymentRequestStatus.PAID);
-        return toResponse(paymentRequestRepository.save(pr));
+        PaymentRequest saved = paymentRequestRepository.save(pr);
+        pushService.resolveRelated(PushService.RELATED_PAYMENT_REQUEST, saved.getId());
+        pushService.clearPayActionsForUser(pr.getPayer(), "/requests");
+        pushService.notifyUser(pr.getPayer(), "Request settled",
+                requester.getName() + " marked your ₹" + pr.getAmount().toPlainString() + " payment as received",
+                "/requests");
+        return toResponse(saved);
     }
 
     private PaymentRequestResponse toResponse(PaymentRequest pr) {
@@ -155,11 +168,15 @@ public class PaymentRequestService {
 
     private String buildUpiLink(User requester, BigDecimal amount, String note) {
         if (!StringUtils.hasText(requester.getUpiId())) return null;
-        return "upi://pay?pa=" + encode(requester.getUpiId().trim())
+        String am = amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+        String tn = note == null ? "" : note.trim();
+        if (tn.length() > 50) tn = tn.substring(0, 50);
+        // Do not encode VPA — GPay rejects pa=name%40bank for some payments
+        return "upi://pay?pa=" + requester.getUpiId().trim()
                 + "&pn=" + encode(requester.getName())
-                + "&am=" + amount.toPlainString()
+                + "&am=" + am
                 + "&cu=INR"
-                + "&tn=" + encode(note);
+                + "&tn=" + encode(tn);
     }
 
     private static String reasonLabel(PaymentRequest pr) {
@@ -174,6 +191,6 @@ public class PaymentRequestService {
     }
 
     private static String encode(String value) {
-        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 }

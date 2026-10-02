@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { listenForNotificationTaps } from './nativePush.js'
+import { readPendingUpiConfirm } from './appLock.js'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
@@ -37,6 +38,13 @@ export default function App() {
 
   useEffect(() => {
     listenForNotificationTaps(navigate)
+  }, [navigate])
+
+  // After GPay, Android may restart the app on "/" — send user back to Scan & Pay confirm.
+  useEffect(() => {
+    if (readPendingUpiConfirm()) {
+      navigate('/scan-pay', { replace: true })
+    }
   }, [navigate])
 
   return (

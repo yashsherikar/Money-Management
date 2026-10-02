@@ -41,6 +41,7 @@ public class NotificationController {
 
     private NotificationResponse toResponse(AppNotification n) {
         return new NotificationResponse(n.getId(), n.getTitle(), n.getBody(), n.getUrl(),
-                n.getActionType(), n.getPayUrl(), n.isViewed(), n.getCreatedAt());
+                n.getActionType(), n.getPayUrl(), n.getRelatedType(), n.getRelatedId(),
+                n.isViewed(), n.getCreatedAt());
     }
 }
