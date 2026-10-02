@@ -1,0 +1,179 @@
+package com.moneymanager.backend.service;
+
+import com.moneymanager.backend.dto.PaymentRequestDtos.PaymentRequestCreate;
+import com.moneymanager.backend.dto.PaymentRequestDtos.PaymentRequestResponse;
+import com.moneymanager.backend.entity.*;
+import com.moneymanager.backend.repository.AccountRepository;
+import com.moneymanager.backend.repository.PaymentRequestRepository;
+import com.moneymanager.backend.repository.TransactionRepository;
+import com.moneymanager.backend.repository.UserRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+
+@Service
+public class PaymentRequestService {
+
+    private final PaymentRequestRepository paymentRequestRepository;
+    private final UserRepository userRepository;
+    private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
+    private final PushService pushService;
+
+    public PaymentRequestService(PaymentRequestRepository paymentRequestRepository,
+                                 UserRepository userRepository,
+                                 AccountRepository accountRepository,
+                                 TransactionRepository transactionRepository,
+                                 PushService pushService) {
+        this.paymentRequestRepository = paymentRequestRepository;
+        this.userRepository = userRepository;
+        this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
+        this.pushService = pushService;
+    }
+
+    @Transactional
+    public PaymentRequestResponse create(User requester, PaymentRequestCreate request) {
+        String email = request.email().trim().toLowerCase();
+        User payer = userRepository.findByIgnoreCaseEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "no Money Manager user with email " + email));
+        if (payer.getId().equals(requester.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you can't ask yourself for money");
+        }
+
+        PaymentRequest pr = new PaymentRequest();
+        pr.setRequester(requester);
+        pr.setPayer(payer);
+        pr.setAmount(request.amount());
+        pr.setNote(blankToNull(request.note()));
+        paymentRequestRepository.save(pr);
+
+        String reason = reasonLabel(pr);
+        String payUrl = buildUpiLink(requester, request.amount(), reason);
+        pushService.notifyUser(payer, "Money request",
+                requester.getName() + " is asking for ₹" + request.amount().toPlainString()
+                        + (pr.getNote() != null ? " — " + pr.getNote() : ""),
+                "/requests", PushService.ACTION_PAY_VIEW, payUrl);
+
+        return toResponse(pr);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentRequestResponse> incoming(User user) {
+        return paymentRequestRepository.findByPayerIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentRequestResponse> outgoing(User user) {
+        return paymentRequestRepository.findByRequesterIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public PaymentRequestResponse respond(User payer, Long id, boolean accept) {
+        PaymentRequest pr = paymentRequestRepository.findByIdAndPayerId(id, payer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "request not found"));
+        if (pr.getStatus() != PaymentRequestStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "request already responded to");
+        }
+        pr.setStatus(accept ? PaymentRequestStatus.ACCEPTED : PaymentRequestStatus.DECLINED);
+        pr.setRespondedAt(Instant.now());
+        paymentRequestRepository.save(pr);
+
+        pushService.notifyUser(pr.getRequester(),
+                accept ? "Request accepted" : "Request declined",
+                payer.getName() + (accept ? " accepted" : " declined") + " your request for ₹"
+                        + pr.getAmount().toPlainString(),
+                "/requests");
+
+        return toResponse(pr);
+    }
+
+    @Transactional
+    public PaymentRequestResponse markPaid(User requester, Long id) {
+        PaymentRequest pr = paymentRequestRepository.findByIdAndRequesterId(id, requester.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "request not found"));
+        if (pr.getStatus() != PaymentRequestStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "request must be accepted before it can be marked paid");
+        }
+
+        List<Account> spendable = accountRepository.findByUserIdOrderByCreatedAtAsc(requester.getId()).stream()
+                .filter(a -> a.getType() != AccountType.CARD && a.getType() != AccountType.EMERGENCY_FUND)
+                .toList();
+        Account account = spendable.stream().filter(Account::isPrimary).findFirst()
+                .or(() -> spendable.stream().findFirst())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "add a bank/cash account first to receive this"));
+
+        String desc = "From " + pr.getPayer().getName()
+                + (pr.getNote() != null ? " — " + pr.getNote() : " (money request)");
+
+        Transaction txn = new Transaction();
+        txn.setUser(requester);
+        txn.setAccount(account);
+        txn.setType(TransactionType.INCOME);
+        txn.setAmount(pr.getAmount());
+        txn.setDescription(desc);
+        txn.setTxnDate(LocalDate.now());
+        transactionRepository.save(txn);
+
+        account.setBalance(account.getBalance().add(pr.getAmount()));
+        accountRepository.save(account);
+
+        pr.setStatus(PaymentRequestStatus.PAID);
+        return toResponse(paymentRequestRepository.save(pr));
+    }
+
+    private PaymentRequestResponse toResponse(PaymentRequest pr) {
+        String upiId = pr.getRequester().getUpiId();
+        String upiLink = buildUpiLink(pr.getRequester(), pr.getAmount(), reasonLabel(pr));
+        return new PaymentRequestResponse(
+                pr.getId(),
+                pr.getRequester().getId(),
+                pr.getRequester().getName(),
+                upiId,
+                pr.getPayer().getId(),
+                pr.getPayer().getName(),
+                pr.getAmount(),
+                pr.getNote(),
+                pr.getStatus().name(),
+                upiLink
+        );
+    }
+
+    private String buildUpiLink(User requester, BigDecimal amount, String note) {
+        if (!StringUtils.hasText(requester.getUpiId())) return null;
+        return "upi://pay?pa=" + encode(requester.getUpiId().trim())
+                + "&pn=" + encode(requester.getName())
+                + "&am=" + amount.toPlainString()
+                + "&cu=INR"
+                + "&tn=" + encode(note);
+    }
+
+    private static String reasonLabel(PaymentRequest pr) {
+        if (StringUtils.hasText(pr.getNote())) return pr.getNote().trim();
+        return "Money for " + pr.getRequester().getName();
+    }
+
+    private static String blankToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+}

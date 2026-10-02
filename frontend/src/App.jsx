@@ -22,6 +22,7 @@ import Notifications from './pages/Notifications.jsx'
 import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
 import Onboarding from './pages/Onboarding.jsx'
+import ScanPay from './pages/ScanPay.jsx'
 
 function Protected({ children }) {
   return (
@@ -57,6 +58,7 @@ export default function App() {
       <Route path="/wishlist" element={<Protected><Wishlist /></Protected>} />
       <Route path="/requests" element={<Protected><Requests /></Protected>} />
       <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
+      <Route path="/scan-pay" element={<Protected><ScanPay /></Protected>} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
     </Routes>

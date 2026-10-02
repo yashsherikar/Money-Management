@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { App as CapApp } from '@capacitor/app'
 import { useAuth } from '../context/AuthContext.jsx'
 import { isNativePlatform, isBiometricEnabled, authenticateWithBiometric, setBiometricEnabled } from '../biometricLock.js'
-import { isPinSet, verifyAppLockPin, getLockoutRemainingMs, clearAppLockPin } from '../appLock.js'
+import { isPinSet, verifyAppLockPin, getLockoutRemainingMs, clearAppLockPin, RESUME_LOCK_AFTER_MS, isResumeLockSuppressed } from '../appLock.js'
 import PinPad from './PinPad.jsx'
 import { LockIconStage, UnlockFlash } from './LockAnimations.jsx'
 
@@ -47,6 +47,7 @@ export default function BiometricGate({ children }) {
   const inFlightRef = useRef(false)
   const lastUnlockedAtRef = useRef(0)
   const lastBiometricAttemptEndedAtRef = useRef(0)
+  const backgroundedAtRef = useRef(0)
   const failCountRef = useRef(0)
 
   const celebrate = useCallback((onDone) => {
@@ -123,14 +124,31 @@ export default function BiometricGate({ children }) {
     if (!isNativePlatform()) return undefined
     let handle
     CapApp.addListener('appStateChange', ({ isActive }) => {
-      if (!isActive || !needsGate) return
-      if (Date.now() - lastUnlockedAtRef.current < 2000) return
+      if (!needsGate) return
+
+      if (!isActive) {
+        // Going to background (home, QR scanner, GPay, another app…)
+        backgroundedAtRef.current = Date.now()
+        return
+      }
+
+      // Becoming active again — only lock if away long enough, or not suppressed
+      // (e.g. QR scanner / UPI pay marked a temporary suppress).
+      if (isResumeLockSuppressed()) return
       if (Date.now() - lastBiometricAttemptEndedAtRef.current < BIOMETRIC_DISMISS_COOLDOWN_MS) return
+
+      const awayMs = backgroundedAtRef.current
+        ? Date.now() - backgroundedAtRef.current
+        : RESUME_LOCK_AFTER_MS + 1
+      backgroundedAtRef.current = 0
+
+      if (awayMs < RESUME_LOCK_AFTER_MS) return
+
       startLock()
     }).then((h) => { handle = h })
     return () => handle?.remove()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsGate])
+  }, [needsGate, startLock])
 
   async function handlePinComplete(pin) {
     const ok = await verifyAppLockPin(pin)

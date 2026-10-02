@@ -1,0 +1,18 @@
+package com.moneymanager.backend.repository;
+
+import com.moneymanager.backend.entity.PaymentRequest;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PaymentRequestRepository extends JpaRepository<PaymentRequest, Long> {
+
+    List<PaymentRequest> findByPayerIdOrderByCreatedAtDesc(Long payerId);
+
+    List<PaymentRequest> findByRequesterIdOrderByCreatedAtDesc(Long requesterId);
+
+    Optional<PaymentRequest> findByIdAndPayerId(Long id, Long payerId);
+
+    Optional<PaymentRequest> findByIdAndRequesterId(Long id, Long requesterId);
+}
