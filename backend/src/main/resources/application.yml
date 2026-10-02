@@ -34,7 +34,10 @@ app:
     secret: ${JWT_SECRET:change-this-dev-secret-change-this-dev-secret}
     expiration-ms: ${JWT_EXPIRATION_MS:604800000}
   cors:
-    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173}
+    # Always also allows Capacitor https://localhost in SecurityConfig (code).
+    # On Render, set ALLOWED_ORIGINS to your Vercel URL too, e.g.:
+    # https://your-app.vercel.app,http://localhost:5173
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,https://localhost}
 
 wishroom:
   api:

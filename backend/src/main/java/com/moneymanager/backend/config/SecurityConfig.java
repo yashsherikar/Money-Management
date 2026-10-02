@@ -21,13 +21,26 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
+    /** Capacitor Android (androidScheme=https) + common local/web origins. */
+    private static final List<String> BUILTIN_ORIGINS = List.of(
+            "https://localhost",
+            "capacitor://localhost",
+            "http://localhost",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173"
+    );
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
@@ -74,7 +87,9 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
+                        // All auth routes (and CORS preflight) must be public — Capacitor hits these first
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/actuator/health", "/api/ping").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/internal/**").permitAll()
                         .anyRequest().authenticated()
@@ -86,10 +101,24 @@ public class SecurityConfig {
 
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+        Set<String> origins = new LinkedHashSet<>(BUILTIN_ORIGINS);
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            Arrays.stream(allowedOrigins.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(origins::add);
+        }
+        // Patterns cover Vite ports and Capacitor; credentials need explicit origins/patterns
+        List<String> patterns = new ArrayList<>(origins);
+        patterns.add("http://localhost:*");
+        patterns.add("http://127.0.0.1:*");
+        patterns.add("https://*.vercel.app");
+        config.setAllowedOriginPatterns(patterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        log.info("CORS allowed origin patterns: {}", patterns);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

@@ -15,4 +15,5 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: ALLOWED_ORIGINS
-        sync: false
+        # Must include Capacitor Android origin + your web app URL
+        value: https://localhost,capacitor://localhost,http://localhost:5173
