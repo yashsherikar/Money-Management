@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import client from '../api/client'
 import { isNativePlatform } from '../nativePush.js'
 import { disablePush, isPushSupported } from '../push.js'
@@ -7,11 +7,28 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem('user')
-    return raw ? JSON.parse(raw) : null
+    try {
+      const raw = localStorage.getItem('user')
+      const token = localStorage.getItem('token')
+      if (!raw || !token) return null
+      return JSON.parse(raw)
+    } catch {
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      return null
+    }
   })
 
+  useEffect(() => {
+    function onLogout() {
+      setUser(null)
+    }
+    window.addEventListener('mm-auth-logout', onLogout)
+    return () => window.removeEventListener('mm-auth-logout', onLogout)
+  }, [])
+
   function persist(data) {
+    if (!data?.token) throw new Error('Login response missing token')
     localStorage.setItem('token', data.token)
     localStorage.setItem('user', JSON.stringify({ id: data.userId, email: data.email, name: data.name }))
     setUser({ id: data.userId, email: data.email, name: data.name })

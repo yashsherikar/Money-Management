@@ -44,11 +44,23 @@ function tokenStillValid() {
   const token = localStorage.getItem('token')
   if (!token) return false
   try {
-    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now()
+    const part = token.split('.')[1]
+    if (!part) return false
+    // JWT uses base64url — pad before atob or parse fails and every 401 logs you out
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    const payload = JSON.parse(atob(padded))
+    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now() + 5_000
   } catch {
     return false
   }
+}
+
+function clearSessionSoft() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  // Soft logout — full window.location reload breaks Capacitor SPA / causes login loops
+  window.dispatchEvent(new Event('mm-auth-logout'))
 }
 
 client.interceptors.response.use(
@@ -61,18 +73,17 @@ client.interceptors.response.use(
     pendingCount--
     notifyLoading()
     const status = err.response?.status
-    const isAuthEndpoint = err.config?.url?.includes('/auth/')
-    const sessionRevoked = err.response?.data?.message?.includes('session revoked')
-    if (!isAuthEndpoint && (status === 401 || status === 403)) {
-      // Only log out when the token is actually gone/expired, or the server explicitly
-      // revoked this session (e.g. evicted by a 4th-device login). Otherwise surface
-      // the error on the page instead of wiping the session and reloading.
+    const url = err.config?.url || ''
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/signup')
+    const message = String(err.response?.data?.message || '')
+    const sessionRevoked = message.includes('session revoked')
+    if (!isAuthEndpoint && status === 401) {
+      // Only hard-logout when token is expired/missing, or server revoked the session.
+      // Never use window.location.href here — that loops on Capacitor.
       if (!tokenStillValid() || sessionRevoked) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        window.location.href = '/login'
+        clearSessionSoft()
       } else {
-        console.error('Server rejected an authenticated request:', err.config?.method, err.config?.url, status, err.response?.data)
+        console.error('Server rejected an authenticated request:', err.config?.method, url, status, err.response?.data)
       }
     }
     return Promise.reject(err)

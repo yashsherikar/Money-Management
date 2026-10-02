@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { EyeIcon, EyeOffIcon } from '../components/icons.jsx'
@@ -7,7 +7,7 @@ import client from '../api/client'
 import { promptNativePushIfNeeded } from '../nativePush.js'
 
 export default function Signup() {
-  const { signup } = useAuth()
+  const { user, signup } = useAuth()
   const { lang, setLang, t } = useLanguage()
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -17,14 +17,16 @@ export default function Signup() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  if (user) return <Navigate to="/" replace />
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
       await signup(email.trim(), password, name.trim())
-      await promptNativePushIfNeeded(client)
-      navigate('/')
+      promptNativePushIfNeeded(client).catch(() => {})
+      navigate('/', { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || t('Signup failed'))
     } finally {
