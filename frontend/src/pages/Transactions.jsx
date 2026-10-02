@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import client from '../api/client'
-import { categoryIcon } from '../utils/categoryIcon.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
+import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
@@ -244,76 +244,40 @@ export default function Transactions() {
       </form>
       </CollapsibleSection>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        {transactions.length === 0 && (
-          <div className="px-4 py-8 text-center text-sm text-slate-500">{t('No transactions this month.')}</div>
-        )}
-        <ul className="divide-y divide-slate-100">
-          {transactions.map((txn) => {
-            const title = txn.description || txn.categoryName || t('Transaction')
-            const isIncome = txn.type === 'INCOME'
-            return (
-              <li key={txn.id} className="px-4 py-3.5 sm:px-5 sm:py-4">
-                <div className="flex items-start gap-3 min-w-0">
-                  <span
-                    className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
-                      isIncome ? 'bg-emerald-50' : 'bg-red-50'
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {categoryIcon(`${txn.description || ''} ${txn.categoryName || ''}`, txn.type)}
-                  </span>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[0.95rem] font-semibold text-slate-900 leading-snug break-words">
-                          {title}
-                        </div>
-                        <div className="mt-1 text-[0.8rem] text-slate-500 leading-relaxed">
-                          <span>{txn.txnDate}</span>
-                          {txn.accountName ? <span> · {txn.accountName}</span> : null}
-                          {txn.categoryName && txn.description ? <span> · {txn.categoryName}</span> : null}
-                        </div>
-                      </div>
-
-                      <div
-                        className={`shrink-0 text-right text-[0.95rem] font-bold tabular-nums leading-snug ${
-                          isIncome ? 'text-emerald-600' : 'text-red-600'
-                        }`}
-                      >
-                        {isIncome ? '+' : '−'}₹
-                        {Number(txn.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </div>
-                    </div>
-
-                    <div className="mt-2.5 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(txn)}
-                        aria-label={t('Edit')}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-brand-600 hover:bg-slate-100"
-                      >
-                        <EditIcon />
-                        <span>{t('Edit')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(txn.id)}
-                        aria-label={t('Delete')}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50"
-                      >
-                        <DeleteIcon />
-                        <span>{t('Delete')}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      </div>
+      <MoneyList empty={t('No transactions this month.')}>
+        {transactions.map((txn) => {
+          const title = txn.description || txn.categoryName || t('Transaction')
+          const isIncome = txn.type === 'INCOME'
+          const meta = [
+            txn.txnDate,
+            txn.accountName,
+            txn.categoryName && txn.description ? txn.categoryName : null,
+          ].filter(Boolean).join(' · ')
+          return (
+            <MoneyRow
+              key={txn.id}
+              title={title}
+              meta={meta}
+              amount={txn.amount}
+              income={isIncome}
+              type={txn.type}
+              iconText={`${txn.description || ''} ${txn.categoryName || ''}`}
+              actions={(
+                <>
+                  <RowAction onClick={() => startEdit(txn)} tone="brand">
+                    <EditIcon />
+                    <span>{t('Edit')}</span>
+                  </RowAction>
+                  <RowAction onClick={() => handleDelete(txn.id)} tone="danger">
+                    <DeleteIcon />
+                    <span>{t('Delete')}</span>
+                  </RowAction>
+                </>
+              )}
+            />
+          )
+        })}
+      </MoneyList>
     </div>
   )
 }

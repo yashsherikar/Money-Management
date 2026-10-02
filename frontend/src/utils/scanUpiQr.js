@@ -7,13 +7,15 @@ let scanGeneration = 0
 
 async function ensureCameraPermission() {
   const current = await BarcodeScanner.checkPermissions()
-  if (current.camera === 'granted') return true
+  if (current.camera === 'granted' || current.camera === 'limited') return true
   const requested = await BarcodeScanner.requestPermissions()
-  return requested.camera === 'granted'
+  return requested.camera === 'granted' || requested.camera === 'limited'
 }
 
 function hideScannerChrome() {
   document.body.classList.remove('barcode-scanner-active')
+  document.documentElement.style.background = ''
+  document.body.style.background = ''
 }
 
 async function cleanupScan() {
@@ -24,12 +26,27 @@ async function cleanupScan() {
   activeCancel = null
 }
 
+async function ensureGoogleModule(timeoutMs = 12_000) {
+  try {
+    const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable()
+    if (available) return true
+    await Promise.race([
+      BarcodeScanner.installGoogleBarcodeScannerModule(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('module-timeout')), timeoutMs)),
+    ])
+    const again = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable()
+    return !!again.available
+  } catch {
+    return false
+  }
+}
+
 /**
- * Opens an in-app camera scan. Torch turns on while the preview is still coming up,
- * then turns off once the camera is visible (user can toggle flash again in a dark room).
- * Resolves with raw QR string, or rejects on cancel/error.
+ * Opens camera and returns raw QR string.
+ * Prefers Google's native scanner UI (reliable — no WebView transparency).
+ * Falls back to in-app camera behind WebView + custom overlay.
  */
-export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPreviewReady } = {}) {
+export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPreviewReady, onUsingOverlay } = {}) {
   if (!Capacitor.isNativePlatform()) {
     throw new Error('QR camera scan works in the Android app. Paste the UPI link below on web.')
   }
@@ -39,14 +56,39 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
     throw new Error('This device cannot scan QR codes')
   }
 
-  const allowed = await ensureCameraPermission()
-  if (!allowed) {
-    throw new Error('Camera permission is required to scan QR codes')
-  }
-
   suppressResumeLock(120_000)
   await cleanupScan()
   const gen = ++scanGeneration
+
+  // 1) Google ready-to-use scanner — opens real camera UI, no transparency tricks
+  const moduleOk = await ensureGoogleModule()
+  if (moduleOk && gen === scanGeneration) {
+    try {
+      onUsingOverlay?.(false)
+      const { barcodes } = await BarcodeScanner.scan({
+        formats: [BarcodeFormat.QrCode],
+      })
+      if (gen !== scanGeneration) throw new Error('cancelled')
+      const value = barcodes?.[0]?.rawValue?.trim()
+      if (value) return value
+    } catch (err) {
+      const msg = err?.message || String(err)
+      if (/cancel/i.test(msg)) throw new Error('cancelled')
+      // fall through to custom camera
+    }
+  }
+
+  // 2) Custom in-app camera (behind WebView)
+  const allowed = await ensureCameraPermission()
+  if (!allowed) {
+    try { await BarcodeScanner.openSettings() } catch { /* ignore */ }
+    throw new Error('Camera permission is required to scan QR codes. Enable Camera in Settings, then try again.')
+  }
+
+  if (gen !== scanGeneration) throw new Error('cancelled')
+  onUsingOverlay?.(true)
+  document.documentElement.style.background = 'transparent'
+  document.body.style.background = 'transparent'
   document.body.classList.add('barcode-scanner-active')
 
   return new Promise((resolve, reject) => {
@@ -61,12 +103,8 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
         warmTimer = null
       }
       activeCancel = null
-      // Restore UI immediately — don't wait for native stopScan, or Cancel/Back
-      // leaves a blank camera feed with the app hidden behind barcode-scanner-active.
       hideScannerChrome()
-      try {
-        await cleanupScan()
-      } catch { /* ignore */ }
+      try { await cleanupScan() } catch { /* ignore */ }
       if (gen === scanGeneration) fn()
     }
 
@@ -107,7 +145,6 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
           if (!settled && gen === scanGeneration) onTorchAvailable?.(false)
         }
 
-        // Preview still settling — flash on so dark rooms aren't a black screen.
         if (torchAvailable && !settled && gen === scanGeneration) {
           try {
             await BarcodeScanner.enableTorch()
@@ -115,11 +152,8 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
           } catch { /* ignore */ }
         }
 
-        await new Promise((r) => {
-          warmTimer = setTimeout(r, 480)
-        })
+        await new Promise((r) => { warmTimer = setTimeout(r, 480) })
         warmTimer = null
-
         if (settled || gen !== scanGeneration) return
 
         if (torchAvailable) {
@@ -136,9 +170,10 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
   })
 }
 
-/** Cancels an in-progress scan and always restores the UI (even mid "Opening camera…"). */
+/** Cancels an in-progress custom scan and restores the UI. */
 export async function cancelUpiQrScan() {
   hideScannerChrome()
+  scanGeneration += 1
   const cancel = activeCancel
   if (cancel) {
     await Promise.resolve(cancel())

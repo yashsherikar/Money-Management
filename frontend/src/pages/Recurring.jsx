@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import client, { networkErrorMessage } from '../api/client'
 import { notifyTransactionsChanged } from '../utils/confirmDuePaid.js'
-import { categoryIcon } from '../utils/categoryIcon.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
+import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -269,58 +269,67 @@ export default function Recurring() {
       </form>
       </CollapsibleSection>
 
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-        {items.length === 0 && <div className="p-4 text-sm text-slate-500">{t('Nothing set up yet.')}</div>}
+      <MoneyList empty={t('Nothing set up yet.')}>
         {items.map((r) => {
           const canPay = r.canMarkPaid ?? (r.active && (r.due || r.recurrenceType === 'MONTHLY'))
           const isDue = !!r.due
-          return (
-          <div key={r.id} className={`p-4 flex items-center justify-between flex-wrap gap-3 ${isDue && r.active ? 'bg-amber-500/5' : ''}`}>
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-xl leading-none">{categoryIcon(`${r.description || ''} ${r.categoryName || ''}`, r.type)}</span>
-              <div className="min-w-0">
-                <div className="font-medium flex items-center flex-wrap gap-2">
-                  {r.description}
-                  {!r.active && <span className="text-xs text-slate-400">({t('paused')})</span>}
-                  {r.active && isDue && (
-                    <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-semibold">
-                      {t('Due')}
-                    </span>
-                  )}
-                  {r.active && !canPay && (
-                    <span className="text-[10px] uppercase tracking-wide bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-semibold">
-                      {t('Paid')}
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-slate-500">
-                  {r.recurrenceType === 'INTERVAL_DAYS'
-                    ? `${t('every')} ${r.intervalDays} ${t('days')} · ${t('next')} ${r.nextDueDate}`
-                    : `${t('day')} ${r.dayOfMonth} ${t('of every month')}`}
-                  {' · '}{r.accountName}{r.categoryName ? ` · ${r.categoryName}` : ''}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className={`font-semibold ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>{money(r.amount)}</div>
-              {canPay && (
-                <button
-                  type="button"
-                  onClick={() => markPaid(r.id)}
-                  disabled={confirmingId === r.id}
-                  className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
-                >
-                  {confirmingId === r.id ? t('Saving…') : t('Mark paid')}
-                </button>
+          const badges = (
+            <>
+              {!r.active && <span className="text-xs text-slate-400">({t('paused')})</span>}
+              {r.active && isDue && (
+                <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-semibold">
+                  {t('Due')}
+                </span>
               )}
-              <button onClick={() => toggleActive(r)} className="text-sm text-brand-600 px-1">{r.active ? t('Pause') : t('Resume')}</button>
-              <button onClick={() => startEdit(r)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
-              <button onClick={() => handleDelete(r.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
-            </div>
-          </div>
+              {r.active && !canPay && (
+                <span className="text-[10px] uppercase tracking-wide bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-semibold">
+                  {t('Paid')}
+                </span>
+              )}
+            </>
+          )
+          const meta = [
+            r.recurrenceType === 'INTERVAL_DAYS'
+              ? `${t('every')} ${r.intervalDays} ${t('days')} · ${t('next')} ${r.nextDueDate}`
+              : `${t('day')} ${r.dayOfMonth} ${t('of every month')}`,
+            r.accountName,
+            r.categoryName,
+          ].filter(Boolean).join(' · ')
+          return (
+            <MoneyRow
+              key={r.id}
+              title={(
+                <span className="inline-flex items-center flex-wrap gap-2">
+                  {r.description}
+                  {badges}
+                </span>
+              )}
+              meta={meta}
+              amount={r.amount}
+              income={r.type === 'INCOME'}
+              type={r.type}
+              iconText={`${r.description || ''} ${r.categoryName || ''}`}
+              actions={(
+                <>
+                  {canPay && (
+                    <button
+                      type="button"
+                      onClick={() => markPaid(r.id)}
+                      disabled={confirmingId === r.id}
+                      className="text-xs bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 font-medium disabled:opacity-60"
+                    >
+                      {confirmingId === r.id ? t('Saving…') : t('Mark paid')}
+                    </button>
+                  )}
+                  <RowAction onClick={() => toggleActive(r)}>{r.active ? t('Pause') : t('Resume')}</RowAction>
+                  <RowAction onClick={() => startEdit(r)}><EditIcon /><span>{t('Edit')}</span></RowAction>
+                  <RowAction onClick={() => handleDelete(r.id)} tone="danger"><DeleteIcon /><span>{t('Delete')}</span></RowAction>
+                </>
+              )}
+            />
           )
         })}
-      </div>
+      </MoneyList>
     </div>
   )
 }

@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import {
   RELATED,
   confirmDuePaid,
   parseConfirmIdFromUrl,
   notifyTransactionsChanged,
 } from '../utils/confirmDuePaid.js'
-import { openUpiPayLink } from '../utils/upiQr.js'
+import { openUpiPayLink, parseUpiQr, isPersonalUpi, copyVpaAndOpenApp, formatUpiAmount } from '../utils/upiQr.js'
 
 function timeAgo(iso) {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -60,9 +61,30 @@ export default function Notifications() {
     navigate(item.url?.split('?')[0] || item.url)
   }
 
-  function handlePayNow(item) {
+  async function handlePayNow(item) {
     markViewed(item)
-    if (item.payUrl) openUpiPayLink(item.payUrl)
+    if (!item.payUrl) return
+    try {
+      const parsed = parseUpiQr(item.payUrl)
+      if (isPersonalUpi(parsed.mc) || parsed.personal) {
+        await copyVpaAndOpenApp({
+          pa: parsed.pa,
+          amount: formatUpiAmount(parsed.am) || '1.00',
+          app: 'gpay',
+        })
+      } else {
+        await openUpiPayLink(item.payUrl, {
+          pa: parsed.pa,
+          amount: parsed.am,
+          pn: parsed.pn,
+          merchant: true,
+          mc: parsed.mc,
+          app: 'gpay',
+        })
+      }
+    } catch {
+      openUpiPayLink(item.payUrl).catch(() => {})
+    }
   }
 
   async function handlePaid(item) {
@@ -93,36 +115,52 @@ export default function Notifications() {
           {toast}
         </div>
       )}
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-        {items.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No notifications yet.')}</div>}
+      <MoneyList empty={t('No notifications yet.')}>
         {items.map((item) => (
-          <div key={item.id} className="p-4 flex gap-3">
-            {!item.viewed && <span className="mt-1.5 w-2.5 h-2.5 rounded-full bg-brand-500 shrink-0" />}
-            <div className={`flex-1 min-w-0 ${item.viewed ? 'opacity-60' : ''}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="font-medium">{item.title}</div>
-                <div className="text-xs text-slate-400 shrink-0">{timeAgo(item.createdAt)}</div>
-              </div>
-              <div className="text-sm text-slate-600 mt-0.5">{item.body}</div>
-              <div className="flex gap-2 mt-2">
+          <MoneyRow
+            key={item.id}
+            title={(
+              <span className="inline-flex items-center gap-2">
+                {!item.viewed && <span className="w-2 h-2 rounded-full bg-brand-500 shrink-0" />}
+                <span className={item.viewed ? 'opacity-70' : ''}>{item.title}</span>
+              </span>
+            )}
+            meta={(
+              <span className={item.viewed ? 'opacity-70' : ''}>
+                {item.body}
+                <span className="text-slate-400"> · {timeAgo(item.createdAt)}</span>
+              </span>
+            )}
+            hideAmount
+            iconText={item.title}
+            type="EXPENSE"
+            actions={(
+              <>
                 {item.actionType === 'PAID_VIEW' && (
                   <button
+                    type="button"
                     onClick={() => handlePaid(item)}
                     disabled={busyId === item.id}
-                    className="text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 font-medium disabled:opacity-60"
+                    className="text-xs bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 font-medium disabled:opacity-60"
                   >
                     {busyId === item.id ? t('Saving…') : t('Paid')}
                   </button>
                 )}
                 {item.actionType === 'PAY_VIEW' && item.payUrl && (
-                  <button onClick={() => handlePayNow(item)} className="text-sm bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 font-medium">{t('Pay now')}</button>
+                  <button
+                    type="button"
+                    onClick={() => handlePayNow(item)}
+                    className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 font-medium"
+                  >
+                    {t('Pay now')}
+                  </button>
                 )}
-                <button onClick={() => handleView(item)} className="text-sm border border-slate-300 rounded-md px-3 py-1.5">{t('View')}</button>
-              </div>
-            </div>
-          </div>
+                <RowAction onClick={() => handleView(item)}>{t('View')}</RowAction>
+              </>
+            )}
+          />
         ))}
-      </div>
+      </MoneyList>
     </div>
   )
 }

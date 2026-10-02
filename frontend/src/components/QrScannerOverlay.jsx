@@ -23,12 +23,11 @@ export default function QrScannerOverlay({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onCancel])
 
-  // If overlay unmounts unexpectedly, still tear down the native camera.
+  // Do NOT cancel the native camera on overlay remount (React StrictMode).
+  // Cancel only via Cancel/Back → onCancel → cancelUpiQrScan.
   useEffect(() => {
     if (!open) return undefined
-    return () => {
-      cancelUpiQrScan().catch(() => {})
-    }
+    return undefined
   }, [open])
 
   useEffect(() => {
