@@ -175,7 +175,7 @@ export default function Settings() {
           )}
         </div>
 
-        {native && (
+        {native && false && (
           <div className="bg-white rounded-xl p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -208,6 +208,15 @@ export default function Settings() {
                 </pre>
               </div>
             ) : null}
+          </div>
+        )}
+
+        {native && (
+          <div className="bg-white rounded-xl p-6">
+            <h2 className="font-semibold">{t('Payment notification access')}</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {t('Auto-track from GPay alerts is off in this install build (Play Protect blocks apps that request notification access). Pay, Scan QR, and manual logging still work. We can turn auto-track on later via Play Store.')}
+            </p>
           </div>
         )}
 

@@ -51,14 +51,10 @@
         </service>
         <receiver android:name=".NotificationActionReceiver" android:exported="false" />
 
-        <service
-            android:name=".UpiPaymentNotificationListener"
-            android:exported="true"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+        <!-- UpiPaymentNotificationListener intentionally NOT registered here.
+             Play Protect blocks sideloaded APKs that declare Notification Access
+             ("sensitive data"). Re-enable the <service> when distributing via
+             Play Store or a trusted channel; Part A Pay works without it. -->
     </application>
 
     <!-- Android 11+ package visibility: resolve every common UPI app for upi://pay -->
