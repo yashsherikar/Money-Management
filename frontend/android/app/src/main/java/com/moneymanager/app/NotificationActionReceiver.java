@@ -14,7 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** "Pay now" on a notification: open the system UPI chooser (any installed UPI app). */
+/** "Pay now" on a notification: open the system UPI chooser with a clean URI. */
 public class NotificationActionReceiver extends BroadcastReceiver {
 
     public static final String ACTION_PAY = "com.moneymanager.app.ACTION_PAY";
@@ -33,12 +33,15 @@ public class NotificationActionReceiver extends BroadcastReceiver {
         try {
             context.startActivity(buildUpiChooser(context, payUrl.trim()));
         } catch (Exception ignored) {
-            // No UPI app installed
+            // No UPI app / bad link
         }
     }
 
     static Intent buildUpiChooser(Context context, String url) {
-        Intent base = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        String clean = UpiLauncherPlugin.rebuildCleanUpiUrl(url);
+        Uri uri = UpiLauncherPlugin.uriFromCleanUpi(clean);
+
+        Intent base = new Intent(Intent.ACTION_VIEW, uri);
         base.addCategory(Intent.CATEGORY_DEFAULT);
         base.addCategory(Intent.CATEGORY_BROWSABLE);
 
@@ -51,16 +54,15 @@ public class NotificationActionReceiver extends BroadcastReceiver {
         }
 
         if (byPackage.isEmpty()) {
-            Intent fallback = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            Intent fallback = new Intent(Intent.ACTION_VIEW, uri);
             fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            return fallback;
+            return Intent.createChooser(fallback, "Pay with UPI");
         }
 
         List<Intent> targeted = new ArrayList<>();
         for (ResolveInfo info : byPackage.values()) {
-            Intent specific = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            Intent specific = new Intent(Intent.ACTION_VIEW, uri);
             specific.setPackage(info.activityInfo.packageName);
-            specific.setClassName(info.activityInfo.packageName, info.activityInfo.name);
             targeted.add(specific);
         }
 

@@ -52,7 +52,7 @@ export default function Dashboard() {
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Dashboard')}</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard label={t('Income')} value={money(summary.totalIncome)} tone="good" />
         <StatCard label={t('Expense')} value={money(summary.totalExpense)} tone="bad" />
         <StatCard

@@ -32,7 +32,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 relative">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-slate-50 px-4 py-8 relative" style={{ paddingTop: 'max(2rem, env(safe-area-inset-top))', paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
       <button
         onClick={() => setLang(lang === 'mr' ? 'en' : 'mr')}
         className="absolute top-4 right-4 text-sm text-slate-600 hover:underline"

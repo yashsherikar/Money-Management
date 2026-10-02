@@ -46,9 +46,9 @@ public class PaymentRequestService {
         String email = request.email().trim().toLowerCase();
         User payer = userRepository.findByIgnoreCaseEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "no Money Manager user with email " + email));
+                        "No Money Manager user with email " + email));
         if (payer.getId().equals(requester.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "you can't ask yourself for money");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You can't ask yourself for money");
         }
 
         PaymentRequest pr = new PaymentRequest();
@@ -84,9 +84,9 @@ public class PaymentRequestService {
     @Transactional
     public PaymentRequestResponse respond(User payer, Long id, boolean accept) {
         PaymentRequest pr = paymentRequestRepository.findByIdAndPayerId(id, payer.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "request not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
         if (pr.getStatus() != PaymentRequestStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "request already responded to");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request already responded to");
         }
         pr.setStatus(accept ? PaymentRequestStatus.ACCEPTED : PaymentRequestStatus.DECLINED);
         pr.setRespondedAt(Instant.now());
@@ -109,11 +109,11 @@ public class PaymentRequestService {
     @Transactional
     public PaymentRequestResponse markPaid(User requester, Long id) {
         PaymentRequest pr = paymentRequestRepository.findByIdAndRequesterId(id, requester.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "request not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
         if (pr.getStatus() != PaymentRequestStatus.ACCEPTED
                 && pr.getStatus() != PaymentRequestStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "only pending or accepted requests can be marked paid");
+                    "Only pending or accepted requests can be marked paid");
         }
 
         List<Account> spendable = accountRepository.findByUserIdOrderByCreatedAtAsc(requester.getId()).stream()
@@ -122,7 +122,7 @@ public class PaymentRequestService {
         Account account = spendable.stream().filter(Account::isPrimary).findFirst()
                 .or(() -> spendable.stream().findFirst())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "add a bank/cash account first to receive this"));
+                        "Add a bank/cash account first to receive this"));
 
         String desc = "From " + pr.getPayer().getName()
                 + (pr.getNote() != null ? " — " + pr.getNote() : " (money request)");
