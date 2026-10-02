@@ -35,6 +35,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
+        <!-- Google ML Kit barcode UI (used by BarcodeScanner.scan) -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
 
         <!-- Only one FirebaseMessagingService can exist per app — remove Capacitor's default
              (it only auto-displays "notification"-payload messages and does nothing useful for

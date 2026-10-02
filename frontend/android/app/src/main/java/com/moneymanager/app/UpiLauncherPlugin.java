@@ -110,48 +110,92 @@ public class UpiLauncherPlugin extends Plugin {
     }
 
     /**
-     * P2P-safe path: copy VPA to clipboard and open the UPI app home
-     * (user pastes / searches like a normal manual pay).
+     * P2P-safe path.
+     * GPay: paste into search often fails — open payee via deep link WITHOUT amount
+     * (user types ₹ in GPay). Clipboard still set as backup.
+     * PhonePe / Paytm / BHIM: copy VPA + open app home (paste works there).
      */
     @PluginMethod
     public void copyAndOpen(PluginCall call) {
         try {
             String pa = sanitizePa(call.getString("pa"));
             String am = normalizeAmount(call.getString("am"));
+            String pn = sanitizePn(call.getString("pn"));
             String app = call.getString("app");
             if (am == null) throw new IllegalArgumentException("Bad amount");
 
+            // Plain text only — GPay/PhonePe paste fields reject HTML/styled clips
             ClipboardManager cm = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(ClipData.newPlainText("UPI ID", pa));
+            ClipData clip = ClipData.newPlainText("text", pa);
+            cm.setPrimaryClip(clip);
 
             PackageManager pm = getContext().getPackageManager();
             String pkg = resolvePackage(app);
-            Intent launch = null;
-            if (pkg != null && isInstalled(pm, pkg)) {
-                launch = pm.getLaunchIntentForPackage(pkg);
-            }
-            if (launch == null) {
+            if (pkg == null || !isInstalled(pm, pkg)) {
+                pkg = null;
                 for (String candidate : new String[]{GPAY, PHONEPE, PAYTM, BHIM}) {
                     if (isInstalled(pm, candidate)) {
-                        launch = pm.getLaunchIntentForPackage(candidate);
-                        if (launch != null) break;
+                        pkg = candidate;
+                        break;
                     }
                 }
             }
-            if (launch == null) {
+            if (pkg == null) {
                 call.reject("No UPI app installed");
                 return;
             }
 
-            toast("UPI ID copied, send ₹" + am);
+            Intent launch;
+            if (GPAY.equals(pkg)) {
+                // No am= — avoids fake bank-limit; GPay opens this UPI ID for amount entry
+                String query = "pa=" + pa + "&cu=INR";
+                if (pn != null) query += "&pn=" + pn;
+                launch = new Intent(Intent.ACTION_VIEW);
+                launch.setData(Uri.parse("tez://upi/pay?" + query));
+                launch.setPackage(GPAY);
+                if (launch.resolveActivity(pm) == null) {
+                    launch = new Intent(Intent.ACTION_VIEW, opaqueUpiUri(query));
+                    launch.setPackage(GPAY);
+                }
+                if (launch.resolveActivity(pm) == null) {
+                    // Last resort: home + clipboard (paste is flaky in GPay)
+                    launch = pm.getLaunchIntentForPackage(GPAY);
+                    toast("UPI ID copied\nGPay → New payment → paste, enter ₹" + am);
+                } else {
+                    toast("GPay opened for " + pa + "\nEnter ₹" + am + " there");
+                }
+            } else {
+                launch = pm.getLaunchIntentForPackage(pkg);
+                if (launch == null) {
+                    call.reject("Could not open UPI app");
+                    return;
+                }
+                toast("UPI ID copied — paste in app, send ₹" + am);
+            }
+
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(launch);
+            // Brief delay so clipboard is committed before GPay/PhonePe reads it
+            final Intent toStart = launch;
+            Activity activity = getActivity();
+            if (activity != null) {
+                activity.runOnUiThread(() ->
+                        activity.getWindow().getDecorView().postDelayed(() -> {
+                            try {
+                                getContext().startActivity(toStart);
+                            } catch (Exception e) {
+                                toast("Could not open app");
+                            }
+                        }, 280));
+            } else {
+                getContext().startActivity(toStart);
+            }
 
             JSObject ret = new JSObject();
             ret.put("copied", true);
             ret.put("pa", pa);
             ret.put("am", am);
             ret.put("opened", true);
+            ret.put("gpayDeepLink", GPAY.equals(pkg));
             call.resolve(ret);
         } catch (Exception e) {
             call.reject(e.getMessage() == null ? "Copy/open failed" : e.getMessage(), e);

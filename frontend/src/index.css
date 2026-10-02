@@ -237,20 +237,36 @@ a.w-full {
   min-height: 2.75rem;
 }
 
-/* Bottom nav QR orb scales with screen width */
+/* Bottom nav — floating dock */
 .scan-nav-orb {
-  width: clamp(55px, 16vw, 67px) !important;
-  height: clamp(55px, 16vw, 67px) !important;
-  /* Float above the bar — keep bar height unchanged */
-  margin-top: clamp(-28px, -8vw, -34px) !important;
+  width: clamp(52px, 14vw, 58px) !important;
+  height: clamp(52px, 14vw, 58px) !important;
+  margin-top: clamp(-26px, -7vw, -30px) !important;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #F1F5F9;
+  background: linear-gradient(160deg, #4C8CFF 0%, #226DFF 55%, #16419E 100%);
+  border: 2px solid rgba(200, 220, 255, 0.22);
+  box-shadow:
+    0 4px 14px rgba(34, 109, 255, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.12) inset;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.scan-nav-orb-active {
+  transform: scale(1.06);
+  box-shadow:
+    0 6px 18px rgba(34, 109, 255, 0.45),
+    0 0 0 3px rgba(0, 245, 212, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.14) inset;
 }
 .scan-nav-orb svg {
-  width: clamp(28px, 8.6vw, 36px);
-  height: clamp(28px, 8.6vw, 36px);
+  width: clamp(24px, 7vw, 28px);
+  height: clamp(24px, 7vw, 28px);
 }
 
-/* App chrome safe areas */
 .app-header {
   padding-top: max(0.75rem, env(safe-area-inset-top));
   padding-left: max(1rem, env(safe-area-inset-left));
@@ -259,19 +275,137 @@ a.w-full {
 .app-main {
   padding-left: max(1rem, env(safe-area-inset-left));
   padding-right: max(1rem, env(safe-area-inset-right));
-  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px));
 }
+
 .app-bottom-nav {
-  padding-top: 0.35rem;
-  padding-bottom: max(0.35rem, env(safe-area-inset-bottom));
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  /* Lock bar height — large QR icon overflows upward, does not stretch the bar */
-  height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
-  min-height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
-  max-height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  position: fixed;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 max(0.75rem, env(safe-area-inset-left)) max(0.55rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-right));
+  pointer-events: none;
+  background: transparent;
+  border: none;
+  height: auto;
+  min-height: 0;
+  max-height: none;
   overflow: visible;
+}
+.app-bottom-nav-inner {
+  pointer-events: auto;
+  display: flex;
   align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.15rem;
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 0.4rem 0.35rem 0.45rem;
+  background:
+    linear-gradient(180deg, rgba(28, 36, 52, 0.98) 0%, rgba(14, 18, 28, 0.98) 100%);
+  border: 1px solid rgba(90, 110, 145, 0.28);
+  border-radius: 22px;
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  overflow: visible;
+  min-height: 3.65rem;
+}
+
+.nav-item {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  padding: 0.15rem 0.1rem 0.1rem;
+  color: #6B7C93;
+  font-weight: 500;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.18s ease;
+}
+.nav-item-pay {
+  justify-content: flex-end;
+  padding-bottom: 0.05rem;
+}
+.nav-item-active {
+  color: #00F5D4;
+}
+.nav-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 12px;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.nav-icon-active {
+  color: #00F5D4;
+  background: rgba(0, 245, 212, 0.1);
+  transform: translateY(-1px);
+}
+.nav-label-active {
+  color: #00F5D4 !important;
+  font-weight: 600;
+}
+.nav-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+.nav-dot-on {
+  background: #00F5D4;
+  transform: scale(1.15);
+}
+.nav-item-pay .nav-dot {
+  display: none;
+}
+
+/* More bottom sheet */
+.more-sheet {
+  background: #161D2B !important;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+  border-top: 1px solid rgba(90, 110, 145, 0.25);
+}
+.more-sheet-handle {
+  width: 2.5rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: #3A4A63;
+  margin: 0.15rem auto 0.35rem;
+}
+.more-sheet-link {
+  display: block;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #C4CEDB;
+  border-left: 2px solid transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.more-sheet-link:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.more-sheet-link-active {
+  background: rgba(34, 109, 255, 0.14) !important;
+  color: #4C8CFF !important;
+  border-left-color: #226DFF;
 }
 
 /* Prevent long money / UPI strings from blowing layout */
@@ -384,13 +518,30 @@ button.rounded-md {
   background: linear-gradient(180deg, #0D1117 0%, #131B2C 55%, #0D1117 100%);
 }
 
-/* In-app QR camera: hide app chrome, show only the scanner overlay */
+/* In-app QR camera: hide app chrome, show only the scanner overlay.
+   Must beat body { background-color: #0D1117 !important } or the camera stays black. */
 body.barcode-scanner-active {
-  visibility: hidden;
+  visibility: hidden !important;
   background: transparent !important;
+  background-color: transparent !important;
+}
+html:has(body.barcode-scanner-active),
+html:has(body.barcode-scanner-active) body,
+body.barcode-scanner-active #root,
+body.barcode-scanner-active #root > div,
+body.barcode-scanner-active main,
+body.barcode-scanner-active .app-shell,
+body.barcode-scanner-active [class*="bg-navy"],
+body.barcode-scanner-active [class*="min-h-screen"] {
+  background: transparent !important;
+  background-color: transparent !important;
 }
 body.barcode-scanner-active .barcode-scanner-modal {
-  visibility: visible;
+  visibility: visible !important;
+  background: transparent !important;
+}
+body.barcode-scanner-active .barcode-scanner-modal * {
+  visibility: visible !important;
 }
 
 @keyframes scannerOverlayIn {

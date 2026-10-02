@@ -350,6 +350,17 @@ export const mr = {
   'Enter a valid UPI ID': 'वैध UPI ID टाका',
   'Enter details or scan a QR, then open GPay / PhonePe and paste the UPI ID.':
     'तपशील भरा किंवा QR स्कॅन करा, नंतर GPay/PhonePe उघडून UPI ID पेस्ट करा.',
+  'Scan a merchant QR or paste a UPI link. Personal UPI uses copy + open; merchants use the payment link.':
+    'व्यापारी QR स्कॅन करा किंवा UPI लिंक पेस्ट करा. खाजगी UPI = कॉपी+उघडा; व्यापारी = पेमेंट लिंक.',
+  'Paste UPI QR / link': 'UPI QR / लिंक पेस्ट करा',
+  'Personal UPI — copy ID & open app (GPay links often fail).':
+    'खाजगी UPI — ID कॉपी करून अॅप उघडा (GPay लिंक अनेकदा अयशस्वी).',
+  'Merchant QR — Pay buttons open the UPI app with the payment link.':
+    'व्यापारी QR — Pay बटणे पेमेंट लिंकने UPI अॅप उघडतात.',
+  'Opened UPI app with merchant payment link.': 'व्यापारी पेमेंट लिंकने UPI अॅप उघडले.',
+  'Merchant / shop QR': 'व्यापारी / दुकान QR',
+  'Merchant: we open the UPI app with the payment link (amount already filled).':
+    'व्यापारी: पेमेंट लिंकने UPI अॅप उघडतो (रक्कम आधीच भरलेली).',
   'QR details filled — pick an app to pay.': 'QR तपशील भरले — पेमेंटसाठी अॅप निवडा.',
   'UPI ID copied — paste in the app and send ₹': 'UPI ID कॉपी झाली — अॅपमध्ये पेस्ट करून ₹ पाठवा ',
   'We copy the UPI ID and open the app. Paste it in search / Pay UPI ID, enter the amount, and pay.':

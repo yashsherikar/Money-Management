@@ -293,8 +293,9 @@ export async function copyUpiPayLink({ pa, amount }) {
   return built
 }
 
-/** P2P path: copy VPA (+ show amount in toast) and open UPI app home — same as manual pay. */
-export async function copyVpaAndOpenApp({ pa, amount, app = null }) {
+/** P2P path: copy VPA (+ show amount in toast) and open UPI app home — same as manual pay.
+ *  GPay: native side opens payee without amount (paste is unreliable there). */
+export async function copyVpaAndOpenApp({ pa, amount, pn, app = null }) {
   const cleanPa = normalizeVpa(pa)
   const am = formatUpiAmount(amount)
   if (!cleanPa || !cleanPa.includes('@')) throw new Error('Invalid UPI ID')
@@ -303,7 +304,7 @@ export async function copyVpaAndOpenApp({ pa, amount, app = null }) {
   const { Capacitor, registerPlugin } = await import('@capacitor/core')
   if (Capacitor.isNativePlatform()) {
     const UpiLauncher = registerPlugin('UpiLauncher')
-    await UpiLauncher.copyAndOpen({ pa: cleanPa, am, app: app || null })
+    await UpiLauncher.copyAndOpen({ pa: cleanPa, am, pn: pn || null, app: app || null })
     return { pa: cleanPa, amount: am }
   }
   await navigator.clipboard?.writeText(cleanPa)

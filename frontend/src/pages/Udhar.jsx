@@ -4,6 +4,7 @@ import StatCard from '../components/StatCard.jsx'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
+import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 function money(n) {
@@ -165,35 +166,35 @@ export default function Udhar() {
       </form>
       </CollapsibleSection>
 
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-        {entries.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No udhar entries yet.')}</div>}
+      <MoneyList empty={t('No udhar entries yet.')}>
         {entries.map((e) => (
-          <div key={e.id} className="p-4 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <div className="font-medium">
+          <MoneyRow
+            key={e.id}
+            title={(
+              <span>
                 {e.type === 'LENT' ? `${t('You gave')} ${e.contactName}` : `${t('You took from')} ${e.contactName}`}
                 {e.settled && <span className="ml-2 text-xs text-emerald-600 font-medium">{t('SETTLED')}</span>}
-              </div>
-              <div className="text-xs text-slate-500">
-                {e.txnDate}{e.dueDate ? ` · ${t('due')} ${e.dueDate}` : ''}{e.accountName ? ` · ${e.accountName}` : ''}{e.note ? ` · ${e.note}` : ''}
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className={`font-semibold ${e.type === 'LENT' ? 'text-emerald-600' : 'text-red-600'}`}>{money(e.amount)}</div>
-              {!e.settled && e.type === 'BORROWED' && e.contactLinked && (
-                <button onClick={() => handleRequestSettle(e.id)} className="text-sm text-brand-600">
-                  {e.settleRequested ? t('Remind again') : t('Notify lender')}
-                </button>
-              )}
-              {!e.settled && <button onClick={() => handleSettle(e.id)} className="text-sm text-brand-600">{t('Settle')}</button>}
-              {!e.settled && (
-                <button onClick={() => startEdit(e)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
-              )}
-              <button onClick={() => handleDelete(e.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
-            </div>
-          </div>
+              </span>
+            )}
+            meta={[e.txnDate, e.dueDate ? `${t('due')} ${e.dueDate}` : null, e.accountName, e.note].filter(Boolean).join(' · ')}
+            amount={e.amount}
+            income={e.type === 'LENT'}
+            iconText={e.contactName}
+            actions={(
+              <>
+                {!e.settled && e.type === 'BORROWED' && e.contactLinked && (
+                  <RowAction onClick={() => handleRequestSettle(e.id)}>
+                    {e.settleRequested ? t('Remind again') : t('Notify lender')}
+                  </RowAction>
+                )}
+                {!e.settled && <RowAction onClick={() => handleSettle(e.id)}>{t('Settle')}</RowAction>}
+                {!e.settled && <RowAction onClick={() => startEdit(e)}><EditIcon /><span>{t('Edit')}</span></RowAction>}
+                <RowAction onClick={() => handleDelete(e.id)} tone="danger"><DeleteIcon /><span>{t('Delete')}</span></RowAction>
+              </>
+            )}
+          />
         ))}
-      </div>
+      </MoneyList>
     </div>
   )
 }

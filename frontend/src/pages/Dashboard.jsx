@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import client, { networkErrorMessage } from '../api/client'
 import StatCard from '../components/StatCard.jsx'
-import { categoryIcon } from '../utils/categoryIcon.js'
+import MoneyRow from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 
 const COLORS = ['#226DFF', '#00F5D4', '#f59e0b', '#FF5376', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
@@ -106,20 +106,18 @@ export default function Dashboard() {
           {summary.unwantedExpenses.length === 0 ? (
             <div className="text-sm text-slate-500">{t('Nothing flagged. Nice.')}</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100 -mx-4 -mb-4">
               {summary.unwantedExpenses.map((u) => (
-                <div key={u.transactionId} className="py-2 flex justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{categoryIcon(`${u.description || ''} ${u.categoryName || ''}`, 'EXPENSE')}</span>
-                    <div>
-                      <div className="font-medium">{u.description || u.categoryName}</div>
-                      <div className="text-xs text-slate-500">{u.categoryName}</div>
-                    </div>
-                  </div>
-                  <div className="font-semibold text-red-600">{money(u.amount)}</div>
-                </div>
+                <MoneyRow
+                  key={u.transactionId}
+                  title={u.description || u.categoryName}
+                  meta={u.categoryName}
+                  amount={u.amount}
+                  type="EXPENSE"
+                  iconText={`${u.description || ''} ${u.categoryName || ''}`}
+                />
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </div>
