@@ -10,6 +10,8 @@ import {
   parseUpiQr,
   buildUpiPayLink,
   openUpiPayLink,
+  validateUpiAmount,
+  formatUpiAmount,
   resolveCategoryId,
   rememberMerchantCategoryId,
   categoryNameForMcc,
@@ -29,6 +31,7 @@ const empty = {
   pn: '',
   mc: '',
   am: '',
+  mam: '',
   cu: 'INR',
   tn: '',
   personal: false,
@@ -51,6 +54,8 @@ export default function ScanPay() {
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [payPreview, setPayPreview] = useState(null) // { link, pa, amount, name }
+  const [paying, setPaying] = useState(false)
   const [logging, setLogging] = useState(false)
   const [loggedOk, setLoggedOk] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
@@ -72,6 +77,7 @@ export default function ScanPay() {
       pn: pending.pn || '',
       mc: pending.mc || '',
       am: pending.am || '',
+      mam: pending.mam || '',
       cu: pending.cu || 'INR',
       tn: pending.tn || '',
       personal: !!pending.personal,
@@ -175,6 +181,7 @@ export default function ScanPay() {
       pn: parsed.pn,
       mc: parsed.mc,
       am: parsed.am || '',
+      mam: parsed.mam || '',
       cu: parsed.cu || 'INR',
       tn: parsed.tn,
       personal: hintPersonal,
@@ -232,6 +239,7 @@ export default function ScanPay() {
     }
   }
 
+  /** Step 1: validate + show exact payee/amount. Never opens GPay yet. */
   function openPay() {
     setError('')
     setLoggedOk(false)
@@ -239,8 +247,9 @@ export default function ScanPay() {
       setError(t('Scan a UPI QR first'))
       return
     }
-    if (!form.am || Number(form.am) <= 0) {
-      setError(t('Enter amount before paying'))
+    const amountError = validateUpiAmount(form.am, { mam: form.mam, raw: form.raw })
+    if (amountError) {
+      setError(amountError)
       return
     }
     if (!form.accountId) {
@@ -251,40 +260,65 @@ export default function ScanPay() {
       setError(t('Select a category'))
       return
     }
-    const link = buildUpiPayLink({
-      pa: form.pa,
-      pn: form.pn || form.description,
-      am: form.am,
-      cu: form.cu,
-      mc: form.personal ? undefined : form.mc,
-      tn: form.tn || form.description,
-      raw: form.raw,
-    })
-    awaitingReturnRef.current = true
-    // Persist — Android may kill WebView while GPay is open
-    suppressResumeLock(300_000)
-    savePendingUpiConfirm({
-      pa: form.pa,
-      pn: form.pn,
-      mc: form.mc,
-      am: form.am,
-      cu: form.cu,
-      tn: form.tn,
-      personal: form.personal,
-      raw: form.raw,
-      accountId: form.accountId,
-      categoryId: form.categoryId,
-      description: form.description,
-      sharedCategoryName: form.sharedCategoryName,
-    })
-    openUpiPayLink(link)
-    if (!isNativePlatform()) {
-      setTimeout(() => {
-        if (awaitingReturnRef.current) {
-          awaitingReturnRef.current = false
-          setConfirmOpen(true)
-        }
-      }, 1500)
+    try {
+      const built = buildUpiPayLink({
+        pa: form.pa,
+        pn: form.pn || form.description,
+        am: form.am,
+        cu: 'INR',
+        tn: form.tn || form.description,
+      })
+      // Lock the normalized amount into the form so logging matches what GPay got
+      setForm((f) => ({ ...f, am: built.amount, pa: built.pa }))
+      setPayPreview({
+        link: built.link,
+        pa: built.pa,
+        amount: built.amount,
+        name: form.pn || form.description || built.pa,
+      })
+    } catch (err) {
+      setError(err.message || t('Could not build payment link'))
+    }
+  }
+
+  /** Step 2: user confirmed — open any installed UPI app (PhonePe, GPay, Paytm, …). */
+  async function confirmAndOpenUpi() {
+    if (!payPreview?.link || paying) return
+    setPaying(true)
+    setError('')
+    try {
+      awaitingReturnRef.current = true
+      suppressResumeLock(300_000)
+      savePendingUpiConfirm({
+        pa: payPreview.pa,
+        pn: form.pn,
+        mc: form.mc,
+        am: payPreview.amount,
+        cu: 'INR',
+        tn: form.tn,
+        personal: form.personal,
+        raw: form.raw,
+        accountId: form.accountId,
+        categoryId: form.categoryId,
+        description: form.description,
+        sharedCategoryName: form.sharedCategoryName,
+      })
+      await openUpiPayLink(payPreview.link)
+      setPayPreview(null)
+      if (!isNativePlatform()) {
+        setTimeout(() => {
+          if (awaitingReturnRef.current) {
+            awaitingReturnRef.current = false
+            setConfirmOpen(true)
+          }
+        }, 1500)
+      }
+    } catch (err) {
+      awaitingReturnRef.current = false
+      clearPendingUpiConfirm()
+      setError(err?.message || t('Could not open UPI app'))
+    } finally {
+      setPaying(false)
     }
   }
 
@@ -315,6 +349,11 @@ export default function ScanPay() {
       setConfirmOpen(false)
       return
     }
+    const amount = formatUpiAmount(form.am)
+    if (!amount) {
+      setError(t('Invalid amount'))
+      return
+    }
     setLogging(true)
     setError('')
     try {
@@ -322,11 +361,10 @@ export default function ScanPay() {
         accountId: Number(form.accountId),
         categoryId: Number(form.categoryId),
         type: 'EXPENSE',
-        amount: Number(form.am),
+        amount: Number(amount),
         description: form.description || form.pn || form.pa,
         txnDate: new Date().toISOString().slice(0, 10),
       })
-      // Shared DB so any other user scanning this UPI ID gets the same category
       await saveUpiHint().catch(() => {})
       rememberMerchantCategoryId(form.pa, form.categoryId)
       clearPendingUpiConfirm()
@@ -366,7 +404,7 @@ export default function ScanPay() {
 
       <h1 className="text-2xl font-bold mb-2">{t('Scan & Pay')}</h1>
       <p className="text-sm text-slate-500 mb-6">
-        {t('Scan a UPI QR, check details, pay in GPay/PhonePe, then confirm to log the expense.')}
+        {t('Scan a UPI QR, check details, pay in any UPI app (PhonePe, GPay, Paytm…), then confirm to log the expense.')}
       </p>
 
       {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
@@ -413,9 +451,17 @@ export default function ScanPay() {
         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs text-slate-500">{titleLabel}</span>
+              <span
+                className={
+                  form.personal
+                    ? 'text-sm font-bold text-teal tracking-wide'
+                    : 'text-xs text-slate-500'
+                }
+              >
+                {titleLabel}
+              </span>
               {form.personal && (
-                <span className="text-[10px] uppercase tracking-wide bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                <span className="text-[10px] uppercase tracking-wide bg-teal/15 text-teal px-2 py-0.5 rounded font-semibold">
                   {t('Not a merchant')}
                 </span>
               )}
@@ -458,16 +504,6 @@ export default function ScanPay() {
               required
               value={form.am}
               onChange={(e) => setForm((f) => ({ ...f, am: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Description')}</label>
-            <input
-              type="text"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-md"
             />
           </div>
@@ -527,10 +563,22 @@ export default function ScanPay() {
             )}
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Description / Note')}</label>
+            <input
+              type="text"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder={t('e.g. Lunch, rent share, groceries…')}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md"
+            />
+          </div>
+
           <button
             type="button"
             onClick={openPay}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-3 font-semibold"
+            disabled={paying}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
           >
             {t('Pay with UPI')}
           </button>
@@ -547,6 +595,47 @@ export default function ScanPay() {
           >
             {t('Already paid? Log expense')}
           </button>
+        </div>
+      )}
+
+      {payPreview && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !paying && setPayPreview(null)} />
+          <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4">
+            <h2 className="font-bold text-lg mb-1">{t('Confirm payment')}</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              {t('Check payee and amount carefully, then pick any UPI app.')}
+            </p>
+            <div className="bg-slate-50 rounded-xl p-4 space-y-2 mb-4">
+              <div className="text-xs text-slate-500">{t('Paying to')}</div>
+              <div className="font-semibold text-base">{payPreview.name}</div>
+              <div className="font-mono text-sm text-teal">{payPreview.pa}</div>
+              <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
+                <span className="text-sm text-slate-500">{t('Amount')}</span>
+                <span className="text-2xl font-bold text-emerald-600">
+                  ₹{Number(payPreview.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={paying}
+                onClick={confirmAndOpenUpi}
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
+              >
+                {paying ? t('Opening…') : t('Pay with UPI app')}
+              </button>
+              <button
+                type="button"
+                disabled={paying}
+                onClick={() => setPayPreview(null)}
+                className="flex-1 border border-slate-300 rounded-md py-3"
+              >
+                {t('Cancel')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

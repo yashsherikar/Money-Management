@@ -8,6 +8,7 @@ import {
   parseConfirmIdFromUrl,
   notifyTransactionsChanged,
 } from '../utils/confirmDuePaid.js'
+import { openUpiPayLink } from '../utils/upiQr.js'
 
 function timeAgo(iso) {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -61,7 +62,7 @@ export default function Notifications() {
 
   function handlePayNow(item) {
     markViewed(item)
-    if (item.payUrl) window.location.href = item.payUrl
+    if (item.payUrl) openUpiPayLink(item.payUrl)
   }
 
   async function handlePaid(item) {

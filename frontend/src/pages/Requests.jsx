@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { openUpiPayLink } from '../utils/upiQr.js'
 
 function money(n) {
-  return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+  return `â‚¹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
 }
 
 const statusTone = {
@@ -127,7 +128,7 @@ export default function Requests() {
             disabled={asking}
             className="bg-brand-600 hover:bg-brand-700 text-white rounded-md px-4 py-2.5 text-sm font-medium disabled:opacity-60"
           >
-            {asking ? t('Sending…') : t('Send request')}
+            {asking ? t('Sendingâ€¦') : t('Send request')}
           </button>
         </form>
       </section>
@@ -153,9 +154,9 @@ export default function Requests() {
               )}
               {r.status === 'ACCEPTED' && (
                 r.upiPayLink ? (
-                  <a href={r.upiPayLink} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
+                  <button type="button" onClick={() => openUpiPayLink(r.upiPayLink).catch((e) => alert(e.message || 'Could not open UPI'))} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
                     {t('Pay via UPI')}
-                  </a>
+                  </button>
                 ) : (
                   <span className="text-xs text-slate-500">{r.requesterName} {t("hasn't added a UPI ID yet")}</span>
                 )
@@ -172,7 +173,7 @@ export default function Requests() {
           <div key={r.id} className="p-4 flex items-center justify-between flex-wrap gap-2">
             <div>
               <div className="font-medium">
-                {r.payerName} · {money(r.amount)}
+                {r.payerName} Â· {money(r.amount)}
                 {r.note ? <> {t('for')} "{r.note}"</> : null}
               </div>
               <div className={`text-xs font-medium ${statusTone[r.status]}`}>{t(r.status)}</div>
@@ -199,9 +200,9 @@ export default function Requests() {
             </div>
             {!b.paid && (
               b.upiPayLink ? (
-                <a href={b.upiPayLink} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
+                <button type="button" onClick={() => openUpiPayLink(b.upiPayLink).catch((e) => alert(e.message || 'Could not open UPI'))} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
                   {t('Pay via UPI')}
-                </a>
+                </button>
               ) : (
                 <span className="text-xs text-slate-500">{b.payerName} {t("hasn't added a UPI ID yet")}</span>
               )
@@ -210,7 +211,7 @@ export default function Requests() {
         ))}
       </div>
 
-      <h2 className="font-semibold mb-3">{t('Wishlist — asking you to pay')}</h2>
+      <h2 className="font-semibold mb-3">{t('Wishlist â€” asking you to pay')}</h2>
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 mb-8">
         {incoming.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No requests.')}</div>}
         {incoming.map((r) => (
@@ -228,9 +229,9 @@ export default function Requests() {
               )}
               {r.status === 'ACCEPTED' && (
                 r.upiPayLink ? (
-                  <a href={r.upiPayLink} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
+                  <button type="button" onClick={() => openUpiPayLink(r.upiPayLink).catch((e) => alert(e.message || 'Could not open UPI'))} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
                     {t('Pay via UPI')}
-                  </a>
+                  </button>
                 ) : (
                   <span className="text-xs text-slate-500">{r.requesterName} {t("hasn't added a UPI ID yet")}</span>
                 )
@@ -240,13 +241,13 @@ export default function Requests() {
         ))}
       </div>
 
-      <h2 className="font-semibold mb-3">{t('Wishlist — you asked others')}</h2>
+      <h2 className="font-semibold mb-3">{t('Wishlist â€” you asked others')}</h2>
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {outgoing.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No requests.')}</div>}
         {outgoing.map((r) => (
           <div key={r.id} className="p-4 flex items-center justify-between flex-wrap gap-2">
             <div>
-              <div className="font-medium">{r.memberName} · {money(r.amount)} {t('for')} "{r.wishlistItemName}"</div>
+              <div className="font-medium">{r.memberName} Â· {money(r.amount)} {t('for')} "{r.wishlistItemName}"</div>
               <div className={`text-xs font-medium ${statusTone[r.status]}`}>{t(r.status)}</div>
             </div>
             {r.status === 'ACCEPTED' && (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import client from '../api/client'
+import client, { networkErrorMessage } from '../api/client'
 import { notifyTransactionsChanged } from '../utils/confirmDuePaid.js'
 import { categoryIcon } from '../utils/categoryIcon.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
@@ -29,6 +29,7 @@ export default function Recurring() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [confirmingId, setConfirmingId] = useState(null)
+  const [okMsg, setOkMsg] = useState('')
 
   async function loadAll() {
     const [itemsRes, accRes, catRes] = await Promise.all([
@@ -71,6 +72,7 @@ export default function Recurring() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setOkMsg('')
     try {
       const payload = {
         accountId: Number(form.accountId),
@@ -83,15 +85,21 @@ export default function Recurring() {
         lastDoneDate: form.recurrenceType === 'INTERVAL_DAYS' ? form.lastDoneDate : null,
         nextDueDate: form.recurrenceType === 'INTERVAL_DAYS' ? form.nextDueDate : null,
       }
-      if (editingId) {
+      const wasEdit = !!editingId
+      if (wasEdit) {
         await client.put(`/recurring-transactions/${editingId}`, payload)
       } else {
         await client.post('/recurring-transactions', payload)
       }
       resetForm()
-      loadAll()
+      setOkMsg(wasEdit ? t('Updated.') : t('Added.'))
+      try {
+        await loadAll()
+      } catch {
+        // Save already succeeded — don't scare the user with a reload error
+      }
     } catch (err) {
-      setError(err.response?.data?.message || t('Save failed'))
+      setError(networkErrorMessage(err, t('Save failed')))
     }
   }
 
@@ -104,6 +112,8 @@ export default function Recurring() {
   function startEdit(item) {
     setEditingId(item.id)
     setFormOpen(true)
+    setError('')
+    setOkMsg('')
     const lastDoneDate = item.nextDueDate && item.intervalDays
       ? new Date(new Date(item.nextDueDate).getTime() - item.intervalDays * 86400000).toISOString().slice(0, 10)
       : today
@@ -148,11 +158,16 @@ export default function Recurring() {
   async function handleAddCategory(e) {
     e.preventDefault()
     if (!newCategoryName.trim()) return
-    const { data } = await client.post('/categories', { name: newCategoryName.trim(), essential: false })
-    setCategories((prev) => [...prev, data])
-    setForm((f) => ({ ...f, categoryId: String(data.id) }))
-    setNewCategoryName('')
-    setAddingCategory(false)
+    setError('')
+    try {
+      const { data } = await client.post('/categories', { name: newCategoryName.trim(), essential: false })
+      setCategories((prev) => [...prev, data])
+      setForm((f) => ({ ...f, categoryId: String(data.id) }))
+      setNewCategoryName('')
+      setAddingCategory(false)
+    } catch (err) {
+      setError(networkErrorMessage(err, t('Could not add category')))
+    }
   }
 
   return (
@@ -162,6 +177,7 @@ export default function Recurring() {
         {t('Tap Mark paid on each item after you pay it — that logs it in Transactions and updates your balance.')}
       </p>
       {error && !formOpen && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
+      {okMsg && !formOpen && <div className="mb-4 text-sm text-emerald-700 bg-emerald-50 p-2 rounded">{okMsg}</div>}
 
       <CollapsibleSection title={t('Add recurring transaction')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">

@@ -52,6 +52,42 @@
         <receiver android:name=".NotificationActionReceiver" android:exported="false" />
     </application>
 
+    <!-- Android 11+ package visibility: resolve every common UPI app for upi://pay -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" android:host="pay" />
+        </intent>
+        <!-- Popular UPI apps (chooser still includes any other app that handles upi://) -->
+        <package android:name="com.google.android.apps.nbu.paisa.user" />
+        <package android:name="com.phonepe.app" />
+        <package android:name="com.phonepe.app.business" />
+        <package android:name="net.one97.paytm" />
+        <package android:name="in.org.npci.upiapp" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <package android:name="in.amazon.mShop.android.shopping" />
+        <package android:name="com.amazon.mobile.shopping" />
+        <package android:name="com.dreamplug.androidapp" />
+        <package android:name="com.mobikwik_new" />
+        <package android:name="com.freecharge.android" />
+        <package android:name="com.fampay.in" />
+        <package android:name="money.super.payments" />
+        <package android:name="com.naviapp" />
+        <package android:name="com.samsung.android.spay" />
+        <package android:name="com.csam.icici.bank.imobile" />
+        <package android:name="com.sbi.lotusintouch" />
+        <package android:name="com.axis.mobile" />
+        <package android:name="com.snapwork.hdfc" />
+        <package android:name="com.bankofbaroda.upi" />
+        <package android:name="com.myairtelapp" />
+        <package android:name="com.olacabs.customer" />
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

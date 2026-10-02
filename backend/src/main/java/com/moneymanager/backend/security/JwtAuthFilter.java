@@ -54,9 +54,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (rejection != null) {
                 request.setAttribute(FAILURE_REASON, "token rejected — " + rejection);
                 log.warn("{} {}: token rejected — {}", request.getMethod(), path, rejection);
-            } else if (!sessionRepository.existsByJti(jwtService.extractJti(token))) {
-                request.setAttribute(FAILURE_REASON, "session revoked — logged in from another device");
-                log.warn("{} {}: session revoked (evicted by a newer login elsewhere)", request.getMethod(), path);
+            } else if (!sessionValid(token, request)) {
+                // FAILURE_REASON already set inside sessionValid
             } else {
                 Long userId = jwtService.extractUserId(token);
                 Optional<User> user = userRepository.findById(userId);
@@ -70,5 +69,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Session eviction check. If the DB is briefly unavailable (e.g. pool exhausted on
+     * Render/Neon free tier), don't treat that as "logged out" — allow the valid JWT through
+     * so updates aren't saved then reported as authentication failures.
+     */
+    private boolean sessionValid(String token, HttpServletRequest request) {
+        try {
+            if (!sessionRepository.existsByJti(jwtService.extractJti(token))) {
+                request.setAttribute(FAILURE_REASON, "session revoked — logged in from another device");
+                log.warn("{} {}: session revoked (evicted by a newer login elsewhere)",
+                        request.getMethod(), request.getRequestURI());
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("{} {}: session check failed ({}), allowing JWT-only auth",
+                    request.getMethod(), request.getRequestURI(), e.getMessage());
+            return true;
+        }
     }
 }

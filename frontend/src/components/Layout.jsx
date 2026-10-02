@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
 
 const qrIcon = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect width="5" height="5" x="3" y="3" rx="1" />
     <rect width="5" height="5" x="16" y="3" rx="1" />
     <rect width="5" height="5" x="3" y="16" rx="1" />
@@ -20,6 +20,42 @@ const qrIcon = (
     <path d="M12 21v-1" />
   </svg>
 )
+
+function ScanNavTab({ t }) {
+  return (
+    <NavLink
+      to="/scan-pay"
+      className="flex-1 flex flex-col items-center gap-1 pb-2 text-[11px] font-medium"
+    >
+      {({ isActive }) => (
+        <>
+          <span
+            className={`scan-nav-orb flex items-center justify-center rounded-full transition-transform duration-200 ${
+              isActive ? 'scale-110' : 'scale-100'
+            }`}
+            style={{
+              width: 48,
+              height: 48,
+              marginTop: -14,
+              color: isActive ? '#E8F4FF' : 'rgba(200, 230, 255, 0.92)',
+              background: isActive
+                ? 'radial-gradient(circle at 35% 30%, rgba(180, 220, 255, 0.55), rgba(100, 170, 240, 0.28) 55%, rgba(70, 140, 220, 0.18))'
+                : 'radial-gradient(circle at 35% 30%, rgba(210, 235, 255, 0.45), rgba(140, 195, 245, 0.22) 55%, rgba(90, 160, 230, 0.12))',
+              border: '1px solid rgba(170, 210, 255, 0.45)',
+              boxShadow: isActive
+                ? '0 0 0 1px rgba(140, 190, 255, 0.25), 0 6px 16px rgba(80, 150, 230, 0.22)'
+                : '0 4px 12px rgba(80, 150, 230, 0.12)',
+              backdropFilter: 'blur(6px)',
+            }}
+          >
+            {qrIcon}
+          </span>
+          <span className={isActive ? 'text-teal' : 'text-dim'}>{t('Scan')}</span>
+        </>
+      )}
+    </NavLink>
+  )
+}
 
 /** Left of center QR */
 const leftTabs = [
@@ -169,7 +205,7 @@ export default function Layout({ children }) {
           <NavTab key={tab.to} to={tab.to} end={tab.to === '/'} label={tab.label} icon={tab.icon} t={t} />
         ))}
 
-        <NavTab to="/scan-pay" label="Scan" icon={qrIcon} t={t} />
+        <ScanNavTab t={t} />
 
         {rightTabs.map((tab) => (
           <NavTab key={tab.to} to={tab.to} label={tab.label} icon={tab.icon} t={t} />
