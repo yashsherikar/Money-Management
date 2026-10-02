@@ -163,11 +163,20 @@ function encodeUpiText(value) {
 }
 
 /**
- * Minimal clean upi://pay link — pa never encoded, amount always x.xx, no merchant junk.
- * Param order matches NPCI examples: pa, pn, am, cu, tn.
- * Returns { link, pa, amount } so the UI can show exactly what will be paid.
+ * Minimal clean upi://pay link — pa never encoded, amount always x.xx.
+ * Merchant: adds mc + unique tr (GPay intent needs these).
+ * Personal/P2P: pa + am + cu (+ optional pn/tn) — for QR / copy only, not GPay intent.
  */
-export function buildUpiPayLink({ pa, pn, am, cu = 'INR', tn }) {
+export function buildUpiPayLink({
+  pa,
+  pn,
+  am,
+  cu = 'INR',
+  tn,
+  includeName = false,
+  merchant = false,
+  mc = '',
+}) {
   const cleanPa = normalizeVpa(pa)
   if (!cleanPa || !cleanPa.includes('@')) {
     throw new Error('Invalid UPI ID')
@@ -182,24 +191,29 @@ export function buildUpiPayLink({ pa, pn, am, cu = 'INR', tn }) {
     throw new Error(`Amount above ₹${UPI_MAX_AMOUNT.toLocaleString('en-IN')} UPI limit`)
   }
 
-  const parts = [`pa=${cleanPa}`]
+  const parts = [`pa=${cleanPa}`, `am=${amount}`, `cu=INR`]
   const name = sanitizeUpiNote(pn)
-  if (name) parts.push(`pn=${encodeUpiText(name)}`)
-  parts.push(`am=${amount}`)
-  parts.push(`cu=INR`)
   const note = sanitizeUpiNote(tn)
-  if (note) parts.push(`tn=${encodeUpiText(note)}`)
+  if (includeName || merchant) {
+    if (name) parts.splice(1, 0, `pn=${encodeUpiText(name)}`)
+    if (note) parts.push(`tn=${encodeUpiText(note)}`)
+  }
+  if (merchant) {
+    const mcc = String(mc || '').trim()
+    if (mcc && !isPersonalUpi(mcc)) parts.push(`mc=${encodeURIComponent(mcc)}`)
+    parts.push(`tr=MM${Date.now()}`)
+  }
 
   const link = `upi://pay?${parts.join('&')}`
-  assertSafeUpiLink(link, { pa: cleanPa, amount })
-  return { link, pa: cleanPa, amount }
+  assertSafeUpiLink(link, { pa: cleanPa, amount, merchant })
+  return { link, pa: cleanPa, amount, merchant: !!merchant }
 }
 
 /**
  * Final safety gate — refuse to open GPay if the link is wrong.
  * Catches the bugs that cause "bank limit" / wrong payee / wrong amount.
  */
-export function assertSafeUpiLink(link, { pa, amount }) {
+export function assertSafeUpiLink(link, { pa, amount, merchant = false }) {
   if (!link || typeof link !== 'string') throw new Error('Empty payment link')
   if (!/^upi:\/\/pay\?/i.test(link)) throw new Error('Payment link must start with upi://pay?')
   if (/%40/i.test(link)) throw new Error('Payment link wrongly encoded UPI ID — blocked')
@@ -218,34 +232,114 @@ export function assertSafeUpiLink(link, { pa, amount }) {
   if (/[?&](sign|mode|orgid|mam)=/i.test(link)) {
     throw new Error('Payment link has unsafe merchant fields — blocked')
   }
+  if (!merchant && /[?&](mc|tr)=/i.test(link)) {
+    throw new Error('Personal pay link must not include merchant fields — blocked')
+  }
   return true
 }
 
 /**
- * Open UPI app. On native, ONLY via UpiLauncher (never WebView href — that corrupts the link).
- * Always rebuilds a fresh clean link from pa/am so nothing in memory can drift.
+ * Open UPI app via deep link — **merchant / verified VPA only**.
+ * Personal GPay intent often fails with fake "bank limit"; use QR or copyAndOpen instead.
  */
 export async function openUpiPayLink(link, opts = {}) {
-  if (!link) throw new Error('Missing payment link')
+  if (!link && !opts.pa) throw new Error('Missing payment link')
 
-  // Prefer explicit fields when provided; otherwise parse the link and rebuild
-  let cleanPa = opts.pa ? normalizeVpa(opts.pa) : normalizeVpa(queryParam(link, 'pa'))
-  let amount = opts.amount ? formatUpiAmount(opts.amount) : formatUpiAmount(queryParam(link, 'am'))
+  const cleanPa = normalizeVpa(opts.pa || queryParam(link, 'pa'))
+  const amount = formatUpiAmount(opts.amount || queryParam(link, 'am'))
   const pn = opts.pn != null ? opts.pn : queryParam(link, 'pn')
-  const tn = opts.tn != null ? opts.tn : queryParam(link, 'tn')
+  const merchant = opts.merchant !== false
+  const mc = opts.mc != null ? opts.mc : queryParam(link, 'mc')
+  if (!cleanPa || !cleanPa.includes('@')) throw new Error('Invalid UPI ID')
+  if (!amount) throw new Error('Invalid amount')
 
-  const built = buildUpiPayLink({ pa: cleanPa, pn, am: amount, tn })
-  assertSafeUpiLink(built.link, { pa: built.pa, amount: built.amount })
+  const built = buildUpiPayLink({
+    pa: cleanPa,
+    am: amount,
+    pn,
+    includeName: !!pn,
+    merchant,
+    mc,
+  })
+  assertSafeUpiLink(built.link, { pa: built.pa, amount: built.amount, merchant })
 
   const { Capacitor, registerPlugin } = await import('@capacitor/core')
   if (Capacitor.isNativePlatform()) {
     const UpiLauncher = registerPlugin('UpiLauncher')
-    await UpiLauncher.open({ url: built.link })
+    await UpiLauncher.pay({
+      pa: built.pa,
+      am: built.amount,
+      pn: pn || null,
+      mc: merchant && mc && !isPersonalUpi(mc) ? String(mc).trim() : null,
+      merchant: !!merchant,
+      app: opts.app || null,
+    })
     return built
   }
-  // Web only — still avoid <a href> re-serialization
   window.location.href = built.link
   return built
+}
+
+/** Copy minimal UPI link to clipboard (native toast shows the exact string). */
+export async function copyUpiPayLink({ pa, amount }) {
+  const built = buildUpiPayLink({ pa, am: amount })
+  const { Capacitor, registerPlugin } = await import('@capacitor/core')
+  if (Capacitor.isNativePlatform()) {
+    const UpiLauncher = registerPlugin('UpiLauncher')
+    await UpiLauncher.copyPayLink({ pa: built.pa, am: built.amount })
+    return built
+  }
+  await navigator.clipboard?.writeText(built.link)
+  return built
+}
+
+/** P2P path: copy VPA (+ show amount in toast) and open UPI app home — same as manual pay. */
+export async function copyVpaAndOpenApp({ pa, amount, app = null }) {
+  const cleanPa = normalizeVpa(pa)
+  const am = formatUpiAmount(amount)
+  if (!cleanPa || !cleanPa.includes('@')) throw new Error('Invalid UPI ID')
+  if (!am) throw new Error('Invalid amount')
+
+  const { Capacitor, registerPlugin } = await import('@capacitor/core')
+  if (Capacitor.isNativePlatform()) {
+    const UpiLauncher = registerPlugin('UpiLauncher')
+    await UpiLauncher.copyAndOpen({ pa: cleanPa, am, app: app || null })
+    return { pa: cleanPa, amount: am }
+  }
+  await navigator.clipboard?.writeText(cleanPa)
+  return { pa: cleanPa, amount: am }
+}
+
+/** Build PNG data-URL for a pay QR (works for personal IDs when scanned from gallery). */
+export async function makePayQrDataUrl({ pa, am, pn }) {
+  const built = buildUpiPayLink({ pa, am, pn, includeName: !!pn })
+  const QRCode = (await import('qrcode')).default
+  const dataUrl = await QRCode.toDataURL(built.link, {
+    width: 640,
+    margin: 2,
+    errorCorrectionLevel: 'M',
+  })
+  return { ...built, dataUrl }
+}
+
+/** Save pay QR to gallery (Android) or download (web). */
+export async function savePayQrToGallery({ pa, am, pn }) {
+  const { dataUrl, ...built } = await makePayQrDataUrl({ pa, am, pn })
+  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+  const safeName = `MM-Pay-${built.pa.replace(/[^a-zA-Z0-9._-]/g, '_')}-${built.amount}.png`
+
+  const { Capacitor, registerPlugin } = await import('@capacitor/core')
+  if (Capacitor.isNativePlatform()) {
+    const UpiLauncher = registerPlugin('UpiLauncher')
+    await UpiLauncher.saveQrPng({ base64, fileName: safeName })
+    return { ...built, dataUrl, saved: true }
+  }
+
+  const a = document.createElement('a')
+  a.href = dataUrl
+  a.download = safeName
+  a.click()
+  return { ...built, dataUrl, saved: true }
 }
 
 export function categoryIdByName(categories, categoryName) {

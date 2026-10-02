@@ -1,11 +1,11 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { listenForNotificationTaps } from './nativePush.js'
-import { readPendingUpiConfirm } from './appLock.js'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
+import PendingPayConfirm from './components/PendingPayConfirm.jsx'
 import LoadingBar from './components/LoadingBar.jsx'
 import InstallPrompt from './components/InstallPrompt.jsx'
 import Login from './pages/Login.jsx'
@@ -23,7 +23,9 @@ import Notifications from './pages/Notifications.jsx'
 import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
 import Onboarding from './pages/Onboarding.jsx'
-import ScanPay from './pages/ScanPay.jsx'
+import Pay from './pages/Pay.jsx'
+import PaymentCategoryPrompt from './components/PaymentCategoryPrompt.jsx'
+import PaymentNotifyAsk from './components/PaymentNotifyAsk.jsx'
 
 function Protected({ children }) {
   return (
@@ -40,17 +42,13 @@ export default function App() {
     listenForNotificationTaps(navigate)
   }, [navigate])
 
-  // After GPay, Android may restart the app on "/" — send user back to Scan & Pay confirm.
-  useEffect(() => {
-    if (readPendingUpiConfirm()) {
-      navigate('/scan-pay', { replace: true })
-    }
-  }, [navigate])
-
   return (
     <BiometricGate>
     <LoadingBar />
     <DueReminders />
+    <PendingPayConfirm />
+    <PaymentCategoryPrompt />
+    <PaymentNotifyAsk />
     <InstallPrompt />
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -66,7 +64,8 @@ export default function App() {
       <Route path="/wishlist" element={<Protected><Wishlist /></Protected>} />
       <Route path="/requests" element={<Protected><Requests /></Protected>} />
       <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
-      <Route path="/scan-pay" element={<Protected><ScanPay /></Protected>} />
+      <Route path="/pay" element={<Protected><Pay /></Protected>} />
+      <Route path="/scan-pay" element={<Protected><Pay /></Protected>} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
     </Routes>

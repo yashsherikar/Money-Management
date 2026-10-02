@@ -6,6 +6,12 @@ import { enablePush, disablePush, isPushEnabled, isPushSupported } from '../push
 import { isNativePlatform, isNativePushEnabled, enableNativePush, disableNativePush } from '../nativePush.js'
 import { isBiometricEnabled } from '../biometricLock.js'
 import { isPinSet as isAppLockSet } from '../appLock.js'
+import {
+  isPaymentNotifySupported,
+  isPaymentNotifyEnabled,
+  openPaymentNotifySettings,
+  getLastPaymentNotifyRaw,
+} from '../utils/paymentNotify.js'
 
 export default function Settings() {
   const { t } = useLanguage()
@@ -27,6 +33,8 @@ export default function Settings() {
   const [pushError, setPushError] = useState('')
   const [testResults, setTestResults] = useState(null)
   const [testBusy, setTestBusy] = useState(false)
+  const [payNotifyOn, setPayNotifyOn] = useState(false)
+  const [lastPayRaw, setLastPayRaw] = useState(null)
 
   function load() {
     client.get('/profile').then((res) => setPinSet(res.data.pinSet))
@@ -34,9 +42,21 @@ export default function Settings() {
 
   const native = isNativePlatform()
 
+  async function refreshPayNotify() {
+    if (!isPaymentNotifySupported()) return
+    setPayNotifyOn(await isPaymentNotifyEnabled())
+    setLastPayRaw(await getLastPaymentNotifyRaw())
+  }
+
   useEffect(() => {
     load()
     ;(native ? isNativePushEnabled() : isPushEnabled()).then(setPushOn)
+    refreshPayNotify()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refreshPayNotify()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
   async function togglePush() {
@@ -154,6 +174,42 @@ export default function Settings() {
             </div>
           )}
         </div>
+
+        {native && (
+          <div className="bg-white rounded-xl p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">{t('Payment notification access')}</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  {t('Read GPay/PhonePe payment alerts to auto-log expenses by category. Turn on once in system settings.')}
+                </p>
+                <p className={`text-xs mt-2 font-medium ${payNotifyOn ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {payNotifyOn ? t('Enabled') : t('Off — tap Enable to open system settings')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  await openPaymentNotifySettings()
+                  setTimeout(refreshPayNotify, 1500)
+                }}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
+                  payNotifyOn ? 'border border-slate-300' : 'bg-brand-500 hover:bg-brand-600 text-white'
+                }`}
+              >
+                {payNotifyOn ? t('Open settings') : t('Enable')}
+              </button>
+            </div>
+            {lastPayRaw?.title || lastPayRaw?.text ? (
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <div className="text-xs font-medium text-slate-600 mb-1">{t('Last payment notification (for tuning)')}</div>
+                <pre className="text-[11px] bg-slate-50 rounded p-2 whitespace-pre-wrap break-words text-slate-600">
+                  {JSON.stringify(lastPayRaw, null, 2)}
+                </pre>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {native && (
           <div className="bg-white rounded-xl p-6">

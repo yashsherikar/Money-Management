@@ -50,4 +50,9 @@ public class PaymentRequestController {
     public PaymentRequestResponse markPaid(@AuthenticationPrincipal User user, @PathVariable Long id) {
         return paymentRequestService.markPaid(user, id);
     }
+
+    @PatchMapping("/{id}/confirm-sent")
+    public PaymentRequestResponse confirmSent(@AuthenticationPrincipal User user, @PathVariable Long id) {
+        return paymentRequestService.confirmSent(user, id);
+    }
 }

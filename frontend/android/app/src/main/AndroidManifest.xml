@@ -50,6 +50,15 @@
             </intent-filter>
         </service>
         <receiver android:name=".NotificationActionReceiver" android:exported="false" />
+
+        <service
+            android:name=".UpiPaymentNotificationListener"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 
     <!-- Android 11+ package visibility: resolve every common UPI app for upi://pay -->

@@ -99,22 +99,36 @@ export function isResumeLockSuppressed() {
 }
 
 const PENDING_UPI_KEY = 'mm_pending_upi_confirm'
+const PENDING_UPI_KEY_LEGACY = 'mm_pending_upi_confirm' // was sessionStorage
 
-/** Save Scan&Pay form before opening GPay so "Did you pay?" survives app remount. */
+/**
+ * Save pay context before leaving for GPay/PhonePe.
+ * Uses localStorage so "Did you pay?" still shows after both apps are force-closed.
+ */
 export function savePendingUpiConfirm(payload) {
   try {
-    sessionStorage.setItem(PENDING_UPI_KEY, JSON.stringify({ ...payload, savedAt: Date.now() }))
+    const data = JSON.stringify({ ...payload, savedAt: Date.now() })
+    localStorage.setItem(PENDING_UPI_KEY, data)
+    try { sessionStorage.removeItem(PENDING_UPI_KEY_LEGACY) } catch { /* ignore */ }
   } catch { /* ignore */ }
 }
 
 export function readPendingUpiConfirm() {
   try {
-    const raw = sessionStorage.getItem(PENDING_UPI_KEY)
+    let raw = localStorage.getItem(PENDING_UPI_KEY)
+    if (!raw) {
+      // migrate older sessionStorage saves once
+      raw = sessionStorage.getItem(PENDING_UPI_KEY_LEGACY)
+      if (raw) {
+        localStorage.setItem(PENDING_UPI_KEY, raw)
+        sessionStorage.removeItem(PENDING_UPI_KEY_LEGACY)
+      }
+    }
     if (!raw) return null
     const data = JSON.parse(raw)
-    // Expire after 30 minutes
-    if (!data?.savedAt || Date.now() - data.savedAt > 30 * 60_000) {
-      sessionStorage.removeItem(PENDING_UPI_KEY)
+    // Expire after 24 hours (user may close both apps for a while)
+    if (!data?.savedAt || Date.now() - data.savedAt > 24 * 60 * 60_000) {
+      localStorage.removeItem(PENDING_UPI_KEY)
       return null
     }
     return data
@@ -124,6 +138,7 @@ export function readPendingUpiConfirm() {
 }
 
 export function clearPendingUpiConfirm() {
-  sessionStorage.removeItem(PENDING_UPI_KEY)
+  try { localStorage.removeItem(PENDING_UPI_KEY) } catch { /* ignore */ }
+  try { sessionStorage.removeItem(PENDING_UPI_KEY_LEGACY) } catch { /* ignore */ }
 }
 
