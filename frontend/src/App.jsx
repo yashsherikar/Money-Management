@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { listenForNotificationTaps } from './nativePush.js'
+import { startSmsPayWatcher } from './utils/smsPayWatch.js'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
@@ -23,6 +24,7 @@ import Profile from './pages/Profile.jsx'
 import Settings from './pages/Settings.jsx'
 import Onboarding from './pages/Onboarding.jsx'
 import Pay from './pages/Pay.jsx'
+import PendingPays from './pages/PendingPays.jsx'
 import PaymentCategoryPrompt from './components/PaymentCategoryPrompt.jsx'
 
 function Protected({ children }) {
@@ -39,6 +41,10 @@ export default function App() {
   useEffect(() => {
     listenForNotificationTaps(navigate)
   }, [navigate])
+
+  useEffect(() => {
+    return startSmsPayWatcher()
+  }, [])
 
   return (
     <BiometricGate>
@@ -62,6 +68,7 @@ export default function App() {
       <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
       <Route path="/pay" element={<Protected><Pay /></Protected>} />
       <Route path="/scan-pay" element={<Protected><Pay /></Protected>} />
+      <Route path="/pending-pays" element={<Protected><PendingPays /></Protected>} />
       <Route path="/profile" element={<Protected><Profile /></Protected>} />
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
     </Routes>

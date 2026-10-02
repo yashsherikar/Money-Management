@@ -77,6 +77,7 @@ const rightTabs = [
 ]
 
 const moreLinks = [
+  { to: '/pending-pays', label: 'Pending pays' },
   { to: '/recurring', label: 'Recurring' },
   { to: '/investments', label: 'Investments' },
   { to: '/udhar', label: 'Udhar' },

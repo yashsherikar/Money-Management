@@ -12,6 +12,12 @@ import {
   openPaymentNotifySettings,
   getLastPaymentNotifyRaw,
 } from '../utils/paymentNotify.js'
+import {
+  isSmsPaySupported,
+  checkSmsPermission,
+  requestSmsPermission,
+} from '../utils/smsPayWatch.js'
+import { countWaitingP2pPays } from '../utils/pendingP2pPays.js'
 
 export default function Settings() {
   const { t } = useLanguage()
@@ -35,6 +41,8 @@ export default function Settings() {
   const [testBusy, setTestBusy] = useState(false)
   const [payNotifyOn, setPayNotifyOn] = useState(false)
   const [lastPayRaw, setLastPayRaw] = useState(null)
+  const [smsOk, setSmsOk] = useState(false)
+  const [waitingCount, setWaitingCount] = useState(0)
 
   function load() {
     client.get('/profile').then((res) => setPinSet(res.data.pinSet))
@@ -52,8 +60,18 @@ export default function Settings() {
     load()
     ;(native ? isNativePushEnabled() : isPushEnabled()).then(setPushOn)
     refreshPayNotify()
+    if (isSmsPaySupported()) {
+      checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
+      setWaitingCount(countWaitingP2pPays())
+    }
     const onVis = () => {
-      if (document.visibilityState === 'visible') refreshPayNotify()
+      if (document.visibilityState === 'visible') {
+        refreshPayNotify()
+        if (isSmsPaySupported()) {
+          checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
+          setWaitingCount(countWaitingP2pPays())
+        }
+      }
     }
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
@@ -217,6 +235,45 @@ export default function Settings() {
             <p className="text-xs text-slate-500 mt-1">
               {t('Auto-track from GPay alerts is off in this install build (Play Protect blocks apps that request notification access). Pay, Scan QR, and manual logging still work. We can turn auto-track on later via Play Store.')}
             </p>
+          </div>
+        )}
+
+        {native && isSmsPaySupported() && (
+          <div className="bg-white rounded-xl p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">{t('Bank SMS (P2P confirm)')}</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  {t('Read bank debit SMS to mark P2P pays as Paid. Works even if SMS arrives 5–15 minutes late.')}
+                </p>
+                <p className={`text-xs mt-2 font-medium ${smsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  {smsOk ? t('SMS permission on') : t('SMS permission off')}
+                  {waitingCount > 0 ? ` · ${waitingCount} ${t('waiting')}` : ''}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 shrink-0">
+                {!smsOk ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const r = await requestSmsPermission()
+                      setSmsOk(!!r?.granted)
+                    }}
+                    className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium"
+                  >
+                    {t('Enable')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/pending-pays')}
+                    className="border border-slate-300 rounded-md px-3 py-1.5 text-sm font-medium"
+                  >
+                    {t('Pending pays')}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
