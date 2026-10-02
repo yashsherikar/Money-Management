@@ -164,6 +164,7 @@ function encodeUpiText(value) {
 
 /**
  * Minimal clean upi://pay link — pa never encoded, amount always x.xx, no merchant junk.
+ * Param order matches NPCI examples: pa, pn, am, cu, tn.
  * Returns { link, pa, amount } so the UI can show exactly what will be paid.
  */
 export function buildUpiPayLink({ pa, pn, am, cu = 'INR', tn }) {
@@ -171,20 +172,21 @@ export function buildUpiPayLink({ pa, pn, am, cu = 'INR', tn }) {
   if (!cleanPa || !cleanPa.includes('@')) {
     throw new Error('Invalid UPI ID')
   }
-  if (/%40/i.test(cleanPa)) {
+  if (/%40/i.test(cleanPa) || /%/.test(cleanPa)) {
     throw new Error('Invalid UPI ID encoding')
   }
 
   const amount = formatUpiAmount(am)
   if (!amount) throw new Error('Invalid amount')
+  if (Number(amount) > UPI_MAX_AMOUNT) {
+    throw new Error(`Amount above ₹${UPI_MAX_AMOUNT.toLocaleString('en-IN')} UPI limit`)
+  }
 
-  const parts = [
-    `pa=${cleanPa}`,
-    `am=${amount}`,
-    `cu=INR`,
-  ]
+  const parts = [`pa=${cleanPa}`]
   const name = sanitizeUpiNote(pn)
   if (name) parts.push(`pn=${encodeUpiText(name)}`)
+  parts.push(`am=${amount}`)
+  parts.push(`cu=INR`)
   const note = sanitizeUpiNote(tn)
   if (note) parts.push(`tn=${encodeUpiText(note)}`)
 
@@ -221,22 +223,29 @@ export function assertSafeUpiLink(link, { pa, amount }) {
 
 /**
  * Open UPI app. On native, ONLY via UpiLauncher (never WebView href — that corrupts the link).
+ * Always rebuilds a fresh clean link from pa/am so nothing in memory can drift.
  */
-export async function openUpiPayLink(link) {
+export async function openUpiPayLink(link, opts = {}) {
   if (!link) throw new Error('Missing payment link')
-  assertSafeUpiLink(link, {
-    pa: queryParam(link, 'pa'),
-    amount: queryParam(link, 'am'),
-  })
+
+  // Prefer explicit fields when provided; otherwise parse the link and rebuild
+  let cleanPa = opts.pa ? normalizeVpa(opts.pa) : normalizeVpa(queryParam(link, 'pa'))
+  let amount = opts.amount ? formatUpiAmount(opts.amount) : formatUpiAmount(queryParam(link, 'am'))
+  const pn = opts.pn != null ? opts.pn : queryParam(link, 'pn')
+  const tn = opts.tn != null ? opts.tn : queryParam(link, 'tn')
+
+  const built = buildUpiPayLink({ pa: cleanPa, pn, am: amount, tn })
+  assertSafeUpiLink(built.link, { pa: built.pa, amount: built.amount })
 
   const { Capacitor, registerPlugin } = await import('@capacitor/core')
   if (Capacitor.isNativePlatform()) {
     const UpiLauncher = registerPlugin('UpiLauncher')
-    await UpiLauncher.open({ url: link })
-    return
+    await UpiLauncher.open({ url: built.link })
+    return built
   }
   // Web only — still avoid <a href> re-serialization
-  window.location.href = link
+  window.location.href = built.link
+  return built
 }
 
 export function categoryIdByName(categories, categoryName) {

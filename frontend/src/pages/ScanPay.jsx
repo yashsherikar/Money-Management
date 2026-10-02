@@ -281,19 +281,26 @@ export default function ScanPay() {
     }
   }
 
-  /** Step 2: user confirmed — open any installed UPI app (PhonePe, GPay, Paytm, …). */
+  /** Step 2: user confirmed — rebuild a fresh clean link, then open any UPI app. */
   async function confirmAndOpenUpi() {
-    if (!payPreview?.link || paying) return
+    if (!payPreview?.pa || !payPreview?.amount || paying) return
     setPaying(true)
     setError('')
     try {
+      // Rebuild at the last second so amount/VPA cannot drift or get corrupted
+      const built = buildUpiPayLink({
+        pa: payPreview.pa,
+        pn: form.pn || form.description,
+        am: payPreview.amount,
+        tn: form.tn || form.description,
+      })
       awaitingReturnRef.current = true
       suppressResumeLock(300_000)
       savePendingUpiConfirm({
-        pa: payPreview.pa,
+        pa: built.pa,
         pn: form.pn,
         mc: form.mc,
-        am: payPreview.amount,
+        am: built.amount,
         cu: 'INR',
         tn: form.tn,
         personal: form.personal,
@@ -303,7 +310,12 @@ export default function ScanPay() {
         description: form.description,
         sharedCategoryName: form.sharedCategoryName,
       })
-      await openUpiPayLink(payPreview.link)
+      await openUpiPayLink(built.link, {
+        pa: built.pa,
+        amount: built.amount,
+        pn: form.pn || form.description,
+        tn: form.tn || form.description,
+      })
       setPayPreview(null)
       if (!isNativePlatform()) {
         setTimeout(() => {
@@ -403,7 +415,7 @@ export default function ScanPay() {
       />
 
       <h1 className="text-2xl font-bold mb-2">{t('Scan & Pay')}</h1>
-      <p className="text-sm text-slate-500 mb-6">
+      <p className="page-sub">
         {t('Scan a UPI QR, check details, pay in any UPI app (PhonePe, GPay, Paytm…), then confirm to log the expense.')}
       </p>
 
@@ -497,13 +509,11 @@ export default function ScanPay() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t('Amount')}</label>
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              min="0"
-              step="0.01"
               required
               value={form.am}
-              onChange={(e) => setForm((f) => ({ ...f, am: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, am: e.target.value.replace(/[^\d.]/g, '') }))}
               className="w-full px-3 py-2 border border-slate-300 rounded-md"
             />
           </div>
@@ -615,6 +625,10 @@ export default function ScanPay() {
                 <span className="text-2xl font-bold text-emerald-600">
                   ₹{Number(payPreview.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
+              </div>
+              <div className="pt-2 border-t border-slate-200">
+                <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">{t('UPI link (check amount)')}</div>
+                <div className="font-mono text-[11px] text-slate-400 break-all leading-snug">{payPreview.link}</div>
               </div>
             </div>
             <div className="flex gap-2">
