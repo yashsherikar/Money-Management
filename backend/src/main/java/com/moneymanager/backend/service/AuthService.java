@@ -37,6 +37,7 @@ public class AuthService {
         this.pushSubscriptionRepository = pushSubscriptionRepository;
     }
 
+    @Transactional
     public AuthResponse signup(SignupRequest request) {
         if (userRepository.existsByIgnoreCaseEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "email already registered");
@@ -49,6 +50,7 @@ public class AuthService {
         return toResponse(user, request.platform());
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByIgnoreCaseEmail(request.email())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no account with this email — please sign up"));

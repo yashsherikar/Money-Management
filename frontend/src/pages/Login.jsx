@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { EyeIcon, EyeOffIcon } from '../components/icons.jsx'
@@ -7,7 +7,7 @@ import client, { networkErrorMessage } from '../api/client'
 import { promptNativePushIfNeeded } from '../nativePush.js'
 
 export default function Login() {
-  const { login } = useAuth()
+  const { user, login } = useAuth()
   const { lang, setLang, t } = useLanguage()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
@@ -16,14 +16,17 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  if (user) return <Navigate to="/" replace />
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
       await login(email.trim(), password)
-      await promptNativePushIfNeeded(client)
-      navigate('/')
+      // Don't block login on push registration failures
+      promptNativePushIfNeeded(client).catch(() => {})
+      navigate('/', { replace: true })
     } catch (err) {
       setError(networkErrorMessage(err, t('Login failed')))
     } finally {
