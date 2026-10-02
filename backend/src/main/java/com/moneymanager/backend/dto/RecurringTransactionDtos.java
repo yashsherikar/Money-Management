@@ -34,6 +34,10 @@ public class RecurringTransactionDtos {
             Integer dayOfMonth,
             Integer intervalDays,
             LocalDate nextDueDate,
-            boolean active
+            boolean active,
+            /** True when the due day/cycle has arrived and payment hasn't been confirmed yet. */
+            boolean due,
+            /** True when the user can tap Mark paid (active + not already logged for this cycle). */
+            boolean canMarkPaid
     ) {}
 }
