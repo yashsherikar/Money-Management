@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import {
   listPendingP2pPays,
   markPendingP2pNotPaid,
   markPendingP2pConfirmed,
   removePendingP2pPay,
+  updatePendingP2pPay,
   waitingP2pPays,
 } from '../utils/pendingP2pPays.js'
 import {
@@ -126,13 +128,28 @@ export default function PendingPays() {
     setBusyId(item.id)
     try {
       markPendingP2pConfirmed(item.id, { source: 'manual' })
-      try {
-        const [a, c] = await Promise.all([client.get('/accounts'), client.get('/categories')])
-        await handleDetectedUpiPayment(
-          { amount: item.amount, pa: item.pa, payeeName: item.pn },
-          { accounts: a.data, categories: c.data },
-        )
-      } catch { /* ignore */ }
+      const [a, c] = await Promise.all([client.get('/accounts'), client.get('/categories')])
+      const logResult = await handleDetectedUpiPayment(
+        { amount: item.amount, pa: item.pa, payeeName: item.pn, source: 'manual' },
+        { accounts: a.data, categories: c.data },
+      )
+      updatePendingP2pPay(item.id, {
+        transactionLogged: !!logResult?.logged,
+        transactionId: logResult?.transactionId || null,
+        logError: logResult?.logged ? null : (logResult?.needsAccount ? 'needs_account' : null),
+      })
+      window.dispatchEvent(new CustomEvent('mm-p2p-sms-confirmed', {
+        detail: { pending: item, logResult },
+      }))
+      if (logResult?.logged) {
+        setHint(t('Saved in Transactions') + (logResult.categoryName ? ` (${logResult.categoryName})` : ''))
+      } else {
+        setHint(t('Marked paid — finish category / account to save in Transactions'))
+      }
+      refresh()
+    } catch (err) {
+      updatePendingP2pPay(item.id, { transactionLogged: false, logError: err?.message || 'log_failed' })
+      setHint(err?.message || t('Could not save transaction'))
       refresh()
     } finally {
       setBusyId(null)
@@ -156,7 +173,7 @@ export default function PendingPays() {
     <div className="page-stack">
       <h1 className="page-title">{t('Pending pays')}</h1>
       <p className="page-sub">
-        {t('P2P payments wait here until bank SMS confirms. Late SMS (5–15 min) is OK — we keep checking. When SMS matches, status becomes Paid automatically.')}
+        {t('P2P (and merchant) pays wait here until bank SMS confirms. When matched, we mark Paid and save the expense in Transactions automatically.')}
       </p>
 
       {hint && (
@@ -250,14 +267,27 @@ export default function PendingPays() {
                 <div className="min-w-0">
                   <div className="font-medium truncate">{item.pn || item.pa}</div>
                   <div className="text-sm">{money(item.amount)} · {ago(item.updatedAt || item.createdAt)}</div>
-                  {item.status === 'confirmed' && item.source === 'sms' && (
-                    <div className="text-[10px] text-teal mt-0.5">{t('Verified by bank SMS — no manual confirm needed')}</div>
+                  {item.status === 'confirmed' && item.transactionLogged && (
+                    <div className="text-[10px] text-teal mt-0.5">
+                      {t('Saved in Transactions')}
+                      {item.source === 'sms' ? ` · ${t('SMS verified')}` : ''}
+                    </div>
+                  )}
+                  {item.status === 'confirmed' && !item.transactionLogged && (
+                    <div className="text-[10px] text-amber-500 mt-0.5">
+                      {t('Paid — not in Transactions yet (check account / category)')}
+                    </div>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${statusClass(item.status)}`}>
                     {statusLabel(item.status, t)}
                   </span>
+                  {item.transactionLogged && (
+                    <Link to="/transactions" className="text-xs text-brand-400 font-medium">
+                      {t('View')} →
+                    </Link>
+                  )}
                   <button type="button" onClick={() => removeItem(item)} className="text-xs text-slate-500">
                     {t('Remove')}
                   </button>

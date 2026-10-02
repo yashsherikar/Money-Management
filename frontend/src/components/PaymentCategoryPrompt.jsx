@@ -9,6 +9,7 @@ import {
 import {
   listenForUpiPaymentNotifications,
   handleDetectedUpiPayment,
+  updateLoggedUpiCategory,
   isPaymentNotifySupported,
 } from '../utils/paymentNotify.js'
 
@@ -21,9 +22,10 @@ function sortCategories(categories) {
 }
 
 /**
- * After GPay/PhonePe notifies a payment:
- * - known payee → auto-log with remembered category
- * - new payee → ask category once and remember
+ * After SMS / notify confirms a payment:
+ * - transaction is already logged (or we log now)
+ * - known payee → toast only
+ * - new payee → ask category to refine (updates the txn)
  */
 export default function PaymentCategoryPrompt() {
   const { t } = useLanguage()
@@ -48,16 +50,22 @@ export default function PaymentCategoryPrompt() {
     if (pending) setPrompt(pending)
   }, [])
 
-  // SMS-confirmed P2P: show toast / category prompt (same path as notification auto-log)
   useEffect(() => {
     const onSmsConfirmed = (e) => {
       const result = e?.detail?.logResult
-      if (result?.logged) {
-        setToast(t('Paid via SMS verified.') + (result.categoryName ? ` (${result.categoryName})` : ''))
+      if (result?.logged && !result?.needsCategory) {
+        setToast(
+          t('Paid — saved in Transactions')
+            + (result.categoryName ? ` (${result.categoryName})` : ''),
+        )
         setTimeout(() => setToast(''), 4500)
-      } else if (result?.needsCategory) {
+      } else if (result?.logged && result?.needsCategory) {
         setPrompt(readPendingCategoryPrompt())
-        setToast(t('Bank SMS matched — choose a category'))
+        setToast(t('Saved in Transactions — pick a better category?'))
+        setTimeout(() => setToast(''), 4000)
+      } else if (result?.needsCategory || result?.needsAccount) {
+        setPrompt(readPendingCategoryPrompt())
+        setToast(t('Bank SMS matched — finish logging'))
         setTimeout(() => setToast(''), 4000)
       } else {
         setToast(t('Bank SMS matched — marked Paid'))
@@ -72,7 +80,7 @@ export default function PaymentCategoryPrompt() {
     if (!isPaymentNotifySupported() || !accounts.length) return undefined
     return listenForUpiPaymentNotifications(async (parsed) => {
       const result = await handleDetectedUpiPayment(parsed, { accounts, categories })
-      if (result.logged) {
+      if (result.logged && !result.needsCategory) {
         setToast(t('Expense logged.') + (result.categoryName ? ` (${result.categoryName})` : ''))
         setTimeout(() => setToast(''), 4000)
       } else if (result.needsCategory) {
@@ -88,22 +96,48 @@ export default function PaymentCategoryPrompt() {
       const cat = categories.find((c) => String(c.id) === String(categoryId))
       const accountId = prompt.accountId || accounts.find((a) => a.isPrimary)?.id || accounts[0]?.id
       if (!accountId) throw new Error(t('Pick an account'))
-      await client.post('/transactions', {
-        accountId: Number(accountId),
-        categoryId: Number(categoryId),
-        type: 'EXPENSE',
-        amount: Number(prompt.amount),
-        description: prompt.pn || prompt.pa || 'UPI payment',
-        txnDate: new Date().toISOString().slice(0, 10),
-      })
-      if (prompt.pa) {
-        rememberPayeeCategory(prompt.pa, categoryId, cat?.name)
+
+      if (prompt.refineOnly && prompt.transactionId) {
+        await updateLoggedUpiCategory({
+          transactionId: prompt.transactionId,
+          accountId,
+          amount: prompt.amount,
+          description: prompt.description,
+          pa: prompt.pa,
+          pn: prompt.pn,
+          categoryId,
+          categories,
+        })
+      } else if (prompt.refineOnly && !prompt.transactionId) {
+        if (prompt.pa) rememberPayeeCategory(prompt.pa, categoryId, cat?.name)
+        window.dispatchEvent(new Event('mm-transactions-changed'))
+      } else {
+        // Not logged yet — create with chosen category remembered first
+        if (prompt.pa) rememberPayeeCategory(prompt.pa, categoryId, cat?.name)
+        const result = await handleDetectedUpiPayment(
+          { amount: prompt.amount, pa: prompt.pa, payeeName: prompt.pn, source: prompt.source || 'manual' },
+          { accounts, categories },
+        )
+        // If auto-picked Other somehow, force update to chosen category
+        if (result?.transactionId && String(result.categoryName || '').toLowerCase() === 'other'
+            && cat && String(cat.name).toLowerCase() !== 'other') {
+          await updateLoggedUpiCategory({
+            transactionId: result.transactionId,
+            accountId,
+            amount: prompt.amount,
+            description: prompt.description,
+            pa: prompt.pa,
+            pn: prompt.pn,
+            categoryId,
+            categories,
+          })
+        }
       }
+
       clearPendingCategoryPrompt()
       setPrompt(null)
       setCategoryId('')
-      window.dispatchEvent(new Event('mm-transactions-changed'))
-      setToast(t('Expense logged.'))
+      setToast(t('Saved in Transactions'))
       setTimeout(() => setToast(''), 3000)
     } catch (err) {
       setToast(err.response?.data?.message || err.message || t('Save failed'))
@@ -113,6 +147,7 @@ export default function PaymentCategoryPrompt() {
   }
 
   function skip() {
+    // Transaction already logged when refineOnly — skip just closes refine UI
     clearPendingCategoryPrompt()
     setPrompt(null)
   }
@@ -130,10 +165,18 @@ export default function PaymentCategoryPrompt() {
         <div className="fixed inset-0 z-[65] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={skip} />
           <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4">
-            <h2 className="font-bold text-lg mb-1">{t('Choose a category')}</h2>
+            <h2 className="font-bold text-lg mb-1">
+              {prompt.refineOnly ? t('Update category') : t('Choose a category')}
+            </h2>
             <p className="text-sm text-slate-600 mb-3">
-              {t('New payee')}{prompt.pn || prompt.pa ? `: ${prompt.pn || prompt.pa}` : ''}.{' '}
-              {t('We will remember this category for next time.')}
+              {prompt.refineOnly
+                ? t('Already saved in Transactions as Other. Pick the right category for next time.')
+                : (
+                  <>
+                    {t('New payee')}{prompt.pn || prompt.pa ? `: ${prompt.pn || prompt.pa}` : ''}.{' '}
+                    {t('We will remember this category for next time.')}
+                  </>
+                )}
             </p>
             <div className="text-sm font-medium mb-3">
               ₹{Number(prompt.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -158,7 +201,7 @@ export default function PaymentCategoryPrompt() {
                 {busy ? t('Saving…') : t('Save')}
               </button>
               <button type="button" onClick={skip} className="flex-1 border border-slate-300 rounded-md py-2.5">
-                {t('Skip')}
+                {prompt.refineOnly ? t('Keep Other') : t('Skip')}
               </button>
             </div>
           </div>

@@ -10,6 +10,11 @@ import {
   notifyTransactionsChanged,
 } from '../utils/confirmDuePaid.js'
 import { openUpiPayLink, parseUpiQr, isPersonalUpi, copyVpaAndOpenApp, formatUpiAmount } from '../utils/upiQr.js'
+import {
+  listLocalAppNotifications,
+  markLocalAppNotificationViewed,
+} from '../utils/localAppNotifications.js'
+import { checkPendingPayRemindersDue } from '../utils/pendingPayReminders.js'
 
 function timeAgo(iso) {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -42,23 +47,53 @@ export default function Notifications() {
   const [toast, setToast] = useState('')
 
   async function load() {
-    const { data } = await client.get('/notifications')
-    setItems(data.notifications)
+    try {
+      await checkPendingPayRemindersDue()
+    } catch { /* ignore */ }
+
+    let server = []
+    try {
+      const { data } = await client.get('/notifications')
+      server = data.notifications || []
+    } catch { /* offline */ }
+
+    const local = listLocalAppNotifications().map((n) => ({
+      ...n,
+      actionType: n.kind === 'pending_pay' ? 'PENDING_PAY' : null,
+      payUrl: null,
+    }))
+
+    const merged = [...local, ...server].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    setItems(merged)
   }
 
   useEffect(() => {
     load()
+    const onLocal = () => load()
+    window.addEventListener('mm-local-notifications-changed', onLocal)
+    window.addEventListener('mm-pending-p2p-changed', onLocal)
+    return () => {
+      window.removeEventListener('mm-local-notifications-changed', onLocal)
+      window.removeEventListener('mm-pending-p2p-changed', onLocal)
+    }
   }, [])
 
   async function markViewed(item) {
     if (item.viewed) return
+    if (item.local) {
+      markLocalAppNotificationViewed(item.id)
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, viewed: true } : i)))
+      return
+    }
     await client.patch(`/notifications/${item.id}/viewed`)
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, viewed: true } : i)))
   }
 
   function handleView(item) {
     markViewed(item)
-    navigate(item.url?.split('?')[0] || item.url)
+    navigate(item.url?.split('?')[0] || item.url || '/pending-pays')
   }
 
   async function handlePayNow(item) {
@@ -153,6 +188,15 @@ export default function Notifications() {
                     className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 font-medium"
                   >
                     {t('Pay now')}
+                  </button>
+                )}
+                {item.actionType === 'PENDING_PAY' && (
+                  <button
+                    type="button"
+                    onClick={() => handleView(item)}
+                    className="text-xs bg-amber-500 hover:bg-amber-600 text-white rounded-md px-3 py-1.5 font-medium"
+                  >
+                    {t('Check pending')}
                   </button>
                 )}
                 <RowAction onClick={() => handleView(item)}>{t('View')}</RowAction>

@@ -22,14 +22,15 @@ import { requestSmsPermission, isSmsPaySupported, checkSmsPermission } from '../
 import { useNavigate } from 'react-router-dom'
 import { suppressResumeLock } from '../appLock.js'
 
-/** Simple brand marks (inline SVG) — no external logo assets needed. */
+/** Payment apps. GPay hidden for P2P (unreliable); PhonePe / Paytm / BHIM work. */
 const APPS = [
   {
     id: 'gpay',
     label: 'GPay',
-    className: 'bg-white text-slate-900 border border-slate-200',
+    p2p: false,
+    logoBg: 'bg-white ring-1 ring-slate-600/40',
     logo: (
-      <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden>
+      <svg viewBox="0 0 24 24" className="w-8 h-8" aria-hidden>
         <path fill="#4285F4" d="M12 11.5v2.7h6.1c-.3 1.5-1.9 4.4-6.1 4.4-3.7 0-6.7-3-6.7-6.8s3-6.8 6.7-6.8c2.1 0 3.5.9 4.3 1.7l2.9-2.8C17.5 2.3 15 1.2 12 1.2 6.5 1.2 2 5.7 2 11.2S6.5 21.2 12 21.2c6.1 0 10.1-4.3 10.1-10.3 0-.7-.1-1.2-.2-1.7H12z" />
         <path fill="#34A853" d="M3.2 7.4 5.4 9c.6-1.8 2.2-3.4 4.6-3.6V3.2C6.8 3.4 4.3 5 3.2 7.4z" opacity=".9" />
         <path fill="#FBBC05" d="M12 21.2c2.7 0 5-.9 6.6-2.4l-2.9-2.3c-.8.6-2 1.1-3.7 1.1-2.9 0-5.3-1.9-6.2-4.5l-3.1 2.4c1.6 3.2 4.9 5.7 9.3 5.7z" opacity=".95" />
@@ -40,9 +41,10 @@ const APPS = [
   {
     id: 'phonepe',
     label: 'PhonePe',
-    className: 'bg-[#5f259f] text-white',
+    p2p: true,
+    logoBg: 'bg-[#5f259f]',
     logo: (
-      <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden>
+      <svg viewBox="0 0 24 24" className="w-8 h-8" aria-hidden>
         <circle cx="12" cy="12" r="10" fill="#5f259f" />
         <path fill="#fff" d="M13.2 6.2h-2.1c-2.6 0-4.3 1.5-4.3 3.9 0 2.6 1.8 3.9 4.5 3.9h.7v1.3c0 .7-.3 1-1 1H9.2v1.9h2.1c2.3 0 3.6-1.2 3.6-3.1v-6.2c0-1.5-.9-2.7-1.7-2.7zm-.5 5.8h-.6c-1.3 0-2.1-.6-2.1-1.8s.8-1.8 2.1-1.8h.6v3.6z" />
       </svg>
@@ -51,22 +53,24 @@ const APPS = [
   {
     id: 'paytm',
     label: 'Paytm',
-    className: 'bg-[#00BAF2] text-white',
+    p2p: true,
+    logoBg: 'bg-[#00BAF2]',
     logo: (
-      <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden>
-        <rect width="24" height="24" rx="5" fill="#00BAF2" />
-        <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="700" fontFamily="Arial">Paytm</text>
+      <svg viewBox="0 0 24 24" className="w-8 h-8" aria-hidden>
+        <rect width="24" height="24" rx="6" fill="#00BAF2" />
+        <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="700" fontFamily="Arial,sans-serif">Paytm</text>
       </svg>
     ),
   },
   {
     id: 'bhim',
     label: 'BHIM',
-    className: 'bg-[#FF6F00] text-white',
+    p2p: true,
+    logoBg: 'bg-[#FF6F00]',
     logo: (
-      <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden>
-        <rect width="24" height="24" rx="5" fill="#FF6F00" />
-        <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="Arial">UPI</text>
+      <svg viewBox="0 0 24 24" className="w-8 h-8" aria-hidden>
+        <rect width="24" height="24" rx="6" fill="#FF6F00" />
+        <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="8" fontWeight="700" fontFamily="Arial,sans-serif">UPI</text>
       </svg>
     ),
   },
@@ -246,7 +250,18 @@ export default function Pay() {
           mc,
           app: appId,
         })
-        setHint(t('Opened UPI app with merchant payment link.'))
+        // Same pending + SMS → Transactions path as P2P
+        addPendingP2pPay({
+          pa: cleanPa,
+          pn: name,
+          amount: Number(am),
+          personal: false,
+        })
+        if (isSmsPaySupported()) {
+          const perm = await checkSmsPermission()
+          if (!perm?.granted) await requestSmsPermission().catch(() => {})
+        }
+        setHint(t('Opened merchant pay link. Waiting for bank SMS to save it in Transactions (SMS can be late).'))
       }
     } catch (err) {
       setError(err?.message || t('Could not open UPI app'))
@@ -401,18 +416,25 @@ export default function Pay() {
         )}
       </div>
 
-      <div className="text-sm font-medium text-slate-700 mb-2">{t('Pay with')}</div>
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        {APPS.map((app) => (
+      <div className="text-sm font-medium text-slate-700 mb-3">{t('Pay with')}</div>
+      <div className="pay-app-row flex flex-wrap justify-center gap-5 mb-4">
+        {APPS.filter((app) => !personal || app.p2p !== false).map((app) => (
           <button
             key={app.id}
             type="button"
             disabled={!!paying || qrBusy}
             onClick={() => payWith(app.id)}
-            className={`rounded-md py-3 px-3 font-semibold disabled:opacity-60 flex items-center justify-center gap-2 ${app.className}`}
+            className="pay-app-btn disabled:opacity-50"
+            aria-label={app.label}
           >
-            {app.logo}
-            <span>{paying === app.id ? t('Opening…') : app.label}</span>
+            <span className={`pay-app-icon ${app.logoBg}`}>
+              {paying === app.id ? (
+                <span className="text-[10px] font-semibold text-slate-500 animate-pulse">…</span>
+              ) : (
+                app.logo
+              )}
+            </span>
+            <span className="pay-app-label">{app.label}</span>
           </button>
         ))}
       </div>
@@ -440,7 +462,7 @@ export default function Pay() {
 
       <p className="text-xs text-slate-500 leading-relaxed">
         {personal
-          ? t('GPay opens the UPI ID (you enter amount there). P2P status waits for bank SMS — even if SMS is 5–15 min late. Open Pending pays to see Waiting / Paid.')
+          ? t('P2P: use PhonePe / Paytm / BHIM (GPay hidden — unreliable for personal UPI). Status waits for bank SMS.')
           : t('Merchant: we open the UPI app with the payment link (amount already filled).')}
       </p>
     </div>

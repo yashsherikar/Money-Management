@@ -4,6 +4,8 @@ import {
   waitingP2pPays,
   markPendingP2pConfirmed,
   listPendingP2pPays,
+  updatePendingP2pPay,
+  getPendingP2pPay,
 } from './pendingP2pPays.js'
 import { handleDetectedUpiPayment } from './paymentNotify.js'
 import client from '../api/client'
@@ -81,11 +83,10 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
 
   // Claim immediately so inbox rescan + live SMS can't double-confirm
   rememberProcessed(key)
-  const updated = markPendingP2pConfirmed(match.id, {
+  markPendingP2pConfirmed(match.id, {
     smsRaw: parsed.raw,
     source: 'sms',
   })
-  if (!updated || updated.status !== 'confirmed') return null
 
   const forLog = {
     amount: match.amount,
@@ -107,7 +108,20 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
       cats = c.data || []
     }
     logResult = await handleDetectedUpiPayment(forLog, { accounts: accs, categories: cats })
-  } catch { /* status already confirmed */ }
+    // Attach txn result onto pending so Pending pays + Transactions stay in sync
+    updatePendingP2pPay(match.id, {
+      transactionLogged: !!logResult?.logged,
+      transactionId: logResult?.transactionId || null,
+      logError: logResult?.logged ? null : (logResult?.needsAccount ? 'needs_account' : null),
+    })
+  } catch (err) {
+    updatePendingP2pPay(match.id, {
+      transactionLogged: false,
+      logError: err?.message || 'log_failed',
+    })
+  }
+
+  const updated = getPendingP2pPay(match.id) || match
 
   try {
     window.dispatchEvent(new CustomEvent('mm-p2p-sms-confirmed', {

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import client from '../api/client'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { waitingP2pPays, countWaitingP2pPays } from '../utils/pendingP2pPays.js'
 
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
@@ -30,6 +32,7 @@ export default function Transactions() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categoryQuery, setCategoryQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  const [waitingPays, setWaitingPays] = useState(() => waitingP2pPays())
 
   async function loadAll() {
     const [txnRes, accRes, catRes] = await Promise.all([
@@ -40,6 +43,7 @@ export default function Transactions() {
     setTransactions(txnRes.data)
     setAccounts(accRes.data)
     setCategories(catRes.data)
+    setWaitingPays(waitingP2pPays())
     const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
     if (primary) setForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
   }
@@ -48,7 +52,13 @@ export default function Transactions() {
     loadAll()
     const onRefresh = () => loadAll()
     window.addEventListener('mm-transactions-changed', onRefresh)
-    return () => window.removeEventListener('mm-transactions-changed', onRefresh)
+    window.addEventListener('mm-pending-p2p-changed', onRefresh)
+    window.addEventListener('mm-p2p-sms-confirmed', onRefresh)
+    return () => {
+      window.removeEventListener('mm-transactions-changed', onRefresh)
+      window.removeEventListener('mm-pending-p2p-changed', onRefresh)
+      window.removeEventListener('mm-p2p-sms-confirmed', onRefresh)
+    }
   }, [])
 
   function resetForm() {
@@ -134,6 +144,37 @@ export default function Transactions() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-5 sm:mb-6">{t('Transactions (this month)')}</h1>
+
+      {waitingPays.length > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-amber-500">
+                {countWaitingP2pPays()} {t('pending UPI pay(s) waiting for bank SMS')}
+              </div>
+              <ul className="mt-1.5 space-y-1">
+                {waitingPays.slice(0, 3).map((p) => (
+                  <li key={p.id} className="text-xs text-slate-500 truncate">
+                    ₹{Number(p.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {' · '}
+                    {p.pn || p.pa}
+                    {!p.reminded ? ` · ${t('reminder in ~15 min if no SMS')}` : ` · ${t('reminder sent')}`}
+                  </li>
+                ))}
+                {waitingPays.length > 3 && (
+                  <li className="text-xs text-slate-500">+{waitingPays.length - 3} more</li>
+                )}
+              </ul>
+            </div>
+            <Link
+              to="/pending-pays"
+              className="shrink-0 text-xs font-semibold text-amber-500 px-2 py-1 rounded-md border border-amber-500/40"
+            >
+              {t('Open')} →
+            </Link>
+          </div>
+        </div>
+      )}
 
       <CollapsibleSection title={t('Add transaction')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">

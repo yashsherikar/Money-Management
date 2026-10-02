@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { listenForNotificationTaps } from './nativePush.js'
 import { startSmsPayWatcher } from './utils/smsPayWatch.js'
+import { startPendingPayReminderWatcher } from './utils/pendingPayReminders.js'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
@@ -45,6 +46,19 @@ export default function App() {
   useEffect(() => {
     return startSmsPayWatcher()
   }, [])
+
+  useEffect(() => {
+    return startPendingPayReminderWatcher()
+  }, [])
+
+  useEffect(() => {
+    const onTap = (e) => {
+      const url = e?.detail?.url
+      if (url) navigate(url)
+    }
+    window.addEventListener('mm-notification-tap', onTap)
+    return () => window.removeEventListener('mm-notification-tap', onTap)
+  }, [navigate])
 
   return (
     <BiometricGate>
