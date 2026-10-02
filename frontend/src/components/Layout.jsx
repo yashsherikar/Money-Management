@@ -208,7 +208,7 @@ export default function Layout({ children }) {
         </div>
       )}
 
-      <nav className="app-bottom-nav fixed bottom-0 inset-x-0 z-40 bg-navbar border-t border-slate-800 pt-1.5 flex items-stretch">
+      <nav className="app-bottom-nav fixed bottom-0 inset-x-0 z-40 bg-navbar border-t border-slate-800 flex overflow-visible">
         {leftTabs.map((tab) => (
           <NavTab key={tab.to} to={tab.to} end={tab.to === '/'} label={tab.label} shortLabel={tab.shortLabel} icon={tab.icon} t={t} />
         ))}

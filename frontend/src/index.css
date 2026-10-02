@@ -241,7 +241,9 @@ a.w-full {
 .scan-nav-orb {
   width: clamp(55px, 16vw, 67px) !important;
   height: clamp(55px, 16vw, 67px) !important;
-  margin-top: clamp(-16px, -4.5vw, -21px) !important;
+  /* Float above the bar — keep bar height unchanged */
+  margin-top: clamp(-28px, -8vw, -34px) !important;
+  flex-shrink: 0;
 }
 .scan-nav-orb svg {
   width: clamp(28px, 8.6vw, 36px);
@@ -260,10 +262,16 @@ a.w-full {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
 .app-bottom-nav {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  padding-top: 0.35rem;
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom));
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  min-height: calc(3.5rem + env(safe-area-inset-bottom));
+  /* Lock bar height — large QR icon overflows upward, does not stretch the bar */
+  height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  min-height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  max-height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  overflow: visible;
+  align-items: flex-end;
 }
 
 /* Prevent long money / UPI strings from blowing layout */
