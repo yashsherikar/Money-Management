@@ -4,7 +4,25 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
 
-const tabs = [
+const qrIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="5" height="5" x="3" y="3" rx="1" />
+    <rect width="5" height="5" x="16" y="3" rx="1" />
+    <rect width="5" height="5" x="3" y="16" rx="1" />
+    <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+    <path d="M21 21v.01" />
+    <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+    <path d="M3 12h.01" />
+    <path d="M12 3h.01" />
+    <path d="M12 16v.01" />
+    <path d="M16 12h1" />
+    <path d="M21 12v.01" />
+    <path d="M12 21v-1" />
+  </svg>
+)
+
+/** Left of center QR */
+const leftTabs = [
   {
     to: '/',
     label: 'Home',
@@ -23,6 +41,10 @@ const tabs = [
       </svg>
     ),
   },
+]
+
+/** Right of center QR */
+const rightTabs = [
   {
     to: '/obligations',
     label: 'Obligations',
@@ -45,6 +67,25 @@ const moreLinks = [
   { to: '/settings', label: 'Settings' },
 ]
 
+function NavTab({ to, end, label, icon, t }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `flex-1 flex flex-col items-center gap-1 pb-2 text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-teal' : 'text-dim'}`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <span className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>{icon}</span>
+          {t(label)}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
 export default function Layout({ children }) {
   const { user, logout } = useAuth()
   const { lang, setLang, t } = useLanguage()
@@ -52,6 +93,7 @@ export default function Layout({ children }) {
   const location = useLocation()
   const [moreOpen, setMoreOpen] = useState(false)
   const [moreClosing, setMoreClosing] = useState(false)
+  const moreActive = moreOpen || moreLinks.some((l) => location.pathname === l.to)
 
   function handleLogout() {
     logout()
@@ -123,28 +165,21 @@ export default function Layout({ children }) {
       )}
 
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-navbar border-t border-slate-800 pt-2 pb-[env(safe-area-inset-bottom,8px)] flex">
-        {tabs.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.to === '/'}
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center gap-1 pb-2 text-[11px] font-medium transition-colors duration-200 ${isActive ? 'text-teal' : 'text-dim'}`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'scale-100'}`}>{tab.icon}</span>
-                {t(tab.label)}
-              </>
-            )}
-          </NavLink>
+        {leftTabs.map((tab) => (
+          <NavTab key={tab.to} to={tab.to} end={tab.to === '/'} label={tab.label} icon={tab.icon} t={t} />
         ))}
+
+        <NavTab to="/scan-pay" label="Scan" icon={qrIcon} t={t} />
+
+        {rightTabs.map((tab) => (
+          <NavTab key={tab.to} to={tab.to} label={tab.label} icon={tab.icon} t={t} />
+        ))}
+
         <button
           onClick={() => setMoreOpen(true)}
-          className={`flex-1 flex flex-col items-center gap-1 pb-2 text-[11px] font-medium transition-colors duration-200 ${moreOpen ? 'text-teal' : 'text-dim'}`}
+          className={`flex-1 flex flex-col items-center gap-1 pb-2 text-[11px] font-medium transition-colors duration-200 ${moreActive ? 'text-teal' : 'text-dim'}`}
         >
-          <span className={`transition-transform duration-200 ${moreOpen ? 'scale-110' : 'scale-100'}`}>
+          <span className={`transition-transform duration-200 ${moreActive ? 'scale-110' : 'scale-100'}`}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
             </svg>

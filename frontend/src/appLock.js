@@ -69,3 +69,20 @@ export async function verifyAppLockPin(pin) {
   }
   return false
 }
+
+/** How long the app can be backgrounded (QR scanner, UPI app, brief switch)
+ *  before returning requires biometric/PIN again. */
+export const RESUME_LOCK_AFTER_MS = 15_000
+
+let suppressResumeLockUntil = 0
+
+/** Call before opening a native overlay (QR scanner, UPI pay) so returning
+ *  doesn't treat that as "left the app" and demand biometric. */
+export function suppressResumeLock(ms = 120_000) {
+  suppressResumeLockUntil = Math.max(suppressResumeLockUntil, Date.now() + ms)
+}
+
+export function isResumeLockSuppressed() {
+  return Date.now() < suppressResumeLockUntil
+}
+

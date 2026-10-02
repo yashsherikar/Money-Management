@@ -204,3 +204,12 @@ button.rounded-md {
   background: linear-gradient(180deg, #0D1117 0%, #131B2C 55%, #0D1117 100%);
 }
 
+/* In-app QR camera: hide app chrome, show only the scanner overlay */
+body.barcode-scanner-active {
+  visibility: hidden;
+  background: transparent !important;
+}
+body.barcode-scanner-active .barcode-scanner-modal {
+  visibility: visible;
+}
+
