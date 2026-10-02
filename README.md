@@ -66,13 +66,24 @@ Run backend tests: `cd backend; mvn test`
 **2. Backend — Render (free web service)**
 - Push this repo to GitHub.
 - On render.com, "New > Blueprint", point it at the repo — it picks up `render.yaml`.
-- Fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `ALLOWED_ORIGINS` (your Vercel URL, added after step 3) in the Render dashboard. `JWT_SECRET` is auto-generated.
+- Fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` in the Render dashboard. `JWT_SECRET` is auto-generated. Capacitor Android (`https://localhost`) is allowed in code for CORS.
 - Free tier spins down after 15 min idle; first request after that takes ~30s to wake up.
 
-**3. Frontend — Vercel (free)**
-- Import the repo on vercel.com, set root directory to `frontend`.
-- Add env var `VITE_API_URL` = `https://<your-render-service>.onrender.com/api`.
-- Deploy. Then go back to Render and set `ALLOWED_ORIGINS` to your Vercel domain.
+**3. Android APK (primary client — no Vercel / web app)**
+- Build from `frontend`:
+  ```
+  cd frontend
+  npm install
+  npm run build
+  npx cap sync android
+  cd android
+  .\gradlew.bat assembleDebug
+  ```
+- APK: `frontend/android/app/build/outputs/apk/debug/app-debug.apk`
+- Shareable copy: `share/MoneyManager.apk`
+- Install on phones via WhatsApp/Drive (allow unknown apps / Install anyway if Play Protect warns).
+
+The hosted web frontend (Vercel) is **not** used. Remove any old Vercel project in the Vercel dashboard if it still exists.
 
 Total cost: ₹0. Trade-off: Render free backend cold-starts after idling.
 

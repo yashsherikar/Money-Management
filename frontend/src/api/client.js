@@ -12,7 +12,15 @@ export function networkErrorMessage(err, fallback = 'Request failed') {
   if (err?.code === 'ECONNABORTED') {
     return 'Server is taking too long (maybe waking up). Tap retry.'
   }
-  return err?.response?.data?.message || err?.message || fallback
+  const msg = err?.response?.data?.message || err?.message || fallback
+  // Capacitor/WebView CORS failures often surface as a bare Spring "authentication required"
+  if (typeof msg === 'string' && /^authentication required$/i.test(msg.trim())) {
+    return 'Could not reach login server from the app. Check internet, wait for server wake-up, then retry.'
+  }
+  if (msg === 'Network Error') {
+    return 'Network error — check internet or wait for the server to wake up, then retry.'
+  }
+  return msg
 }
 
 let pendingCount = 0
