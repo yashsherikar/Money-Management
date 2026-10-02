@@ -1,0 +1,9 @@
+﻿Money Manager — install (Android)
+
+1. Download MoneyManager.apk from this chat / Drive
+2. Open the file
+3. If asked, allow Install from this app (Files / Chrome / Drive)
+4. If Play Protect warns: More details → Install anyway
+5. Open Money Manager → Sign up with your email
+
+Pay works without any special notification access.

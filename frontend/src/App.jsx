@@ -25,7 +25,6 @@ import Settings from './pages/Settings.jsx'
 import Onboarding from './pages/Onboarding.jsx'
 import Pay from './pages/Pay.jsx'
 import PaymentCategoryPrompt from './components/PaymentCategoryPrompt.jsx'
-import PaymentNotifyAsk from './components/PaymentNotifyAsk.jsx'
 
 function Protected({ children }) {
   return (
@@ -48,7 +47,6 @@ export default function App() {
     <DueReminders />
     <PendingPayConfirm />
     <PaymentCategoryPrompt />
-    <PaymentNotifyAsk />
     <InstallPrompt />
     <Routes>
       <Route path="/login" element={<Login />} />

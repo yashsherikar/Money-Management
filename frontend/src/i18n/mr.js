@@ -355,6 +355,8 @@ export const mr = {
   'We copy the UPI ID and open the app. Paste it in search / Pay UPI ID, enter the amount, and pay.':
     'आम्ही UPI ID कॉपी करून अॅप उघडतो. सर्च / Pay UPI ID मध्ये पेस्ट करा, रक्कम टाका आणि पेमेंट करा.',
   'Payment notification access': 'पेमेंट सूचना प्रवेश',
+  'Auto-track from GPay alerts is off in this install build (Play Protect blocks apps that request notification access). Pay, Scan QR, and manual logging still work. We can turn auto-track on later via Play Store.':
+    'या इंस्टॉल बिल्डमध्ये GPay सूचनांवरून ऑटो-ट्रॅक बंद आहे (Play Protect नोटिफिकेशन अॅक्सेस असलेली अॅप्स ब्लॉक करते). Pay, QR स्कॅन आणि मॅन्युअल नोंद चालते. नंतर Play Store मार्गे ऑटो-ट्रॅक चालू करता येईल.',
   'Read GPay/PhonePe payment alerts to auto-log expenses by category. Turn on once in system settings.':
     'श्रेणीनुसार खर्च आपोआप नोंदवण्यासाठी GPay/PhonePe पेमेंट सूचना वाचा. सिस्टम सेटिंग्जमध्ये एकदा चालू करा.',
   'Off — tap Enable to open system settings': 'बंद — Enable दाबा आणि सिस्टम सेटिंग्ज उघडा',
