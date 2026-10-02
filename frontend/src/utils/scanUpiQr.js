@@ -3,6 +3,7 @@ import { BarcodeFormat, BarcodeScanner, LensFacing } from '@capacitor-mlkit/barc
 import { suppressResumeLock } from '../appLock.js'
 
 let activeCancel = null
+let scanGeneration = 0
 
 async function ensureCameraPermission() {
   const current = await BarcodeScanner.checkPermissions()
@@ -11,11 +12,15 @@ async function ensureCameraPermission() {
   return requested.camera === 'granted'
 }
 
+function hideScannerChrome() {
+  document.body.classList.remove('barcode-scanner-active')
+}
+
 async function cleanupScan() {
+  hideScannerChrome()
   try { await BarcodeScanner.disableTorch() } catch { /* ignore */ }
   try { await BarcodeScanner.removeAllListeners() } catch { /* ignore */ }
   try { await BarcodeScanner.stopScan() } catch { /* ignore */ }
-  document.body.classList.remove('barcode-scanner-active')
   activeCancel = null
 }
 
@@ -41,17 +46,28 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
 
   suppressResumeLock(120_000)
   await cleanupScan()
+  const gen = ++scanGeneration
   document.body.classList.add('barcode-scanner-active')
 
   return new Promise((resolve, reject) => {
     let settled = false
+    let warmTimer = null
 
     const finish = async (fn) => {
       if (settled) return
       settled = true
+      if (warmTimer != null) {
+        clearTimeout(warmTimer)
+        warmTimer = null
+      }
       activeCancel = null
-      await cleanupScan()
-      fn()
+      // Restore UI immediately — don't wait for native stopScan, or Cancel/Back
+      // leaves a blank camera feed with the app hidden behind barcode-scanner-active.
+      hideScannerChrome()
+      try {
+        await cleanupScan()
+      } catch { /* ignore */ }
+      if (gen === scanGeneration) fn()
     }
 
     activeCancel = () => finish(() => reject(new Error('cancelled')))
@@ -59,46 +75,60 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
     ;(async () => {
       try {
         await BarcodeScanner.addListener('barcodesScanned', async (event) => {
+          if (settled || gen !== scanGeneration) return
           const value = event.barcodes?.[0]?.rawValue?.trim()
           if (!value) return
           await finish(() => resolve(value))
         })
 
         await BarcodeScanner.addListener('scanError', async (event) => {
+          if (settled || gen !== scanGeneration) return
           await finish(() => reject(new Error(event.message || 'Scan failed')))
         })
+
+        if (settled || gen !== scanGeneration) return
 
         await BarcodeScanner.startScan({
           formats: [BarcodeFormat.QrCode],
           lensFacing: LensFacing.Back,
         })
 
+        if (settled || gen !== scanGeneration) {
+          try { await BarcodeScanner.stopScan() } catch { /* ignore */ }
+          return
+        }
+
         let torchAvailable = false
         try {
           const { available } = await BarcodeScanner.isTorchAvailable()
           torchAvailable = !!available
-          onTorchAvailable?.(torchAvailable)
+          if (!settled && gen === scanGeneration) onTorchAvailable?.(torchAvailable)
         } catch {
-          onTorchAvailable?.(false)
+          if (!settled && gen === scanGeneration) onTorchAvailable?.(false)
         }
 
         // Preview still settling — flash on so dark rooms aren't a black screen.
-        if (torchAvailable) {
+        if (torchAvailable && !settled && gen === scanGeneration) {
           try {
             await BarcodeScanner.enableTorch()
-            onTorchChange?.(true)
+            if (!settled && gen === scanGeneration) onTorchChange?.(true)
           } catch { /* ignore */ }
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 480))
+        await new Promise((r) => {
+          warmTimer = setTimeout(r, 480)
+        })
+        warmTimer = null
+
+        if (settled || gen !== scanGeneration) return
 
         if (torchAvailable) {
           try {
             await BarcodeScanner.disableTorch()
-            onTorchChange?.(false)
+            if (!settled && gen === scanGeneration) onTorchChange?.(false)
           } catch { /* ignore */ }
         }
-        onPreviewReady?.()
+        if (!settled && gen === scanGeneration) onPreviewReady?.()
       } catch (err) {
         await finish(() => reject(err instanceof Error ? err : new Error(String(err))))
       }
@@ -106,9 +136,15 @@ export async function scanUpiQrNative({ onTorchAvailable, onTorchChange, onPrevi
   })
 }
 
+/** Cancels an in-progress scan and always restores the UI (even mid "Opening camera…"). */
 export async function cancelUpiQrScan() {
-  if (activeCancel) activeCancel()
-  else await cleanupScan()
+  hideScannerChrome()
+  const cancel = activeCancel
+  if (cancel) {
+    await Promise.resolve(cancel())
+    return
+  }
+  await cleanupScan()
 }
 
 export async function toggleScanTorch() {

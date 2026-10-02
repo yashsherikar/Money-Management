@@ -20,7 +20,6 @@ export default function Recurring() {
   const { t } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
   const [items, setItems] = useState([])
-  const [dueIds, setDueIds] = useState(() => new Set())
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -32,14 +31,12 @@ export default function Recurring() {
   const [confirmingId, setConfirmingId] = useState(null)
 
   async function loadAll() {
-    const [itemsRes, accRes, catRes, dueRes] = await Promise.all([
+    const [itemsRes, accRes, catRes] = await Promise.all([
       client.get('/recurring-transactions'),
       client.get('/accounts'),
       client.get('/categories'),
-      client.get('/recurring-transactions/due').catch(() => ({ data: [] })),
     ])
     setItems(itemsRes.data)
-    setDueIds(new Set(dueRes.data.map((d) => d.id)))
     setAccounts(accRes.data)
     setCategories(catRes.data)
     const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
@@ -162,7 +159,7 @@ export default function Recurring() {
     <div>
       <h1 className="text-2xl font-bold mb-2">{t('Recurring transactions')}</h1>
       <p className="text-sm text-slate-500 mb-6">
-        {t('When something is due, tap Mark paid here — or confirm in the popup when you open the app.')}
+        {t('Tap Mark paid on each item after you pay it — that logs it in Transactions and updates your balance.')}
       </p>
       {error && !formOpen && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
 
@@ -258,12 +255,28 @@ export default function Recurring() {
 
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {items.length === 0 && <div className="p-4 text-sm text-slate-500">{t('Nothing set up yet.')}</div>}
-        {items.map((r) => (
-          <div key={r.id} className="p-4 flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
+        {items.map((r) => {
+          const canPay = r.canMarkPaid ?? (r.active && (r.due || r.recurrenceType === 'MONTHLY'))
+          const isDue = !!r.due
+          return (
+          <div key={r.id} className={`p-4 flex items-center justify-between flex-wrap gap-3 ${isDue && r.active ? 'bg-amber-500/5' : ''}`}>
+            <div className="flex items-center gap-3 min-w-0">
               <span className="text-xl leading-none">{categoryIcon(`${r.description || ''} ${r.categoryName || ''}`, r.type)}</span>
-              <div>
-                <div className="font-medium">{r.description}{!r.active && <span className="ml-2 text-xs text-slate-400">({t('paused')})</span>}</div>
+              <div className="min-w-0">
+                <div className="font-medium flex items-center flex-wrap gap-2">
+                  {r.description}
+                  {!r.active && <span className="text-xs text-slate-400">({t('paused')})</span>}
+                  {r.active && isDue && (
+                    <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-semibold">
+                      {t('Due')}
+                    </span>
+                  )}
+                  {r.active && !canPay && (
+                    <span className="text-[10px] uppercase tracking-wide bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded font-semibold">
+                      {t('Paid')}
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-slate-500">
                   {r.recurrenceType === 'INTERVAL_DAYS'
                     ? `${t('every')} ${r.intervalDays} ${t('days')} · ${t('next')} ${r.nextDueDate}`
@@ -272,9 +285,9 @@ export default function Recurring() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className={`font-semibold ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>{money(r.amount)}</div>
-              {dueIds.has(r.id) && r.active && (
+              {canPay && (
                 <button
                   type="button"
                   onClick={() => markPaid(r.id)}
@@ -284,12 +297,13 @@ export default function Recurring() {
                   {confirmingId === r.id ? t('Saving…') : t('Mark paid')}
                 </button>
               )}
-              <button onClick={() => toggleActive(r)} className="text-sm text-brand-600">{r.active ? t('Pause') : t('Resume')}</button>
+              <button onClick={() => toggleActive(r)} className="text-sm text-brand-600 px-1">{r.active ? t('Pause') : t('Resume')}</button>
               <button onClick={() => startEdit(r)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
               <button onClick={() => handleDelete(r.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

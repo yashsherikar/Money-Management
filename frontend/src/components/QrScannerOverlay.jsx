@@ -23,6 +23,14 @@ export default function QrScannerOverlay({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onCancel])
 
+  // If overlay unmounts unexpectedly, still tear down the native camera.
+  useEffect(() => {
+    if (!open) return undefined
+    return () => {
+      cancelUpiQrScan().catch(() => {})
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) {
       setTorchAnim('idle')

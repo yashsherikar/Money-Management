@@ -125,6 +125,19 @@ export default function ScanPay() {
     }
   }, [])
 
+  // Android hardware back must close the scanner — otherwise the camera stays up
+  // with the app chrome still hidden (barcode-scanner-active).
+  useEffect(() => {
+    if (!scanning) return undefined
+    let handle = null
+    CapApp.addListener('backButton', () => {
+      handleCancelScan()
+    }).then((h) => { handle = h })
+    return () => {
+      handle?.remove()
+    }
+  }, [scanning])
+
   async function applyParsed(parsed) {
     setError('')
     setLoggedOk(false)
@@ -197,11 +210,16 @@ export default function ScanPay() {
   }
 
   async function handleCancelScan() {
-    await cancelUpiQrScan()
+    // Restore UI first so Cancel/Back never leaves a stuck camera-only screen.
     setScanning(false)
     setCameraReady(false)
     setTorchOn(false)
     setTorchAvailable(false)
+    try {
+      await cancelUpiQrScan()
+    } catch {
+      // ignore — UI already closed
+    }
   }
 
   async function handlePasteParse(e) {

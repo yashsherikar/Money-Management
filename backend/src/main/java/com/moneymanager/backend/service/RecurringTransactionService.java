@@ -87,6 +87,16 @@ public class RecurringTransactionService {
         return today.getDayOfMonth() >= Math.min(rt.getDayOfMonth(), today.lengthOfMonth());
     }
 
+    /** Monthly: unpaid this month (can pay early). Interval: unpaid once the cycle is due. */
+    private boolean canMarkPaid(RecurringTransaction rt, LocalDate today) {
+        if (!rt.isActive()) return false;
+        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            return !today.isBefore(nextDueDate(rt));
+        }
+        String currentMonth = YearMonth.from(today).toString();
+        return !currentMonth.equals(rt.getLastLoggedMonth());
+    }
+
     /** For INTERVAL_DAYS plans: the next date the cycle renews, counting forward from the last confirm (or creation). */
     private LocalDate nextDueDate(RecurringTransaction rt) {
         LocalDate anchor = rt.getLastLoggedDate() != null
@@ -104,6 +114,7 @@ public class RecurringTransactionService {
         if (rt.getRecurrenceType() == RecurrenceType.MONTHLY && currentMonth.equals(rt.getLastLoggedMonth())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already confirmed for this month");
         }
+        // Interval: allow confirm once due (or overdue). Monthly may be confirmed early.
         if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS && today.isBefore(nextDueDate(rt))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not due yet");
         }
@@ -173,6 +184,7 @@ public class RecurringTransactionService {
     }
 
     private RecurringResponse toResponse(RecurringTransaction rt) {
+        LocalDate today = LocalDate.now();
         return new RecurringResponse(
                 rt.getId(),
                 rt.getAccount().getId(),
@@ -186,7 +198,9 @@ public class RecurringTransactionService {
                 rt.getDayOfMonth(),
                 rt.getIntervalDays(),
                 rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS ? nextDueDate(rt) : null,
-                rt.isActive()
+                rt.isActive(),
+                isDue(rt, today),
+                canMarkPaid(rt, today)
         );
     }
 }
