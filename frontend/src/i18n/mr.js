@@ -348,9 +348,15 @@ export const mr = {
   'Point at a UPI QR code': 'UPI QR कोडवर कॅमेरा ठेवा',
   'Flash on for dark rooms': 'अंधारात फ्लॅश चालू',
   'Scan a merchant UPI QR, check details, pay in GPay/PhonePe, then confirm to log the expense.':
-    'व्यापार्‍याचा UPI QR स्कॅन करा, तपशील तपासा, GPay/PhonePe मध्ये पेमेंट करा, नंतर खर्च नोंदवण्यासाठी पुष्टी करा.',
+    'व्यापार्‍याचा UPI QR स्कॅन करा, तपशील तपासा, PhonePe/GPay/Paytm मध्ये पेमेंट करा, नंतर खर्च नोंदवण्यासाठी पुष्टी करा.',
   'Scan a UPI QR, check details, pay in GPay/PhonePe, then confirm to log the expense.':
-    'UPI QR स्कॅन करा, तपशील तपासा, GPay/PhonePe मध्ये पेमेंट करा, नंतर खर्च नोंदवण्यासाठी पुष्टी करा.',
+    'UPI QR स्कॅन करा, तपशील तपासा, PhonePe/GPay/Paytm मध्ये पेमेंट करा, नंतर खर्च नोंदवण्यासाठी पुष्टी करा.',
+  'Scan a UPI QR, check details, pay in any UPI app (PhonePe, GPay, Paytm…), then confirm to log the expense.':
+    'UPI QR स्कॅन करा, तपशील तपासा, कोणत्याही UPI अॅपमध्ये (PhonePe, GPay, Paytm…) पेमेंट करा, नंतर खर्च नोंदवण्यासाठी पुष्टी करा.',
+  'Check payee and amount carefully, then pick any UPI app.':
+    'पेमेंट करण्यापूर्वी प्राप्तकर्ता आणि रक्कम काळजीपूर्वक तपासा, नंतर कोणतेही UPI अॅप निवडा.',
+  'Pay with UPI app': 'UPI अॅपने पैसे द्या',
+  'Opening…': 'उघडत आहे…',
   'Scan QR': 'QR स्कॅन करा',
   'Scanning…': 'स्कॅन होत आहे…',
   'Camera scan needs the Android app. On web, paste the UPI link from the QR.':
@@ -371,6 +377,8 @@ export const mr = {
   'Select a category': 'श्रेणी निवडा',
   Amount: 'रक्कम',
   Description: 'वर्णन',
+  'Description / Note': 'वर्णन / टीप',
+  'e.g. Lunch, rent share, groceries…': 'उदा. जेवण, भाडे वाटप, किराणा…',
   Account: 'खाते',
   Category: 'श्रेणी',
   'Select…': 'निवडा…',

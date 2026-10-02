@@ -91,7 +91,9 @@ export default function Dashboard() {
 
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <h2 className="font-semibold mb-1">{t('Money wasted this month')}</h2>
-          <p className="text-sm text-slate-500 mb-4">{t('Non-essential spending, total')} {money(summary.unwantedExpenseTotal)}</p>
+          <p className="text-sm text-slate-500 mb-4">
+            {t('Non-essential spending (recurring payments are excluded), total')} {money(summary.unwantedExpenseTotal)}
+          </p>
           {summary.unwantedExpenses.length === 0 ? (
             <div className="text-sm text-slate-500">{t('Nothing flagged. Nice.')}</div>
           ) : (

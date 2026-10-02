@@ -44,6 +44,10 @@ public class Transaction {
     @Column(name = "txn_date", nullable = false)
     private LocalDate txnDate;
 
+    /** True when logged via Recurring → Mark paid (never counts as "money wasted"). */
+    @Column(name = "from_recurring", nullable = false)
+    private boolean fromRecurring = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 }

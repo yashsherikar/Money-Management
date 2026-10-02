@@ -44,6 +44,7 @@ public class RecurringTransactionService {
                 .map(this::toResponse).toList();
     }
 
+    @Transactional
     public RecurringResponse create(User user, RecurringRequest request) {
         RecurringTransaction rt = new RecurringTransaction();
         rt.setUser(user);
@@ -51,16 +52,19 @@ public class RecurringTransactionService {
         return toResponse(recurringTransactionRepository.save(rt));
     }
 
+    @Transactional
     public RecurringResponse update(User user, Long id, RecurringRequest request) {
         RecurringTransaction rt = get(user, id);
         applyRequest(user, rt, request);
         return toResponse(recurringTransactionRepository.save(rt));
     }
 
+    @Transactional
     public void delete(User user, Long id) {
         recurringTransactionRepository.delete(get(user, id));
     }
 
+    @Transactional
     public RecurringResponse setActive(User user, Long id, boolean active) {
         RecurringTransaction rt = get(user, id);
         rt.setActive(active);
@@ -128,6 +132,7 @@ public class RecurringTransactionService {
         txn.setAmount(rt.getAmount());
         txn.setDescription(rt.getDescription());
         txn.setTxnDate(today);
+        txn.setFromRecurring(true);
         transactionRepository.save(txn);
 
         BigDecimal delta = rt.getType() == TransactionType.INCOME ? rt.getAmount() : rt.getAmount().negate();
