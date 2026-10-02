@@ -10,6 +10,10 @@ import {
   parseUpiQr,
   buildUpiPayLink,
   openUpiPayLink,
+  copyUpiPayLink,
+  copyVpaAndOpenApp,
+  savePayQrToGallery,
+  makePayQrDataUrl,
   validateUpiAmount,
   formatUpiAmount,
   resolveCategoryId,
@@ -54,8 +58,9 @@ export default function ScanPay() {
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [payPreview, setPayPreview] = useState(null) // { link, pa, amount, name }
+  const [payPreview, setPayPreview] = useState(null) // { link, pa, amount, name, personal, qrDataUrl }
   const [paying, setPaying] = useState(false)
+  const [qrBusy, setQrBusy] = useState(false)
   const [logging, setLogging] = useState(false)
   const [loggedOk, setLoggedOk] = useState(false)
   const [addingCategory, setAddingCategory] = useState(false)
@@ -239,8 +244,28 @@ export default function ScanPay() {
     }
   }
 
+  function markAwaitingReturn(builtPa, builtAmount) {
+    awaitingReturnRef.current = true
+    suppressResumeLock(300_000)
+    savePendingUpiConfirm({
+      kind: 'scan_pay',
+      pa: builtPa,
+      pn: form.pn,
+      mc: form.mc,
+      am: builtAmount,
+      cu: 'INR',
+      tn: form.tn,
+      personal: form.personal,
+      raw: form.raw,
+      accountId: form.accountId,
+      categoryId: form.categoryId,
+      description: form.description,
+      sharedCategoryName: form.sharedCategoryName,
+    })
+  }
+
   /** Step 1: validate + show exact payee/amount. Never opens GPay yet. */
-  function openPay() {
+  async function openPay() {
     setError('')
     setLoggedOk(false)
     if (!form.pa) {
@@ -261,60 +286,64 @@ export default function ScanPay() {
       return
     }
     try {
+      const personal = !!form.personal
       const built = buildUpiPayLink({
         pa: form.pa,
-        pn: form.pn || form.description,
         am: form.am,
-        cu: 'INR',
-        tn: form.tn || form.description,
+        pn: form.pn || form.description,
+        includeName: true,
+        merchant: !personal,
+        mc: form.mc,
       })
-      // Lock the normalized amount into the form so logging matches what GPay got
       setForm((f) => ({ ...f, am: built.amount, pa: built.pa }))
+      let qrDataUrl = null
+      if (personal) {
+        try {
+          const qr = await makePayQrDataUrl({
+            pa: built.pa,
+            am: built.amount,
+            pn: form.pn || form.description,
+          })
+          qrDataUrl = qr.dataUrl
+        } catch {
+          // preview can continue without QR image
+        }
+      }
       setPayPreview({
         link: built.link,
         pa: built.pa,
         amount: built.amount,
         name: form.pn || form.description || built.pa,
+        personal,
+        qrDataUrl,
       })
     } catch (err) {
       setError(err.message || t('Could not build payment link'))
     }
   }
 
-  /** Step 2: user confirmed — rebuild a fresh clean link, then open any UPI app. */
-  async function confirmAndOpenUpi() {
-    if (!payPreview?.pa || !payPreview?.amount || paying) return
+  /** Merchant only — deep-link into GPay / PhonePe. */
+  async function confirmAndOpenUpi(app = null) {
+    if (!payPreview?.pa || !payPreview?.amount || paying || payPreview.personal) return
     setPaying(true)
     setError('')
     try {
-      // Rebuild at the last second so amount/VPA cannot drift or get corrupted
       const built = buildUpiPayLink({
         pa: payPreview.pa,
-        pn: form.pn || form.description,
         am: payPreview.amount,
-        tn: form.tn || form.description,
-      })
-      awaitingReturnRef.current = true
-      suppressResumeLock(300_000)
-      savePendingUpiConfirm({
-        pa: built.pa,
-        pn: form.pn,
+        pn: form.pn || form.description || payPreview.name,
+        includeName: true,
+        merchant: true,
         mc: form.mc,
-        am: built.amount,
-        cu: 'INR',
-        tn: form.tn,
-        personal: form.personal,
-        raw: form.raw,
-        accountId: form.accountId,
-        categoryId: form.categoryId,
-        description: form.description,
-        sharedCategoryName: form.sharedCategoryName,
       })
+      markAwaitingReturn(built.pa, built.amount)
       await openUpiPayLink(built.link, {
         pa: built.pa,
         amount: built.amount,
-        pn: form.pn || form.description,
-        tn: form.tn || form.description,
+        pn: form.pn || form.description || payPreview.name,
+        merchant: true,
+        mc: form.mc,
+        app,
       })
       setPayPreview(null)
       if (!isNativePlatform()) {
@@ -331,6 +360,68 @@ export default function ScanPay() {
       setError(err?.message || t('Could not open UPI app'))
     } finally {
       setPaying(false)
+    }
+  }
+
+  /** P2P — copy UPI ID and open app (manual-style pay). */
+  async function confirmCopyAndOpen(app = null) {
+    if (!payPreview?.pa || !payPreview?.amount || paying) return
+    setPaying(true)
+    setError('')
+    try {
+      markAwaitingReturn(payPreview.pa, payPreview.amount)
+      await copyVpaAndOpenApp({
+        pa: payPreview.pa,
+        amount: payPreview.amount,
+        app,
+      })
+      setPayPreview(null)
+      if (!isNativePlatform()) {
+        setTimeout(() => {
+          if (awaitingReturnRef.current) {
+            awaitingReturnRef.current = false
+            setConfirmOpen(true)
+          }
+        }, 1500)
+      }
+    } catch (err) {
+      awaitingReturnRef.current = false
+      clearPendingUpiConfirm()
+      setError(err?.message || t('Could not open UPI app'))
+    } finally {
+      setPaying(false)
+    }
+  }
+
+  /** P2P — save amount QR to gallery; user scans it from GPay/PhonePe gallery. */
+  async function confirmSavePayQr() {
+    if (!payPreview?.pa || !payPreview?.amount || qrBusy) return
+    setQrBusy(true)
+    setError('')
+    try {
+      const result = await savePayQrToGallery({
+        pa: payPreview.pa,
+        am: payPreview.amount,
+        pn: form.pn || form.description || payPreview.name,
+      })
+      if (result.dataUrl) {
+        setPayPreview((p) => (p ? { ...p, qrDataUrl: result.dataUrl } : p))
+      }
+      markAwaitingReturn(payPreview.pa, payPreview.amount)
+    } catch (err) {
+      setError(err?.message || t('Could not save QR'))
+    } finally {
+      setQrBusy(false)
+    }
+  }
+
+  async function copyPayLink() {
+    if (!payPreview?.pa || !payPreview?.amount) return
+    try {
+      await copyUpiPayLink({ pa: payPreview.pa, amount: payPreview.amount })
+      setError('')
+    } catch (err) {
+      setError(err?.message || t('Could not copy link'))
     }
   }
 
@@ -610,11 +701,13 @@ export default function ScanPay() {
 
       {payPreview && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => !paying && setPayPreview(null)} />
-          <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !paying && !qrBusy && setPayPreview(null)} />
+          <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4 max-h-[92vh] overflow-y-auto">
             <h2 className="font-bold text-lg mb-1">{t('Confirm payment')}</h2>
             <p className="text-sm text-slate-500 mb-4">
-              {t('Check payee and amount carefully, then pick any UPI app.')}
+              {payPreview.personal
+                ? t('Personal UPI: use QR from gallery or copy ID (GPay links often fail).')
+                : t('Merchant UPI: open any UPI app with the payment link.')}
             </p>
             <div className="bg-slate-50 rounded-xl p-4 space-y-2 mb-4">
               <div className="text-xs text-slate-500">{t('Paying to')}</div>
@@ -626,25 +719,102 @@ export default function ScanPay() {
                   ₹{Number(payPreview.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="pt-2 border-t border-slate-200">
-                <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">{t('UPI link (check amount)')}</div>
-                <div className="font-mono text-[11px] text-slate-400 break-all leading-snug">{payPreview.link}</div>
-              </div>
+              {payPreview.personal && payPreview.qrDataUrl && (
+                <div className="pt-3 border-t border-slate-200 flex flex-col items-center gap-2">
+                  <img
+                    src={payPreview.qrDataUrl}
+                    alt="Pay QR"
+                    className="w-44 h-44 rounded-lg bg-white border border-slate-200"
+                  />
+                  <p className="text-[11px] text-slate-500 text-center leading-snug">
+                    {t('Save QR → GPay/PhonePe Scan → choose from gallery')}
+                  </p>
+                </div>
+              )}
+              {!payPreview.personal && (
+                <div className="pt-2 border-t border-slate-200">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">{t('UPI link (check amount)')}</div>
+                  <div className="font-mono text-[11px] text-slate-400 break-all leading-snug">{payPreview.link}</div>
+                </div>
+              )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
+              {payPreview.personal ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={qrBusy || paying}
+                    onClick={confirmSavePayQr}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
+                  >
+                    {qrBusy ? t('Saving QR…') : t('Save pay QR to gallery')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paying || qrBusy}
+                    onClick={() => confirmCopyAndOpen('gpay')}
+                    className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
+                  >
+                    {paying ? t('Opening…') : t('Copy UPI ID & open GPay')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paying || qrBusy}
+                    onClick={() => confirmCopyAndOpen('phonepe')}
+                    className="w-full border border-slate-300 rounded-md py-2.5 text-sm font-medium disabled:opacity-60"
+                  >
+                    {t('Copy UPI ID & open PhonePe')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paying || qrBusy}
+                    onClick={() => confirmCopyAndOpen(null)}
+                    className="w-full border border-slate-300 rounded-md py-2.5 text-sm font-medium disabled:opacity-60"
+                  >
+                    {t('Copy UPI ID & open UPI app')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={paying}
+                    onClick={() => confirmAndOpenUpi('gpay')}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
+                  >
+                    {paying ? t('Opening…') : t('Pay in GPay')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paying}
+                    onClick={() => confirmAndOpenUpi('phonepe')}
+                    className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
+                  >
+                    {t('Pay in PhonePe')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paying}
+                    onClick={() => confirmAndOpenUpi(null)}
+                    className="w-full border border-slate-300 rounded-md py-2.5 text-sm font-medium disabled:opacity-60"
+                  >
+                    {t('Other UPI app…')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={paying}
+                    onClick={copyPayLink}
+                    className="w-full border border-dashed border-slate-400 rounded-md py-2.5 text-sm text-slate-500 disabled:opacity-60"
+                  >
+                    {t('Copy UPI link (test outside app)')}
+                  </button>
+                </>
+              )}
               <button
                 type="button"
-                disabled={paying}
-                onClick={confirmAndOpenUpi}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
-              >
-                {paying ? t('Opening…') : t('Pay with UPI app')}
-              </button>
-              <button
-                type="button"
-                disabled={paying}
+                disabled={paying || qrBusy}
                 onClick={() => setPayPreview(null)}
-                className="flex-1 border border-slate-300 rounded-md py-3"
+                className="w-full py-2 text-sm text-slate-500"
               >
                 {t('Cancel')}
               </button>

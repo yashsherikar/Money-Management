@@ -149,6 +149,31 @@ public class PaymentRequestService {
         return toResponse(saved);
     }
 
+    /**
+     * Payer confirms they sent money via UPI (app cannot detect GPay P2P success).
+     * Does not mark PAID — requester still taps "Mark as received".
+     */
+    @Transactional
+    public PaymentRequestResponse confirmSent(User payer, Long id) {
+        PaymentRequest pr = paymentRequestRepository.findByIdAndPayerId(id, payer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
+        if (pr.getStatus() != PaymentRequestStatus.ACCEPTED
+                && pr.getStatus() != PaymentRequestStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Only pending or accepted requests can be confirmed");
+        }
+        if (pr.getStatus() == PaymentRequestStatus.PENDING) {
+            pr.setStatus(PaymentRequestStatus.ACCEPTED);
+            pr.setRespondedAt(Instant.now());
+            paymentRequestRepository.save(pr);
+        }
+        pushService.notifyUser(pr.getRequester(), "Payment sent?",
+                payer.getName() + " says they paid ₹" + pr.getAmount().toPlainString()
+                        + " — mark as received if money arrived",
+                "/requests");
+        return toResponse(pr);
+    }
+
     private PaymentRequestResponse toResponse(PaymentRequest pr) {
         String upiId = pr.getRequester().getUpiId();
         String upiLink = buildUpiLink(pr.getRequester(), pr.getAmount(), reasonLabel(pr));

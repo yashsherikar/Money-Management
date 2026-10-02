@@ -21,10 +21,10 @@ const qrIcon = (
   </svg>
 )
 
-function ScanNavTab({ t }) {
+function PayNavTab({ t }) {
   return (
     <NavLink
-      to="/scan-pay"
+      to="/pay"
       className="flex-1 min-w-0 flex flex-col items-center justify-end gap-0.5 pb-1.5 text-dim"
     >
       {({ isActive }) => (
@@ -47,7 +47,7 @@ function ScanNavTab({ t }) {
           >
             {qrIcon}
           </span>
-          <span className={`nav-tab-label font-medium ${isActive ? 'text-teal' : 'text-dim'}`}>{t('Scan')}</span>
+          <span className={`nav-tab-label font-medium ${isActive ? 'text-teal' : 'text-dim'}`}>{t('Pay')}</span>
         </>
       )}
     </NavLink>
@@ -213,7 +213,7 @@ export default function Layout({ children }) {
           <NavTab key={tab.to} to={tab.to} end={tab.to === '/'} label={tab.label} shortLabel={tab.shortLabel} icon={tab.icon} t={t} />
         ))}
 
-        <ScanNavTab t={t} />
+        <PayNavTab t={t} />
 
         {rightTabs.map((tab) => (
           <NavTab key={tab.to} to={tab.to} label={tab.label} shortLabel={tab.shortLabel} icon={tab.icon} t={t} />

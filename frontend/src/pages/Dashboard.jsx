@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import client, { networkErrorMessage } from '../api/client'
 import StatCard from '../components/StatCard.jsx'
@@ -50,7 +51,15 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">{t('Dashboard')}</h1>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-bold">{t('Dashboard')}</h1>
+        <Link
+          to="/pay"
+          className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-4 py-2.5 text-sm font-semibold"
+        >
+          {t('Pay')}
+        </Link>
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard label={t('Income')} value={money(summary.totalIncome)} tone="good" />

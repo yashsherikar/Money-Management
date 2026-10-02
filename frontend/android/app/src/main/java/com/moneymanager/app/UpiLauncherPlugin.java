@@ -1,42 +1,74 @@
 package com.moneymanager.app;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
-import android.os.Parcelable;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import android.widget.Toast;
+import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.io.OutputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Opens a clean {@code upi://pay?...} Intent.
- * <p>
- * Critical: never hand GPay a URI built only via {@link Uri#parse(String)} on the full
- * string — Android re-serializes {@code @} in {@code pa=} as {@code %40}, which often
- * shows the right amount on screen but fails after PIN with "exceeded bank limit".
- * We rebuild with {@link Uri.Builder#encodedQuery(String)} so {@code @} and {@code am=}
- * stay exact.
+ * UPI launcher.
+ * Merchant VPAs: deep-link pay (upi:// / tez://) with mc + tr.
+ * Personal/P2P: GPay often rejects intent pays with fake "bank limit" — use
+ * {@link #copyAndOpen} or {@link #saveQrPng} instead.
  */
 @CapacitorPlugin(name = "UpiLauncher")
 public class UpiLauncherPlugin extends Plugin {
 
-    private static final Pattern PA = Pattern.compile("[?&]pa=([^&]*)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern AM = Pattern.compile("[?&]am=([^&]*)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PN = Pattern.compile("[?&]pn=([^&]*)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern TN = Pattern.compile("[?&]tn=([^&]*)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern CU = Pattern.compile("[?&]cu=([^&]*)", Pattern.CASE_INSENSITIVE);
+    private static final String GPAY = "com.google.android.apps.nbu.paisa.user";
+    private static final String PHONEPE = "com.phonepe.app";
+    private static final String PAYTM = "net.one97.paytm";
+    private static final String BHIM = "in.org.npci.upiapp";
+
+    @PluginMethod
+    public void pay(PluginCall call) {
+        try {
+            String pa = sanitizePa(call.getString("pa"));
+            String am = normalizeAmount(call.getString("am"));
+            String pn = sanitizePn(call.getString("pn"));
+            String app = call.getString("app");
+            String mc = call.getString("mc");
+            Boolean merchantFlag = call.getBoolean("merchant", false);
+            if (am == null) throw new IllegalArgumentException("Bad amount");
+
+            String query = "pa=" + pa + "&am=" + am + "&cu=INR";
+            if (pn != null) query += "&pn=" + pn;
+            if (Boolean.TRUE.equals(merchantFlag)) {
+                if (mc != null && !mc.isBlank() && !mc.matches("0+")) {
+                    query += "&mc=" + mc.trim();
+                }
+                query += "&tr=MM" + System.currentTimeMillis();
+            }
+
+            String upiUrl = "upi://pay?" + query;
+            openWithBestIntent(call, upiUrl, query, pa, am, app);
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "Pay failed" : e.getMessage(), e);
+        }
+    }
 
     @PluginMethod
     public void open(PluginCall call) {
@@ -45,167 +77,299 @@ public class UpiLauncherPlugin extends Plugin {
             call.reject("missing url");
             return;
         }
-
-        String clean;
         try {
-            clean = rebuildCleanUpiUrl(url.trim());
-        } catch (IllegalArgumentException e) {
-            call.reject(e.getMessage());
-            return;
-        }
-
-        try {
-            Uri uri = uriFromCleanUpi(clean);
-            Intent base = new Intent(Intent.ACTION_VIEW, uri);
-            base.addCategory(Intent.CATEGORY_DEFAULT);
-            base.addCategory(Intent.CATEGORY_BROWSABLE);
-
-            PackageManager pm = getContext().getPackageManager();
-            List<ResolveInfo> apps = pm.queryIntentActivities(base, PackageManager.MATCH_DEFAULT_ONLY);
-
-            Map<String, ResolveInfo> byPackage = new LinkedHashMap<>();
-            for (ResolveInfo info : apps) {
-                if (info.activityInfo == null) continue;
-                byPackage.putIfAbsent(info.activityInfo.packageName, info);
-            }
-
-            if (byPackage.isEmpty()) {
-                // Still try a plain VIEW — some devices hide packages from queries
-                Activity activity = getActivity();
-                Intent fallback = new Intent(Intent.ACTION_VIEW, uri);
-                if (activity != null) {
-                    activity.startActivity(Intent.createChooser(fallback, "Pay with UPI"));
-                } else {
-                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    getContext().startActivity(Intent.createChooser(fallback, "Pay with UPI"));
-                }
-                JSObject ret = new JSObject();
-                ret.put("opened", true);
-                ret.put("url", clean);
-                call.resolve(ret);
-                return;
-            }
-
-            List<Intent> targeted = new ArrayList<>();
-            for (ResolveInfo info : byPackage.values()) {
-                // Package only — do NOT setClassName (wrong activity can corrupt the UPI payload)
-                Intent specific = new Intent(Intent.ACTION_VIEW, uri);
-                specific.setPackage(info.activityInfo.packageName);
-                targeted.add(specific);
-            }
-
-            Intent launch;
-            if (targeted.size() == 1) {
-                launch = targeted.get(0);
-            } else {
-                Intent primary = targeted.remove(0);
-                launch = Intent.createChooser(primary, "Pay with any UPI app");
-                launch.putExtra(Intent.EXTRA_INITIAL_INTENTS, targeted.toArray(new Parcelable[0]));
-            }
-
-            Activity activity = getActivity();
-            if (activity != null) {
-                activity.startActivity(launch);
-            } else {
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(launch);
-            }
-
-            JSObject ret = new JSObject();
-            ret.put("opened", true);
-            ret.put("url", clean);
-            ret.put("appCount", byPackage.size());
-            call.resolve(ret);
+            String pa = sanitizePa(extractParam(url, "pa"));
+            String am = normalizeAmount(extractParam(url, "am"));
+            String pn = sanitizePn(extractParam(url, "pn"));
+            if (am == null) throw new IllegalArgumentException("Bad amount");
+            String query = "pa=" + pa + "&am=" + am + "&cu=INR";
+            if (pn != null) query += "&pn=" + pn;
+            openWithBestIntent(call, "upi://pay?" + query, query, pa, am, call.getString("app"));
         } catch (Exception e) {
-            call.reject("Could not open a UPI app. Try PhonePe, GPay, Paytm, or BHIM.", e);
+            call.reject(e.getMessage() == null ? "Open failed" : e.getMessage(), e);
         }
     }
 
-    /** Build hierarchical upi://pay URI without re-encoding @ or amount. */
-    static Uri uriFromCleanUpi(String cleanUrl) {
-        int q = cleanUrl.indexOf('?');
-        if (q < 0) throw new IllegalArgumentException("Invalid UPI link");
-        String query = cleanUrl.substring(q + 1);
-        return new Uri.Builder()
-                .scheme("upi")
-                .authority("pay")
-                .encodedQuery(query)
-                .build();
+    @PluginMethod
+    public void copyPayLink(PluginCall call) {
+        try {
+            String pa = sanitizePa(call.getString("pa"));
+            String am = normalizeAmount(call.getString("am"));
+            if (am == null) throw new IllegalArgumentException("Bad amount");
+            String url = "upi://pay?pa=" + pa + "&am=" + am + "&cu=INR";
+            ClipboardManager cm = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("UPI", url));
+            toast("Copied:\n" + url);
+            JSObject ret = new JSObject();
+            ret.put("copied", true);
+            ret.put("url", url);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(e.getMessage());
+        }
     }
 
     /**
-     * Parse with regex (not Uri.getQueryParameter) and rebuild a minimal NPCI link:
-     * {@code upi://pay?pa=…&pn=…&am=x.xx&cu=INR&tn=…}
+     * P2P-safe path: copy VPA to clipboard and open the UPI app home
+     * (user pastes / searches like a normal manual pay).
      */
+    @PluginMethod
+    public void copyAndOpen(PluginCall call) {
+        try {
+            String pa = sanitizePa(call.getString("pa"));
+            String am = normalizeAmount(call.getString("am"));
+            String app = call.getString("app");
+            if (am == null) throw new IllegalArgumentException("Bad amount");
+
+            ClipboardManager cm = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("UPI ID", pa));
+
+            PackageManager pm = getContext().getPackageManager();
+            String pkg = resolvePackage(app);
+            Intent launch = null;
+            if (pkg != null && isInstalled(pm, pkg)) {
+                launch = pm.getLaunchIntentForPackage(pkg);
+            }
+            if (launch == null) {
+                for (String candidate : new String[]{GPAY, PHONEPE, PAYTM, BHIM}) {
+                    if (isInstalled(pm, candidate)) {
+                        launch = pm.getLaunchIntentForPackage(candidate);
+                        if (launch != null) break;
+                    }
+                }
+            }
+            if (launch == null) {
+                call.reject("No UPI app installed");
+                return;
+            }
+
+            toast("UPI ID copied, send ₹" + am);
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(launch);
+
+            JSObject ret = new JSObject();
+            ret.put("copied", true);
+            ret.put("pa", pa);
+            ret.put("am", am);
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "Copy/open failed" : e.getMessage(), e);
+        }
+    }
+
+    /** Save a base64 PNG pay-QR into Pictures/MoneyManager (scan from gallery in GPay/PhonePe). */
+    @PluginMethod
+    public void saveQrPng(PluginCall call) {
+        try {
+            String base64 = call.getString("base64");
+            String fileName = call.getString("fileName", "MM-Pay-QR.png");
+            if (base64 == null || base64.isBlank()) {
+                call.reject("missing base64");
+                return;
+            }
+            if (fileName == null || fileName.isBlank()) fileName = "MM-Pay-QR.png";
+            if (!fileName.toLowerCase(Locale.ROOT).endsWith(".png")) fileName = fileName + ".png";
+
+            byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+            ContentResolver resolver = getContext().getContentResolver();
+            Uri uri;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+                values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                values.put(MediaStore.Images.Media.RELATIVE_PATH,
+                        Environment.DIRECTORY_PICTURES + "/MoneyManager");
+                values.put(MediaStore.Images.Media.IS_PENDING, 1);
+                uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                if (uri == null) throw new IllegalStateException("Could not create gallery row");
+                try (OutputStream out = resolver.openOutputStream(uri)) {
+                    if (out == null) throw new IllegalStateException("Could not open gallery stream");
+                    out.write(bytes);
+                }
+                values.clear();
+                values.put(MediaStore.Images.Media.IS_PENDING, 0);
+                resolver.update(uri, values, null, null);
+            } else {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+                values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                if (uri == null) throw new IllegalStateException("Could not create gallery row");
+                try (OutputStream out = resolver.openOutputStream(uri)) {
+                    if (out == null) throw new IllegalStateException("Could not open gallery stream");
+                    out.write(bytes);
+                }
+            }
+
+            toast("QR saved to Gallery\nOpen GPay → Scan → Gallery");
+            JSObject ret = new JSObject();
+            ret.put("saved", true);
+            ret.put("uri", uri.toString());
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "Save QR failed" : e.getMessage(), e);
+        }
+    }
+
+    private void openWithBestIntent(PluginCall call, String upiUrl, String query, String pa, String am, String app)
+            throws Exception {
+        try {
+            ClipboardManager cm = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("UPI", upiUrl));
+        } catch (Exception ignored) { }
+
+        Uri opaqueUpi = opaqueUpiUri(query);
+        String pkg = resolvePackage(app);
+        PackageManager pm = getContext().getPackageManager();
+
+        Intent intent = null;
+
+        if (pkg == null || GPAY.equals(pkg)) {
+            if (isInstalled(pm, GPAY)) {
+                Intent tez = new Intent(Intent.ACTION_VIEW);
+                tez.setData(Uri.parse("tez://upi/pay?" + query));
+                tez.setPackage(GPAY);
+                if (tez.resolveActivity(pm) != null) {
+                    intent = tez;
+                } else {
+                    String intentUri = "intent://pay?" + query
+                            + "#Intent;scheme=upi;package=" + GPAY + ";end";
+                    Intent parsed = Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME);
+                    if (parsed.resolveActivity(pm) != null) {
+                        intent = parsed;
+                    } else {
+                        Intent gpay = new Intent(Intent.ACTION_VIEW, opaqueUpi);
+                        gpay.setPackage(GPAY);
+                        intent = gpay;
+                    }
+                }
+            }
+        }
+
+        if (intent == null && pkg != null && isInstalled(pm, pkg)) {
+            Intent specific = new Intent(Intent.ACTION_VIEW, opaqueUpi);
+            specific.setPackage(pkg);
+            List<ResolveInfo> matches = pm.queryIntentActivities(specific, 0);
+            if (!matches.isEmpty() && matches.get(0).activityInfo != null) {
+                specific.setClassName(matches.get(0).activityInfo.packageName, matches.get(0).activityInfo.name);
+            }
+            intent = specific;
+        }
+
+        if (intent == null) {
+            Intent view = new Intent(Intent.ACTION_VIEW, opaqueUpi);
+            intent = Intent.createChooser(view, "Pay with UPI");
+        }
+
+        String dataStr = intent.getData() != null ? intent.getData().toString() : upiUrl;
+        toast("Sending to UPI:\n" + dataStr.replace("%40", "@"));
+
+        startActivityForResult(call, intent, "upiPayResult");
+    }
+
+    @ActivityCallback
+    private void upiPayResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        JSObject ret = new JSObject();
+        ret.put("opened", true);
+        ret.put("resultCode", result.getResultCode());
+        call.resolve(ret);
+    }
+
+    static Uri opaqueUpiUri(String query) {
+        return Uri.fromParts("upi", "//pay?" + query, null);
+    }
+
+    static String buildMinimalPayUrl(String paRaw, String amRaw) {
+        String pa = sanitizePa(paRaw);
+        String am = normalizeAmount(amRaw);
+        if (am == null) throw new IllegalArgumentException("Bad amount");
+        return "upi://pay?pa=" + pa + "&am=" + am + "&cu=INR";
+    }
+
+    static Uri uriFromCleanUpi(String cleanUrl) {
+        int q = cleanUrl.indexOf('?');
+        if (q < 0) throw new IllegalArgumentException("Invalid UPI link");
+        return opaqueUpiUri(cleanUrl.substring(q + 1));
+    }
+
     static String rebuildCleanUpiUrl(String url) {
-        String lower = url.toLowerCase(Locale.ROOT);
-        if (!lower.startsWith("upi://pay?")) {
-            throw new IllegalArgumentException("Payment link must start with upi://pay?");
-        }
-        if (lower.contains("%40")) {
-            throw new IllegalArgumentException("UPI ID is wrongly encoded — payment blocked");
-        }
+        return buildMinimalPayUrl(extractParam(url, "pa"), extractParam(url, "am"));
+    }
 
-        String pa = first(PA, url);
-        String am = first(AM, url);
-        String pn = first(PN, url);
-        String tn = first(TN, url);
-        String cu = first(CU, url);
+    private void toast(String msg) {
+        Activity activity = getActivity();
+        if (activity == null) return;
+        activity.runOnUiThread(() -> Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show());
+    }
 
-        if (pa == null || pa.isBlank()) {
-            throw new IllegalArgumentException("UPI ID missing — payment blocked");
+    private static String sanitizePa(String paRaw) {
+        if (paRaw == null || paRaw.isBlank()) throw new IllegalArgumentException("UPI ID missing");
+        String pa = paRaw.trim().replaceAll("(?i)%40", "@");
+        if (!pa.contains("@") || pa.contains("%") || pa.contains(" ") || pa.contains("&") || pa.contains("?")) {
+            throw new IllegalArgumentException("UPI ID invalid: " + pa);
         }
-        pa = pa.trim();
-        pa = pa.replaceAll("(?i)%40", "@");
-        if (!pa.contains("@") || pa.contains("%")) {
-            throw new IllegalArgumentException("UPI ID invalid — payment blocked");
-        }
+        return pa;
+    }
 
-        if (am == null || am.isBlank()) {
-            throw new IllegalArgumentException("Amount missing — payment blocked");
-        }
-        am = normalizeAmount(am);
-        if (am == null) {
-            throw new IllegalArgumentException("Amount must be like 10.00 — payment blocked");
-        }
+    private static String sanitizePn(String pnRaw) {
+        if (pnRaw == null) return null;
+        String t = pnRaw.trim();
+        if (t.isEmpty()) return null;
+        try {
+            if (t.contains("%")) t = Uri.decode(t);
+        } catch (Exception ignored) { }
+        t = t.replaceAll("[&=?]", " ").replaceAll("\\s+", " ").trim();
+        if (t.isEmpty()) return null;
+        return URLEncoder.encode(t, StandardCharsets.UTF_8).replace("+", "%20");
+    }
 
-        if (countKeys(url, "am") != 1 || countKeys(url, "pa") != 1) {
-            throw new IllegalArgumentException("Duplicate amount/UPI ID — payment blocked");
+    private static String resolvePackage(String app) {
+        if (app == null) return null;
+        switch (app.toLowerCase(Locale.ROOT)) {
+            case "gpay":
+            case "google":
+            case "tez":
+                return GPAY;
+            case "phonepe":
+                return PHONEPE;
+            case "paytm":
+                return PAYTM;
+            case "bhim":
+                return BHIM;
+            default:
+                return null;
         }
-        if (lower.matches(".*[?&](sign|mode|orgid|mam)=.*")) {
-            throw new IllegalArgumentException("Unsafe merchant fields — payment blocked");
-        }
+    }
 
-        StringBuilder q = new StringBuilder();
-        q.append("pa=").append(pa);
-        if (pn != null && !pn.isBlank()) {
-            q.append("&pn=").append(safeParam(pn));
+    private static boolean isInstalled(PackageManager pm, String pkg) {
+        try {
+            pm.getPackageInfo(pkg, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
         }
-        q.append("&am=").append(am);
-        q.append("&cu=").append(cu != null && !cu.isBlank() ? safeParam(cu) : "INR");
-        if (tn != null && !tn.isBlank()) {
-            q.append("&tn=").append(safeParam(tn));
-        }
+    }
 
-        String clean = "upi://pay?" + q;
-        if (clean.toLowerCase(Locale.ROOT).contains("%40")) {
-            throw new IllegalArgumentException("UPI ID encoding failed — payment blocked");
-        }
-        return clean;
+    static String extractParam(String url, String key) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("[?&]" + key + "=([^&]*)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(url);
+        return m.find() ? m.group(1) : null;
     }
 
     static String normalizeAmount(String raw) {
+        if (raw == null) return null;
         String cleaned = raw.trim()
                 .replace("₹", "")
                 .replace(",", "")
                 .replace("%20", "")
+                .replace("%2E", ".")
+                .replace("%2e", ".")
                 .replace(" ", "");
-        // Reject if dots were stripped elsewhere into a huge integer from a decimal
-        if (!cleaned.matches("\\d+(\\.\\d{1,2})?")) {
-            // already percent-encoded digits? decode common case
-            cleaned = cleaned.replace("%2E", ".").replace("%2e", ".");
-            if (!cleaned.matches("\\d+(\\.\\d{1,2})?")) return null;
-        }
+        if (!cleaned.matches("\\d+(\\.\\d{1,2})?")) return null;
         try {
             double n = Double.parseDouble(cleaned);
             if (!(n >= 1.0) || n > 100000.0) return null;
@@ -213,36 +377,5 @@ public class UpiLauncherPlugin extends Plugin {
         } catch (NumberFormatException e) {
             return null;
         }
-    }
-
-    /** Keep already-encoded values; encode only raw unsafe chars. Never touch @ in values we control. */
-    static String safeParam(String value) {
-        String v = value.trim();
-        if (v.contains("%")) return v; // already encoded from JS
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < v.length(); i++) {
-            char c = v.charAt(i);
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                    || c == '-' || c == '_' || c == '.' || c == '~' || c == '@') {
-                out.append(c);
-            } else if (c == ' ') {
-                out.append("%20");
-            } else {
-                out.append(String.format(Locale.US, "%%%02X", (int) c));
-            }
-        }
-        return out.toString();
-    }
-
-    static String first(Pattern p, String url) {
-        Matcher m = p.matcher(url);
-        return m.find() ? m.group(1) : null;
-    }
-
-    static int countKeys(String url, String key) {
-        int n = 0;
-        Matcher m = Pattern.compile("[?&]" + key + "=", Pattern.CASE_INSENSITIVE).matcher(url);
-        while (m.find()) n++;
-        return n;
     }
 }

@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { openUpiPayLink } from '../utils/upiQr.js'
+import { suppressResumeLock, savePendingUpiConfirm } from '../appLock.js'
+import { copyVpaAndOpenApp, parseUpiQr, formatUpiAmount } from '../utils/upiQr.js'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
@@ -27,6 +28,7 @@ export default function Requests() {
   const [askError, setAskError] = useState('')
   const [askOk, setAskOk] = useState(false)
   const [asking, setAsking] = useState(false)
+  const [payingId, setPayingId] = useState(null)
 
   async function load() {
     const [inRes, outRes, owedRes, payInRes, payOutRes] = await Promise.all([
@@ -54,6 +56,51 @@ export default function Requests() {
   async function acceptPay(id) { await client.patch(`/payment-requests/${id}/accept`); load() }
   async function declinePay(id) { await client.patch(`/payment-requests/${id}/decline`); load() }
   async function markPayReceived(id) { await client.patch(`/payment-requests/${id}/mark-paid`); load() }
+
+  /**
+   * P2P money requests: GPay deep-link often fails. Copy UPI ID + open app,
+   * then persist "Did you pay?" so it still shows after both apps are closed.
+   */
+  async function payRequestP2p(r, { kind = 'payment_request' } = {}) {
+    if (!r.upiPayLink && !r.requesterUpiId) {
+      alert(t("hasn't added a UPI ID yet"))
+      return
+    }
+    setPayingId(r.id)
+    try {
+      let pa = r.requesterUpiId || ''
+      let am = formatUpiAmount(r.amount || r.shareAmount)
+      if (!pa && r.upiPayLink) {
+        try {
+          const parsed = parseUpiQr(r.upiPayLink)
+          pa = parsed.pa
+          am = formatUpiAmount(parsed.am || r.amount || r.shareAmount) || am
+        } catch {
+          /* fall through */
+        }
+      }
+      if (!pa || !am) {
+        alert(t('Could not open UPI app'))
+        return
+      }
+      suppressResumeLock(300_000)
+      savePendingUpiConfirm({
+        kind,
+        requestId: r.id,
+        participantId: r.participantId || null,
+        pa,
+        am,
+        amount: am,
+        name: r.requesterName || r.payerName || pa,
+        pn: r.requesterName || '',
+      })
+      await copyVpaAndOpenApp({ pa, amount: am, app: 'gpay' })
+    } catch (e) {
+      alert(e.message || t('Could not open UPI app'))
+    } finally {
+      setPayingId(null)
+    }
+  }
 
   async function handleAsk(e) {
     e.preventDefault()
@@ -153,9 +200,14 @@ export default function Requests() {
                 </>
               )}
               {r.status === 'ACCEPTED' && (
-                r.upiPayLink ? (
-                  <button type="button" onClick={() => openUpiPayLink(r.upiPayLink).catch((e) => alert(e.message || 'Could not open UPI'))} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
-                    {t('Pay via UPI')}
+                (r.upiPayLink || r.requesterUpiId) ? (
+                  <button
+                    type="button"
+                    disabled={payingId === r.id}
+                    onClick={() => payRequestP2p(r)}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                  >
+                    {payingId === r.id ? t('Opening…') : t('Pay via UPI')}
                   </button>
                 ) : (
                   <span className="text-xs text-slate-500">{r.requesterName} {t("hasn't added a UPI ID yet")}</span>
@@ -199,9 +251,22 @@ export default function Requests() {
               {b.paid && <div className="text-xs font-medium text-emerald-600">{t('PAID')}</div>}
             </div>
             {!b.paid && (
-              b.upiPayLink ? (
-                <button type="button" onClick={() => openUpiPayLink(b.upiPayLink).catch((e) => alert(e.message || 'Could not open UPI'))} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
-                  {t('Pay via UPI')}
+              (b.upiPayLink || b.requesterUpiId) ? (
+                <button
+                  type="button"
+                  disabled={payingId === b.participantId}
+                  onClick={() => payRequestP2p({
+                    id: b.participantId,
+                    amount: b.shareAmount,
+                    shareAmount: b.shareAmount,
+                    upiPayLink: b.upiPayLink,
+                    requesterUpiId: b.requesterUpiId,
+                    requesterName: b.payerName,
+                    participantId: b.participantId,
+                  }, { kind: 'split_bill' })}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                >
+                  {payingId === b.participantId ? t('Opening…') : t('Pay via UPI')}
                 </button>
               ) : (
                 <span className="text-xs text-slate-500">{b.payerName} {t("hasn't added a UPI ID yet")}</span>
@@ -228,9 +293,14 @@ export default function Requests() {
                 </>
               )}
               {r.status === 'ACCEPTED' && (
-                r.upiPayLink ? (
-                  <button type="button" onClick={() => openUpiPayLink(r.upiPayLink).catch((e) => alert(e.message || 'Could not open UPI'))} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
-                    {t('Pay via UPI')}
+                (r.upiPayLink || r.requesterUpiId) ? (
+                  <button
+                    type="button"
+                    disabled={payingId === r.id}
+                    onClick={() => payRequestP2p(r, { kind: 'contribution' })}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                  >
+                    {payingId === r.id ? t('Opening…') : t('Pay via UPI')}
                   </button>
                 ) : (
                   <span className="text-xs text-slate-500">{r.requesterName} {t("hasn't added a UPI ID yet")}</span>
