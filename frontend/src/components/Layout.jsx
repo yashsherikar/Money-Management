@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
+import { countWaitingP2pPays } from '../utils/pendingP2pPays.js'
 
 const qrIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -63,21 +64,20 @@ const leftTabs = [
 
 const rightTabs = [
   {
-    to: '/obligations',
-    label: 'Obligations',
-    shortLabel: 'Dues',
+    to: '/pending-pays',
+    label: 'Pending pays',
+    shortLabel: 'Pending',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <path d="M3 9h18" />
-        <path d="M8 2v4M16 2v4" />
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
       </svg>
     ),
   },
 ]
 
 const moreLinks = [
-  { to: '/pending-pays', label: 'Pending pays' },
+  { to: '/obligations', label: 'Obligations' },
   { to: '/recurring', label: 'Recurring' },
   { to: '/investments', label: 'Investments' },
   { to: '/udhar', label: 'Udhar' },
@@ -88,7 +88,7 @@ const moreLinks = [
   { to: '/settings', label: 'Settings' },
 ]
 
-function NavTab({ to, end, label, shortLabel, icon, t }) {
+function NavTab({ to, end, label, shortLabel, icon, t, badge = 0 }) {
   return (
     <NavLink
       to={to}
@@ -97,7 +97,12 @@ function NavTab({ to, end, label, shortLabel, icon, t }) {
     >
       {({ isActive }) => (
         <>
-          <span className={`nav-icon-wrap ${isActive ? 'nav-icon-active' : ''}`}>{icon}</span>
+          <span className={`nav-icon-wrap relative ${isActive ? 'nav-icon-active' : ''}`}>
+            {icon}
+            {badge > 0 && (
+              <span className="nav-badge">{badge > 9 ? '9+' : badge}</span>
+            )}
+          </span>
           <span className={`nav-tab-label ${isActive ? 'nav-label-active' : ''}`}>
             {shortLabel ? (
               <>
@@ -122,7 +127,19 @@ export default function Layout({ children }) {
   const location = useLocation()
   const [moreOpen, setMoreOpen] = useState(false)
   const [moreClosing, setMoreClosing] = useState(false)
+  const [pendingCount, setPendingCount] = useState(() => countWaitingP2pPays())
   const moreActive = moreOpen || moreLinks.some((l) => location.pathname === l.to)
+
+  useEffect(() => {
+    const refresh = () => setPendingCount(countWaitingP2pPays())
+    refresh()
+    window.addEventListener('mm-pending-p2p-changed', refresh)
+    window.addEventListener('mm-p2p-sms-confirmed', refresh)
+    return () => {
+      window.removeEventListener('mm-pending-p2p-changed', refresh)
+      window.removeEventListener('mm-p2p-sms-confirmed', refresh)
+    }
+  }, [])
 
   function handleLogout() {
     logout()
@@ -201,7 +218,15 @@ export default function Layout({ children }) {
           <PayNavTab t={t} />
 
           {rightTabs.map((tab) => (
-            <NavTab key={tab.to} to={tab.to} label={tab.label} shortLabel={tab.shortLabel} icon={tab.icon} t={t} />
+            <NavTab
+              key={tab.to}
+              to={tab.to}
+              label={tab.label}
+              shortLabel={tab.shortLabel}
+              icon={tab.icon}
+              t={t}
+              badge={tab.to === '/pending-pays' ? pendingCount : 0}
+            />
           ))}
 
           <button

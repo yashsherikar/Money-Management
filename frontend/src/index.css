@@ -356,6 +356,22 @@ a.w-full {
   background: rgba(0, 245, 212, 0.1);
   transform: translateY(-1px);
 }
+.nav-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: #FF5376;
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px #121824;
+}
 .nav-label-active {
   color: #00F5D4 !important;
   font-weight: 600;
@@ -406,6 +422,54 @@ a.w-full {
   background: rgba(34, 109, 255, 0.14) !important;
   color: #4C8CFF !important;
   border-left-color: #226DFF;
+}
+
+/* Pay screen — icon-first UPI app picker */
+.pay-app-row {
+  padding: 0.25rem 0 0.5rem;
+}
+.pay-app-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  padding: 0.15rem;
+  min-width: 4.25rem;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.pay-app-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.pay-app-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1.05rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+.pay-app-icon svg {
+  width: 2rem;
+  height: 2rem;
+}
+.pay-app-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #8A99AD;
+  line-height: 1.1;
+  text-align: center;
+  max-width: 4.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pay-app-btn:disabled .pay-app-label {
+  opacity: 0.7;
 }
 
 /* Prevent long money / UPI strings from blowing layout */
