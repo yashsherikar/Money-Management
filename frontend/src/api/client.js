@@ -1,8 +1,19 @@
 import axios from 'axios'
 
+// Render free-tier cold starts often take 15–50s. Without a timeout axios waits
+// forever (default 0), which leaves the app stuck on "Loading...".
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
+  timeout: 60_000,
 })
+
+/** User-facing message for failed requests (timeouts, network, API errors). */
+export function networkErrorMessage(err, fallback = 'Request failed') {
+  if (err?.code === 'ECONNABORTED') {
+    return 'Server is taking too long (maybe waking up). Tap retry.'
+  }
+  return err?.response?.data?.message || err?.message || fallback
+}
 
 let pendingCount = 0
 const loadingListeners = new Set()

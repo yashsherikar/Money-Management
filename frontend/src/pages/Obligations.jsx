@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import client from '../api/client'
+import client, { networkErrorMessage } from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
@@ -24,6 +24,7 @@ export default function Obligations() {
   const [summary, setSummary] = useState(null)
   const [accounts, setAccounts] = useState([])
   const [emergencyPlans, setEmergencyPlans] = useState([])
+  const [loadError, setLoadError] = useState('')
 
   const [emiForm, setEmiForm] = useState(emiEmpty)
   const [fdForm, setFdForm] = useState(fdEmpty)
@@ -39,17 +40,22 @@ export default function Obligations() {
   const [efFormOpen, setEfFormOpen] = useState(false)
 
   async function load() {
-    const [obRes, accRes, efRes] = await Promise.all([
-      client.get('/obligations/summary'),
-      client.get('/accounts'),
-      client.get('/emergency-fund'),
-    ])
-    setSummary(obRes.data)
-    setAccounts(accRes.data)
-    setEmergencyPlans(efRes.data)
-    const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
-    if (primary) setEmiForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
-    if (primary) setEfForm((f) => (f.sourceAccountId ? f : { ...f, sourceAccountId: String(primary.id) }))
+    setLoadError('')
+    try {
+      const [obRes, accRes, efRes] = await Promise.all([
+        client.get('/obligations/summary'),
+        client.get('/accounts'),
+        client.get('/emergency-fund'),
+      ])
+      setSummary(obRes.data)
+      setAccounts(accRes.data)
+      setEmergencyPlans(efRes.data)
+      const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
+      if (primary) setEmiForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
+      if (primary) setEfForm((f) => (f.sourceAccountId ? f : { ...f, sourceAccountId: String(primary.id) }))
+    } catch (err) {
+      setLoadError(networkErrorMessage(err, 'Failed to load obligations'))
+    }
   }
 
   useEffect(() => {
@@ -203,6 +209,17 @@ export default function Obligations() {
   async function deleteEf(id) { await client.delete(`/emergency-fund/${id}`); load() }
 
   const emergencyFundAccounts = accounts.filter((a) => a.type === 'EMERGENCY_FUND')
+
+  if (loadError) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-slate-600 mb-4">{loadError}</p>
+        <button type="button" onClick={load} className="px-4 py-2 bg-brand-600 text-white rounded-md">
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   if (!summary) return <div className="text-slate-500">Loading...</div>
 

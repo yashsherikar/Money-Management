@@ -75,7 +75,7 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/health", "/api/ping").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/internal/**").permitAll()
                         .anyRequest().authenticated()
                 )

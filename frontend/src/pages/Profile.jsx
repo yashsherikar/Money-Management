@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import client from '../api/client'
+import client, { networkErrorMessage } from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import AccountsManager from '../components/AccountsManager.jsx'
 
@@ -39,6 +39,7 @@ export default function Profile() {
   const [form, setForm] = useState({ name: '', upiId: '' })
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
 
   const [balanceRevealed, setBalanceRevealed] = useState(false)
   const [balanceValue, setBalanceValue] = useState(null)
@@ -47,10 +48,13 @@ export default function Profile() {
   const [revealError, setRevealError] = useState('')
 
   function load() {
-    client.get('/profile').then((res) => {
-      setProfile(res.data)
-      setForm({ name: res.data.name, upiId: res.data.upiId || '' })
-    })
+    setLoadError('')
+    client.get('/profile')
+      .then((res) => {
+        setProfile(res.data)
+        setForm({ name: res.data.name, upiId: res.data.upiId || '' })
+      })
+      .catch((err) => setLoadError(networkErrorMessage(err, 'Failed to load profile')))
   }
 
   useEffect(() => {
@@ -105,6 +109,17 @@ export default function Profile() {
   function hideBalance() {
     setBalanceRevealed(false)
     setBalanceValue(null)
+  }
+
+  if (loadError) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-slate-600 mb-4">{loadError}</p>
+        <button type="button" onClick={load} className="px-4 py-2 bg-brand-600 text-white rounded-md">
+          Retry
+        </button>
+      </div>
+    )
   }
 
   if (!profile) return <div className="text-slate-500">{t('Loading...')}</div>

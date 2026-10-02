@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import client from '../api/client'
+import client, { networkErrorMessage } from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import { categoryIcon } from '../utils/categoryIcon.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -14,10 +14,30 @@ function money(n) {
 export default function Dashboard() {
   const { t } = useLanguage()
   const [summary, setSummary] = useState(null)
+  const [loadError, setLoadError] = useState('')
+
+  function load() {
+    setLoadError('')
+    setSummary(null)
+    client.get('/dashboard/summary')
+      .then((res) => setSummary(res.data))
+      .catch((err) => setLoadError(networkErrorMessage(err, 'Failed to load dashboard')))
+  }
 
   useEffect(() => {
-    client.get('/dashboard/summary').then((res) => setSummary(res.data))
+    load()
   }, [])
+
+  if (loadError) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-slate-600 mb-4">{loadError}</p>
+        <button type="button" onClick={load} className="px-4 py-2 bg-brand-600 text-white rounded-md">
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   if (!summary) return <div className="text-slate-500">{t('Loading...')}</div>
 
