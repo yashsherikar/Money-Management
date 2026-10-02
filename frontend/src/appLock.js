@@ -70,19 +70,60 @@ export async function verifyAppLockPin(pin) {
   return false
 }
 
-/** How long the app can be backgrounded (QR scanner, UPI app, brief switch)
- *  before returning requires biometric/PIN again. */
+/** How long the app can be backgrounded (brief switch) before biometric/PIN again. */
 export const RESUME_LOCK_AFTER_MS = 15_000
+
+const SUPPRESS_KEY = 'mm_suppress_lock_until'
 
 let suppressResumeLockUntil = 0
 
-/** Call before opening a native overlay (QR scanner, UPI pay) so returning
- *  doesn't treat that as "left the app" and demand biometric. */
-export function suppressResumeLock(ms = 120_000) {
-  suppressResumeLockUntil = Math.max(suppressResumeLockUntil, Date.now() + ms)
+function readPersistedSuppress() {
+  const until = Number(sessionStorage.getItem(SUPPRESS_KEY) || 0)
+  if (until > Date.now()) return until
+  sessionStorage.removeItem(SUPPRESS_KEY)
+  return 0
+}
+
+/** Call before opening QR scanner / GPay so returning doesn't demand biometric.
+ *  Persisted — Android may kill the WebView while GPay is open. */
+export function suppressResumeLock(ms = 300_000) {
+  const until = Date.now() + ms
+  suppressResumeLockUntil = Math.max(suppressResumeLockUntil, until, readPersistedSuppress())
+  sessionStorage.setItem(SUPPRESS_KEY, String(suppressResumeLockUntil))
 }
 
 export function isResumeLockSuppressed() {
-  return Date.now() < suppressResumeLockUntil
+  const until = Math.max(suppressResumeLockUntil, readPersistedSuppress())
+  suppressResumeLockUntil = until
+  return Date.now() < until
+}
+
+const PENDING_UPI_KEY = 'mm_pending_upi_confirm'
+
+/** Save Scan&Pay form before opening GPay so "Did you pay?" survives app remount. */
+export function savePendingUpiConfirm(payload) {
+  try {
+    sessionStorage.setItem(PENDING_UPI_KEY, JSON.stringify({ ...payload, savedAt: Date.now() }))
+  } catch { /* ignore */ }
+}
+
+export function readPendingUpiConfirm() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_UPI_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    // Expire after 30 minutes
+    if (!data?.savedAt || Date.now() - data.savedAt > 30 * 60_000) {
+      sessionStorage.removeItem(PENDING_UPI_KEY)
+      return null
+    }
+    return data
+  } catch {
+    return null
+  }
+}
+
+export function clearPendingUpiConfirm() {
+  sessionStorage.removeItem(PENDING_UPI_KEY)
 }
 

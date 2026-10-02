@@ -121,15 +121,16 @@ public class WishlistService {
             contributionRequestRepository.save(cr);
             String payUrl = null;
             if (org.springframework.util.StringUtils.hasText(user.getUpiId())) {
-                payUrl = "upi://pay?pa=" + encode(user.getUpiId())
+                payUrl = "upi://pay?pa=" + user.getUpiId().trim()
                         + "&pn=" + encode(user.getName())
-                        + "&am=" + r.amount().toPlainString()
+                        + "&am=" + r.amount().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
                         + "&cu=INR"
                         + "&tn=" + encode(item.getName());
             }
             pushService.notifyUser(member, "Money request",
                     user.getName() + " is asking for ₹" + r.amount() + " for \"" + item.getName() + "\"",
-                    "/requests", PushService.ACTION_PAY_VIEW, payUrl);
+                    "/requests", PushService.ACTION_PAY_VIEW, payUrl,
+                    PushService.RELATED_CONTRIBUTION_REQUEST, cr.getId());
             return toResponse(cr);
         }).toList();
     }
@@ -155,15 +156,20 @@ public class WishlistService {
         }
         cr.setStatus(accept ? ContributionStatus.ACCEPTED : ContributionStatus.DECLINED);
         cr.setRespondedAt(Instant.now());
-        return toResponse(contributionRequestRepository.save(cr));
+        ContributionRequest saved = contributionRequestRepository.save(cr);
+        if (!accept) {
+            pushService.resolveRelated(PushService.RELATED_CONTRIBUTION_REQUEST, saved.getId());
+        }
+        return toResponse(saved);
     }
 
     @Transactional
     public ContributionRequestResponse markPaid(User user, Long requestId) {
         ContributionRequest cr = contributionRequestRepository.findByIdAndRequesterId(requestId, user.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "request not found"));
-        if (cr.getStatus() != ContributionStatus.ACCEPTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "request must be accepted before it can be marked paid");
+        if (cr.getStatus() != ContributionStatus.ACCEPTED
+                && cr.getStatus() != ContributionStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "only pending or accepted requests can be marked paid");
         }
         List<Account> spendableAccounts = accountRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
                 .filter(a -> a.getType() != AccountType.CARD && a.getType() != AccountType.EMERGENCY_FUND)
@@ -185,7 +191,10 @@ public class WishlistService {
         accountRepository.save(account);
 
         cr.setStatus(ContributionStatus.PAID);
-        return toResponse(contributionRequestRepository.save(cr));
+        ContributionRequest saved = contributionRequestRepository.save(cr);
+        pushService.resolveRelated(PushService.RELATED_CONTRIBUTION_REQUEST, saved.getId());
+        pushService.clearPayActionsForUser(cr.getMember(), "/requests");
+        return toResponse(saved);
     }
 
     private WishlistItem getOwned(User user, Long id) {
@@ -201,9 +210,9 @@ public class WishlistService {
         String upiLink = null;
         String upiId = cr.getRequester().getUpiId();
         if (upiId != null && !upiId.isBlank()) {
-            upiLink = "upi://pay?pa=" + encode(upiId)
+            upiLink = "upi://pay?pa=" + upiId.trim()
                     + "&pn=" + encode(cr.getRequester().getName())
-                    + "&am=" + cr.getAmount().toPlainString()
+                    + "&am=" + cr.getAmount().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
                     + "&cu=INR"
                     + "&tn=" + encode(cr.getWishlistItem().getName());
         }
@@ -223,6 +232,6 @@ public class WishlistService {
     }
 
     private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 }

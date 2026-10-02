@@ -40,6 +40,11 @@ public class EmiController {
         return emiService.setActive(user, id, active);
     }
 
+    @PostMapping("/{id}/confirm")
+    public EmiResponse confirm(@AuthenticationPrincipal User user, @PathVariable Long id) {
+        return emiService.confirmPaid(user, id);
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@AuthenticationPrincipal User user, @PathVariable Long id) {
         emiService.delete(user, id);

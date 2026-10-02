@@ -154,16 +154,59 @@ export function parseUpiQr(raw) {
   return { pa, pn, mc, am, cu, tn, personal, raw: urlText }
 }
 
-/** Build a fresh upi://pay link (amount/description editable before opening GPay etc.). */
-export function buildUpiPayLink({ pa, pn, am, cu = 'INR', mc, tn }) {
-  const q = new URLSearchParams()
-  q.set('pa', pa)
-  if (pn) q.set('pn', pn)
-  if (am !== '' && am != null) q.set('am', String(Number(am)))
-  q.set('cu', cu || 'INR')
-  if (mc && !isPersonalUpi(mc)) q.set('mc', mc)
-  if (tn) q.set('tn', tn)
-  return `upi://pay?${q.toString()}`
+/** NPCI expects amount with up to 2 decimal places, e.g. 10.00 — not "10" scientific noise. */
+export function formatUpiAmount(am) {
+  const n = Number(am)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return n.toFixed(2)
+}
+
+/**
+ * Build / patch a upi://pay link for GPay/PhonePe.
+ * - Prefer mutating the original QR (`raw`) so merchant fields (sign, mode, orgid…) stay intact.
+ * - Never URL-encode the VPA (`pa`) — `%40` for `@` breaks some GPay flows.
+ * - Amount always `x.xx`.
+ */
+export function buildUpiPayLink({ pa, pn, am, cu = 'INR', mc, tn, raw }) {
+  const amount = formatUpiAmount(am)
+  const note = (tn || '').trim().slice(0, 50)
+
+  // Keep the scanned QR byte-for-byte except amount/currency — merchant signed QRs
+  // fail in GPay if we rebuild and drop `sign` / over-encode `pa`.
+  if (raw && /^upi:\/\//i.test(raw)) {
+    let out = raw
+    if (amount) {
+      if (/[?&]am=/i.test(out)) {
+        out = out.replace(/([?&])am=[^&]*/i, `$1am=${amount}`)
+      } else {
+        out += (out.includes('?') ? '&' : '?') + `am=${amount}`
+      }
+    }
+    if (!/[?&]cu=/i.test(out)) {
+      out += (out.includes('?') ? '&' : '?') + `cu=${cu || 'INR'}`
+    }
+    return out
+  }
+
+  // Fresh P2P / rebuilt link — encode name & note only; leave VPA raw
+  const parts = [`pa=${String(pa || '').trim()}`, `cu=${cu || 'INR'}`]
+  if (pn) parts.push(`pn=${encodeURIComponent(String(pn).trim())}`)
+  if (amount) parts.push(`am=${amount}`)
+  if (mc && !isPersonalUpi(mc)) parts.push(`mc=${String(mc).trim()}`)
+  if (note) parts.push(`tn=${encodeURIComponent(note)}`)
+  return `upi://pay?${parts.join('&')}`
+}
+
+/** Open UPI chooser (GPay etc.) without mangling the scheme. */
+export function openUpiPayLink(link) {
+  if (!link) return
+  const a = document.createElement('a')
+  a.href = link
+  a.rel = 'noopener'
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }
 
 /** Match a category name (from MCC or shared DB hint) to the user's category id. */

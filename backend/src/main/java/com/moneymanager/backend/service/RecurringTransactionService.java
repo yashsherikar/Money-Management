@@ -24,15 +24,18 @@ public class RecurringTransactionService {
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
     private final TransactionRepository transactionRepository;
+    private final PushService pushService;
 
     public RecurringTransactionService(RecurringTransactionRepository recurringTransactionRepository,
                                         AccountRepository accountRepository,
                                         CategoryRepository categoryRepository,
-                                        TransactionRepository transactionRepository) {
+                                        TransactionRepository transactionRepository,
+                                        PushService pushService) {
         this.recurringTransactionRepository = recurringTransactionRepository;
         this.accountRepository = accountRepository;
         this.categoryRepository = categoryRepository;
         this.transactionRepository = transactionRepository;
+        this.pushService = pushService;
     }
 
     @Transactional(readOnly = true)
@@ -125,7 +128,9 @@ public class RecurringTransactionService {
         } else {
             rt.setLastLoggedMonth(currentMonth);
         }
-        return toResponse(recurringTransactionRepository.save(rt));
+        RecurringTransaction saved = recurringTransactionRepository.save(rt);
+        pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, saved.getId());
+        return toResponse(saved);
     }
 
     private RecurringTransaction get(User user, Long id) {

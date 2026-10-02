@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { App as CapApp } from '@capacitor/app'
 import { useAuth } from '../context/AuthContext.jsx'
 import { isNativePlatform, isBiometricEnabled, authenticateWithBiometric, setBiometricEnabled } from '../biometricLock.js'
-import { isPinSet, verifyAppLockPin, getLockoutRemainingMs, clearAppLockPin, RESUME_LOCK_AFTER_MS, isResumeLockSuppressed } from '../appLock.js'
+import { isPinSet, verifyAppLockPin, getLockoutRemainingMs, clearAppLockPin, RESUME_LOCK_AFTER_MS, isResumeLockSuppressed, readPendingUpiConfirm } from '../appLock.js'
 import PinPad from './PinPad.jsx'
 import { LockIconStage, UnlockFlash } from './LockAnimations.jsx'
 
@@ -104,7 +104,8 @@ export default function BiometricGate({ children }) {
   useEffect(() => {
     if (!needsGate) return
     const justOnboarded = Date.now() - Number(localStorage.getItem('justOnboardedAt') || 0) < JUST_ONBOARDED_WINDOW_MS
-    if (justOnboarded) {
+    // Returning from GPay / scanner: WebView may remount — skip lock if suppressed or pay confirm pending
+    if (justOnboarded || isResumeLockSuppressed() || readPendingUpiConfirm()) {
       setLocked(false)
       return
     }

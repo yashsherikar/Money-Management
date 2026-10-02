@@ -1,15 +1,18 @@
 package com.moneymanager.backend.service;
 
 import com.moneymanager.backend.dto.EmiDtos.*;
-import com.moneymanager.backend.entity.Account;
-import com.moneymanager.backend.entity.Emi;
-import com.moneymanager.backend.entity.User;
+import com.moneymanager.backend.entity.*;
 import com.moneymanager.backend.repository.AccountRepository;
+import com.moneymanager.backend.repository.CategoryRepository;
 import com.moneymanager.backend.repository.EmiRepository;
+import com.moneymanager.backend.repository.TransactionRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 @Service
@@ -17,10 +20,20 @@ public class EmiService {
 
     private final EmiRepository emiRepository;
     private final AccountRepository accountRepository;
+    private final CategoryRepository categoryRepository;
+    private final TransactionRepository transactionRepository;
+    private final PushService pushService;
 
-    public EmiService(EmiRepository emiRepository, AccountRepository accountRepository) {
+    public EmiService(EmiRepository emiRepository,
+                       AccountRepository accountRepository,
+                       CategoryRepository categoryRepository,
+                       TransactionRepository transactionRepository,
+                       PushService pushService) {
         this.emiRepository = emiRepository;
         this.accountRepository = accountRepository;
+        this.categoryRepository = categoryRepository;
+        this.transactionRepository = transactionRepository;
+        this.pushService = pushService;
     }
 
     public List<EmiResponse> list(User user) {
@@ -54,6 +67,41 @@ public class EmiService {
         Emi emi = get(user, id);
         emi.setActive(active);
         return toResponse(emiRepository.save(emi));
+    }
+
+    /** User confirmed this month's EMI was paid — logs expense and updates balance. */
+    @Transactional
+    public EmiResponse confirmPaid(User user, Long id) {
+        Emi emi = get(user, id);
+        LocalDate today = LocalDate.now();
+        String currentMonth = YearMonth.from(today).toString();
+        if (currentMonth.equals(emi.getLastLoggedMonth())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already confirmed for this month");
+        }
+        if (today.getDayOfMonth() < Math.min(emi.getDueDay(), today.lengthOfMonth())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EMI is not due yet");
+        }
+
+        Category emiCategory = categoryRepository.findByNameAndIsDefaultTrue("EMI").orElse(null);
+        Account account = emi.getAccount();
+
+        Transaction txn = new Transaction();
+        txn.setUser(user);
+        txn.setAccount(account);
+        txn.setCategory(emiCategory);
+        txn.setType(TransactionType.EXPENSE);
+        txn.setAmount(emi.getEmiAmount());
+        txn.setDescription("EMI - " + emi.getLoanName());
+        txn.setTxnDate(today);
+        transactionRepository.save(txn);
+
+        account.setBalance(account.getBalance().subtract(emi.getEmiAmount()));
+        accountRepository.save(account);
+
+        emi.setLastLoggedMonth(currentMonth);
+        Emi saved = emiRepository.save(emi);
+        pushService.resolveRelated(PushService.RELATED_EMI, saved.getId());
+        return toResponse(saved);
     }
 
     private Emi get(User user, Long id) {

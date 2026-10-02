@@ -39,6 +39,14 @@ public class AppNotification {
     @Column(name = "pay_url", length = 1000)
     private String payUrl;
 
+    /** Links this bell/push row to a domain object (payment request, split share, etc.)
+     *  so it can be dismissed when that object is paid/declined. */
+    @Column(name = "related_type", length = 40)
+    private String relatedType;
+
+    @Column(name = "related_id")
+    private Long relatedId;
+
     @Column(nullable = false)
     private boolean viewed = false;
 

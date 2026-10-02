@@ -18,11 +18,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.security.Security;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Sends push notifications: Web Push (VAPID) for browsers, FCM for the native Android app. */
 @Service
@@ -120,27 +123,41 @@ public class PushService {
 
     /** Which action buttons the native notification shows: PAID_VIEW ("Paid"/"View") for things
      *  you confirm you did, PAY_VIEW ("Pay now"/"View") for requests where someone owes money
-     *  and "Pay now" opens a UPI link directly, VIEW_ONLY for plain informational pushes. */
+     *  and "Pay now" opens a UPI link directly, VIEW_ONLY for plain informational pushes.
+     *  CANCEL tells the native app to remove a prior tray notification with the same tag. */
     public static final String ACTION_PAID_VIEW = "PAID_VIEW";
     public static final String ACTION_PAY_VIEW = "PAY_VIEW";
     public static final String ACTION_VIEW_ONLY = "VIEW_ONLY";
+    public static final String ACTION_CANCEL = "CANCEL";
+
+    public static final String RELATED_PAYMENT_REQUEST = "PAYMENT_REQUEST";
+    public static final String RELATED_CONTRIBUTION_REQUEST = "CONTRIBUTION_REQUEST";
+    public static final String RELATED_SPLIT_PARTICIPANT = "SPLIT_PARTICIPANT";
+    public static final String RELATED_RECURRING_TRANSACTION = "RECURRING_TRANSACTION";
+    public static final String RELATED_EMERGENCY_FUND = "EMERGENCY_FUND";
+    public static final String RELATED_EMI = "EMI";
 
     /** Best-effort: a push failure never blocks the action that triggered it (e.g. creating a request). */
     public void notifyUser(User user, String title, String body) {
-        notifyUser(user, title, body, "/", ACTION_VIEW_ONLY, null);
+        notifyUser(user, title, body, "/", ACTION_VIEW_ONLY, null, null, null);
     }
 
     /** @param url in-app page to open when the notification (or its View action) is tapped. */
     public void notifyUser(User user, String title, String body, String url) {
-        notifyUser(user, title, body, url, ACTION_VIEW_ONLY, null);
+        notifyUser(user, title, body, url, ACTION_VIEW_ONLY, null, null, null);
     }
 
     public void notifyUser(User user, String title, String body, String url, String actionType) {
-        notifyUser(user, title, body, url, actionType, null);
+        notifyUser(user, title, body, url, actionType, null, null, null);
     }
 
     /** @param payUrl only used with ACTION_PAY_VIEW — the upi://pay link "Pay now" opens directly. */
     public void notifyUser(User user, String title, String body, String url, String actionType, String payUrl) {
+        notifyUser(user, title, body, url, actionType, payUrl, null, null);
+    }
+
+    public void notifyUser(User user, String title, String body, String url, String actionType,
+                           String payUrl, String relatedType, Long relatedId) {
         AppNotification record = new AppNotification();
         record.setUser(user);
         record.setTitle(title);
@@ -148,16 +165,75 @@ public class PushService {
         record.setUrl(url);
         record.setActionType(actionType);
         record.setPayUrl(payUrl);
+        record.setRelatedType(relatedType);
+        record.setRelatedId(relatedId);
         notificationRepository.save(record);
 
+        String tag = relatedTag(relatedType, relatedId);
         List<PushSubscription> subs = subscriptionRepository.findByUserId(user.getId());
         for (PushSubscription sub : subs) {
             if (sub.getFcmToken() != null) {
-                sendFcm(sub, title, body, url, actionType, payUrl);
+                sendFcm(sub, title, body, url, actionType, payUrl, tag, relatedType, relatedId);
             } else if (webPushEnabled) {
                 sendWebPush(sub, webPushPayload(title, body, url));
             }
         }
+    }
+
+    /**
+     * Request/share was paid or declined: clear Pay-now actions in the bell, mark viewed, and
+     * cancel the matching tray notification on every device that still has it.
+     */
+    @Transactional
+    public void resolveRelated(String relatedType, Long relatedId) {
+        if (!StringUtils.hasText(relatedType) || relatedId == null) return;
+        List<AppNotification> related = notificationRepository.findByRelatedTypeAndRelatedId(relatedType, relatedId);
+        if (related.isEmpty()) return;
+
+        Set<Long> userIds = new HashSet<>();
+        for (AppNotification n : related) {
+            if (ACTION_PAY_VIEW.equals(n.getActionType()) || ACTION_PAID_VIEW.equals(n.getActionType())) {
+                n.setActionType(ACTION_VIEW_ONLY);
+                n.setPayUrl(null);
+            }
+            n.setViewed(true);
+            notificationRepository.save(n);
+            userIds.add(n.getUser().getId());
+        }
+
+        String tag = relatedTag(relatedType, relatedId);
+        for (Long userId : userIds) {
+            for (PushSubscription sub : subscriptionRepository.findByUserId(userId)) {
+                if (sub.getFcmToken() != null) {
+                    sendFcmCancel(sub, tag);
+                }
+            }
+        }
+    }
+
+    /**
+     * Clears leftover Pay-now rows created before related_id existed, so a settled request
+     * no longer keeps prompting in the bell. Skips rows that still have a related_id — those
+     * are owned by resolveRelated so other open requests stay actionable.
+     */
+    @Transactional
+    public void clearPayActionsForUser(User user, String urlPrefix) {
+        if (user == null || !StringUtils.hasText(urlPrefix)) return;
+        List<AppNotification> all = notificationRepository.findTop50ByUserIdOrderByCreatedAtDesc(user.getId());
+        for (AppNotification n : all) {
+            if (!ACTION_PAY_VIEW.equals(n.getActionType())) continue;
+            if (n.getRelatedId() != null) continue;
+            if (n.getUrl() == null || !n.getUrl().startsWith(urlPrefix)) continue;
+            n.setActionType(ACTION_VIEW_ONLY);
+            n.setPayUrl(null);
+            n.setViewed(true);
+            notificationRepository.save(n);
+        }
+    }
+
+    private static String relatedTag(String relatedType, Long relatedId) {
+        if (!StringUtils.hasText(relatedType) || relatedId == null) return null;
+        return relatedType + ":" + relatedId;
     }
 
     private void sendWebPush(PushSubscription sub, String payload) {
@@ -178,7 +254,9 @@ public class PushService {
      *  runs — even with the app killed — and can build a notification with action buttons itself.
      *  A "notification" message would get auto-displayed by the OS instead, with no way to add
      *  custom actions to it. */
-    private void sendFcm(PushSubscription sub, String title, String body, String url, String actionType, String payUrl) {
+    private void sendFcm(PushSubscription sub, String title, String body, String url,
+                         String actionType, String payUrl, String tag,
+                         String relatedType, Long relatedId) {
         if (!firebaseEnabled) return;
         try {
             Message.Builder message = Message.builder()
@@ -190,6 +268,15 @@ public class PushService {
             if (StringUtils.hasText(payUrl)) {
                 message.putData("payUrl", payUrl);
             }
+            if (StringUtils.hasText(tag)) {
+                message.putData("tag", tag);
+            }
+            if (StringUtils.hasText(relatedType)) {
+                message.putData("relatedType", relatedType);
+            }
+            if (relatedId != null) {
+                message.putData("relatedId", String.valueOf(relatedId));
+            }
             FirebaseMessaging.getInstance().send(message.build());
         } catch (FirebaseMessagingException e) {
             if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
@@ -198,6 +285,28 @@ public class PushService {
             log.warn("FCM push failed for subscription {}: {}", sub.getId(), e.getMessage());
         } catch (Exception e) {
             log.warn("FCM push failed for subscription {}: {}", sub.getId(), e.getMessage());
+        }
+    }
+
+    private void sendFcmCancel(PushSubscription sub, String tag) {
+        if (!firebaseEnabled || !StringUtils.hasText(tag)) return;
+        try {
+            Message message = Message.builder()
+                    .setToken(sub.getFcmToken())
+                    .putData("actionType", ACTION_CANCEL)
+                    .putData("tag", tag)
+                    .putData("title", "")
+                    .putData("body", "")
+                    .putData("url", "/")
+                    .build();
+            FirebaseMessaging.getInstance().send(message);
+        } catch (FirebaseMessagingException e) {
+            if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
+                subscriptionRepository.delete(sub);
+            }
+            log.warn("FCM cancel failed for subscription {}: {}", sub.getId(), e.getMessage());
+        } catch (Exception e) {
+            log.warn("FCM cancel failed for subscription {}: {}", sub.getId(), e.getMessage());
         }
     }
 

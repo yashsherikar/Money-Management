@@ -11,31 +11,54 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        deliverNotificationUrl(getIntent());
+        deliverNotificationTap(getIntent());
     }
 
     @Override
     public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        deliverNotificationUrl(intent);
+        deliverNotificationTap(intent);
     }
 
-    /** Set by MyFirebaseMessagingService's PendingIntents (tapping the notification body, or its
-     *  "Paid"/"View" buttons). Pushed into the WebView as a plain DOM event once the page has had
-     *  a moment to load and register its listener — see mm-notification-tap in main.jsx. */
-    private void deliverNotificationUrl(Intent intent) {
+    /** FCM notification taps (body, Paid, or View) → WebView mm-notification-tap event. */
+    private void deliverNotificationTap(Intent intent) {
         if (intent == null) return;
         String url = intent.getStringExtra("notificationUrl");
         if (url == null) return;
+
+        boolean paid = intent.getBooleanExtra("notificationPaid", false);
+        String relatedType = intent.getStringExtra("relatedType");
+        String relatedId = intent.getStringExtra("relatedId");
+
         intent.removeExtra("notificationUrl");
-        String escaped = url.replace("\\", "\\\\").replace("'", "\\'");
+        intent.removeExtra("notificationPaid");
+        intent.removeExtra("relatedType");
+        intent.removeExtra("relatedId");
+
+        String js = buildTapEventJs(url, paid, relatedType, relatedId);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (getBridge() != null && getBridge().getWebView() != null) {
-                getBridge().getWebView().evaluateJavascript(
-                        "window.dispatchEvent(new CustomEvent('mm-notification-tap', { detail: { url: '" + escaped + "' } }));",
-                        null
-                );
+                getBridge().getWebView().evaluateJavascript(js, null);
             }
         }, 1500);
+    }
+
+    private static String jsString(String value) {
+        if (value == null) return "null";
+        return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'";
+    }
+
+    private static String buildTapEventJs(String url, boolean paid, String relatedType, String relatedId) {
+        StringBuilder detail = new StringBuilder("{ url: ");
+        detail.append(jsString(url));
+        detail.append(", paid: ").append(paid ? "true" : "false");
+        if (relatedType != null) {
+            detail.append(", relatedType: ").append(jsString(relatedType));
+        }
+        if (relatedId != null) {
+            detail.append(", relatedId: ").append(jsString(relatedId));
+        }
+        detail.append(" }");
+        return "window.dispatchEvent(new CustomEvent('mm-notification-tap', { detail: " + detail + " }));";
     }
 }

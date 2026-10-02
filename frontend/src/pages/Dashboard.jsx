@@ -26,6 +26,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     load()
+    const onRefresh = () => load()
+    window.addEventListener('mm-transactions-changed', onRefresh)
+    return () => window.removeEventListener('mm-transactions-changed', onRefresh)
   }, [])
 
   if (loadError) {

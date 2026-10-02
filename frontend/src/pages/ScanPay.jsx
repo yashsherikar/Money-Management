@@ -3,12 +3,13 @@ import { App as CapApp } from '@capacitor/app'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { isNativePlatform } from '../nativePush.js'
-import { suppressResumeLock } from '../appLock.js'
+import { suppressResumeLock, savePendingUpiConfirm, readPendingUpiConfirm, clearPendingUpiConfirm } from '../appLock.js'
 import QrScannerOverlay from '../components/QrScannerOverlay.jsx'
 import { scanUpiQrNative, cancelUpiQrScan } from '../utils/scanUpiQr.js'
 import {
   parseUpiQr,
   buildUpiPayLink,
+  openUpiPayLink,
   resolveCategoryId,
   rememberMerchantCategoryId,
   categoryNameForMcc,
@@ -31,6 +32,7 @@ const empty = {
   cu: 'INR',
   tn: '',
   personal: false,
+  raw: '',
   accountId: '',
   categoryId: '',
   description: '',
@@ -45,17 +47,43 @@ export default function ScanPay() {
   const [paste, setPaste] = useState('')
   const [error, setError] = useState('')
   const [scanning, setScanning] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [logging, setLogging] = useState(false)
   const [loggedOk, setLoggedOk] = useState(false)
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
   const awaitingReturnRef = useRef(false)
   const categoriesRef = useRef([])
 
   useEffect(() => {
     categoriesRef.current = categories
   }, [categories])
+
+  // Restore "Did you pay?" after returning from GPay (WebView may have remounted).
+  useEffect(() => {
+    const pending = readPendingUpiConfirm()
+    if (!pending) return
+    setForm((f) => ({
+      ...f,
+      pa: pending.pa || '',
+      pn: pending.pn || '',
+      mc: pending.mc || '',
+      am: pending.am || '',
+      cu: pending.cu || 'INR',
+      tn: pending.tn || '',
+      personal: !!pending.personal,
+      raw: pending.raw || '',
+      accountId: pending.accountId ? String(pending.accountId) : f.accountId,
+      categoryId: pending.categoryId ? String(pending.categoryId) : '',
+      description: pending.description || '',
+      sharedCategoryName: pending.sharedCategoryName || '',
+    }))
+    setConfirmOpen(true)
+    awaitingReturnRef.current = false
+  }, [])
 
   useEffect(() => {
     Promise.all([client.get('/accounts'), client.get('/categories')]).then(([accRes, catRes]) => {
@@ -79,7 +107,7 @@ export default function ScanPay() {
 
   useEffect(() => {
     const showConfirmIfNeeded = () => {
-      if (awaitingReturnRef.current && form.pa) {
+      if (awaitingReturnRef.current || readPendingUpiConfirm()) {
         awaitingReturnRef.current = false
         setConfirmOpen(true)
       }
@@ -95,7 +123,7 @@ export default function ScanPay() {
       sub.then((h) => h.remove())
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [form.pa])
+  }, [])
 
   async function applyParsed(parsed) {
     setError('')
@@ -137,6 +165,7 @@ export default function ScanPay() {
       cu: parsed.cu || 'INR',
       tn: parsed.tn,
       personal: hintPersonal,
+      raw: parsed.raw || '',
       sharedCategoryName,
       categoryId,
       description,
@@ -146,14 +175,14 @@ export default function ScanPay() {
   async function handleScan() {
     setError('')
     setScanning(true)
-    setTorchOn(true)
+    setCameraReady(false)
+    setTorchOn(false)
     setTorchAvailable(false)
     try {
       const raw = await scanUpiQrNative({
-        onTorchAvailable: (ok) => {
-          setTorchAvailable(ok)
-          setTorchOn(!!ok)
-        },
+        onTorchAvailable: setTorchAvailable,
+        onTorchChange: setTorchOn,
+        onPreviewReady: () => setCameraReady(true),
       })
       await applyParsed(parseUpiQr(raw))
     } catch (err) {
@@ -161,6 +190,7 @@ export default function ScanPay() {
       if (!/cancel/i.test(msg)) setError(msg)
     } finally {
       setScanning(false)
+      setCameraReady(false)
       setTorchOn(false)
       setTorchAvailable(false)
     }
@@ -169,6 +199,7 @@ export default function ScanPay() {
   async function handleCancelScan() {
     await cancelUpiQrScan()
     setScanning(false)
+    setCameraReady(false)
     setTorchOn(false)
     setTorchAvailable(false)
   }
@@ -209,11 +240,26 @@ export default function ScanPay() {
       cu: form.cu,
       mc: form.personal ? undefined : form.mc,
       tn: form.tn || form.description,
+      raw: form.raw,
     })
     awaitingReturnRef.current = true
-    // GPay/PhonePe also backgrounds the app — don't re-lock on return from pay.
-    suppressResumeLock(120_000)
-    window.location.href = link
+    // Persist — Android may kill WebView while GPay is open
+    suppressResumeLock(300_000)
+    savePendingUpiConfirm({
+      pa: form.pa,
+      pn: form.pn,
+      mc: form.mc,
+      am: form.am,
+      cu: form.cu,
+      tn: form.tn,
+      personal: form.personal,
+      raw: form.raw,
+      accountId: form.accountId,
+      categoryId: form.categoryId,
+      description: form.description,
+      sharedCategoryName: form.sharedCategoryName,
+    })
+    openUpiPayLink(link)
     if (!isNativePlatform()) {
       setTimeout(() => {
         if (awaitingReturnRef.current) {
@@ -222,6 +268,16 @@ export default function ScanPay() {
         }
       }, 1500)
     }
+  }
+
+  async function handleAddCategory(e) {
+    e.preventDefault()
+    if (!newCategoryName.trim()) return
+    const { data } = await client.post('/categories', { name: newCategoryName.trim(), essential: false })
+    setCategories((prev) => [...prev, data])
+    setForm((f) => ({ ...f, categoryId: String(data.id) }))
+    setNewCategoryName('')
+    setAddingCategory(false)
   }
 
   async function saveUpiHint() {
@@ -255,6 +311,7 @@ export default function ScanPay() {
       // Shared DB so any other user scanning this UPI ID gets the same category
       await saveUpiHint().catch(() => {})
       rememberMerchantCategoryId(form.pa, form.categoryId)
+      clearPendingUpiConfirm()
       setConfirmOpen(false)
       setLoggedOk(true)
     } catch (err) {
@@ -267,6 +324,7 @@ export default function ScanPay() {
   function skipLog() {
     setConfirmOpen(false)
     awaitingReturnRef.current = false
+    clearPendingUpiConfirm()
   }
 
   const mccHint = categoryNameForMcc(form.mc)
@@ -280,6 +338,7 @@ export default function ScanPay() {
     <div>
       <QrScannerOverlay
         open={scanning}
+        cameraReady={cameraReady}
         torchOn={torchOn}
         torchAvailable={torchAvailable}
         onTorchChange={setTorchOn}
@@ -410,16 +469,39 @@ export default function ScanPay() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t('Category')}</label>
-            <select
-              value={form.categoryId}
-              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md"
-            >
-              <option value="">{t('Select…')}</option>
-              {expenseCategories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            {addingCategory ? (
+              <div className="flex gap-2">
+                <input
+                  autoFocus
+                  placeholder={t('New category name')}
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory(e))}
+                  className="flex-1 px-3 py-2 border border-slate-300 rounded-md"
+                />
+                <button type="button" onClick={handleAddCategory} className="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium">{t('Add')}</button>
+                <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
+              </div>
+            ) : (
+              <select
+                value={form.categoryId}
+                onChange={(e) => {
+                  const picked = categories.find((c) => String(c.id) === e.target.value)
+                  if (picked?.name === 'Other') {
+                    setAddingCategory(true)
+                    setForm((f) => ({ ...f, categoryId: '' }))
+                  } else {
+                    setForm((f) => ({ ...f, categoryId: e.target.value }))
+                  }
+                }}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md"
+              >
+                <option value="">{t('Select…')}</option>
+                {expenseCategories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name === 'Other' ? t('Other (add new)') : c.name}</option>
+                ))}
+              </select>
+            )}
             {form.personal && (
               <p className="text-xs text-slate-500 mt-1">
                 {t('Your choice is saved to the server for this UPI ID so others get it next time.')}

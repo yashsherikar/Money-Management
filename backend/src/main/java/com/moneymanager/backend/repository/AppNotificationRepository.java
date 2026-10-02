@@ -10,4 +10,5 @@ public interface AppNotificationRepository extends JpaRepository<AppNotification
     List<AppNotification> findTop50ByUserIdOrderByCreatedAtDesc(Long userId);
     long countByUserIdAndViewedFalse(Long userId);
     Optional<AppNotification> findByIdAndUserId(Long id, Long userId);
+    List<AppNotification> findByRelatedTypeAndRelatedId(String relatedType, Long relatedId);
 }

@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import {
+  RELATED,
+  confirmDuePaid,
+  parseConfirmIdFromUrl,
+  notifyTransactionsChanged,
+} from '../utils/confirmDuePaid.js'
 
 function timeAgo(iso) {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -13,10 +19,25 @@ function timeAgo(iso) {
   return `${Math.floor(hours / 24)}d`
 }
 
+async function confirmFromNotificationItem(item) {
+  if (item.relatedType && item.relatedId != null) {
+    await confirmDuePaid(item.relatedType, item.relatedId)
+    return true
+  }
+  const confirmId = parseConfirmIdFromUrl(item.url)
+  if (confirmId && item.url?.startsWith('/recurring')) {
+    await confirmDuePaid(RELATED.RECURRING, confirmId)
+    return true
+  }
+  return false
+}
+
 export default function Notifications() {
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [items, setItems] = useState([])
+  const [busyId, setBusyId] = useState(null)
+  const [toast, setToast] = useState('')
 
   async function load() {
     const { data } = await client.get('/notifications')
@@ -35,7 +56,7 @@ export default function Notifications() {
 
   function handleView(item) {
     markViewed(item)
-    navigate(item.url)
+    navigate(item.url?.split('?')[0] || item.url)
   }
 
   function handlePayNow(item) {
@@ -43,9 +64,34 @@ export default function Notifications() {
     if (item.payUrl) window.location.href = item.payUrl
   }
 
+  async function handlePaid(item) {
+    setBusyId(item.id)
+    setToast('')
+    try {
+      await markViewed(item)
+      const logged = await confirmFromNotificationItem(item)
+      if (logged) {
+        notifyTransactionsChanged()
+        await load()
+        navigate('/transactions')
+        return
+      }
+      navigate(item.url?.split('?')[0] || item.url || '/recurring')
+    } catch (err) {
+      setToast(err.response?.data?.message || err.message || t('Could not mark as paid'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">{t('Notifications')}</h1>
+      {toast && (
+        <div className={`mb-4 text-sm p-2 rounded ${toast.includes(t('Logged')) ? 'text-emerald-700 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+          {toast}
+        </div>
+      )}
       <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
         {items.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No notifications yet.')}</div>}
         {items.map((item) => (
@@ -59,7 +105,13 @@ export default function Notifications() {
               <div className="text-sm text-slate-600 mt-0.5">{item.body}</div>
               <div className="flex gap-2 mt-2">
                 {item.actionType === 'PAID_VIEW' && (
-                  <button onClick={() => handleView(item)} className="text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 font-medium">{t('Paid')}</button>
+                  <button
+                    onClick={() => handlePaid(item)}
+                    disabled={busyId === item.id}
+                    className="text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 font-medium disabled:opacity-60"
+                  >
+                    {busyId === item.id ? t('Saving…') : t('Paid')}
+                  </button>
                 )}
                 {item.actionType === 'PAY_VIEW' && item.payUrl && (
                   <button onClick={() => handlePayNow(item)} className="text-sm bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 font-medium">{t('Pay now')}</button>

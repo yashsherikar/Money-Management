@@ -21,10 +21,14 @@ public class EmergencyFundService {
 
     private final EmergencyFundPlanRepository emergencyFundPlanRepository;
     private final AccountRepository accountRepository;
+    private final PushService pushService;
 
-    public EmergencyFundService(EmergencyFundPlanRepository emergencyFundPlanRepository, AccountRepository accountRepository) {
+    public EmergencyFundService(EmergencyFundPlanRepository emergencyFundPlanRepository,
+                                 AccountRepository accountRepository,
+                                 PushService pushService) {
         this.emergencyFundPlanRepository = emergencyFundPlanRepository;
         this.accountRepository = accountRepository;
+        this.pushService = pushService;
     }
 
     @Transactional(readOnly = true)
@@ -83,7 +87,9 @@ public class EmergencyFundService {
         accountRepository.save(target);
 
         plan.setLastLoggedMonth(currentMonth);
-        return toResponse(emergencyFundPlanRepository.save(plan));
+        EmergencyFundPlan saved = emergencyFundPlanRepository.save(plan);
+        pushService.resolveRelated(PushService.RELATED_EMERGENCY_FUND, saved.getId());
+        return toResponse(saved);
     }
 
     private void applyRequest(User user, EmergencyFundPlan plan, EmergencyFundRequest r) {

@@ -12,6 +12,8 @@ public class AppNotificationDtos {
             String url,
             String actionType,
             String payUrl,
+            String relatedType,
+            Long relatedId,
             boolean viewed,
             Instant createdAt
     ) {}

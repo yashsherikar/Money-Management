@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import client from '../api/client'
+import { notifyTransactionsChanged } from '../utils/confirmDuePaid.js'
 import { categoryIcon } from '../utils/categoryIcon.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
@@ -16,7 +18,9 @@ const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', 
 
 export default function Recurring() {
   const { t } = useLanguage()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [items, setItems] = useState([])
+  const [dueIds, setDueIds] = useState(() => new Set())
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -25,14 +29,17 @@ export default function Recurring() {
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  const [confirmingId, setConfirmingId] = useState(null)
 
   async function loadAll() {
-    const [itemsRes, accRes, catRes] = await Promise.all([
+    const [itemsRes, accRes, catRes, dueRes] = await Promise.all([
       client.get('/recurring-transactions'),
       client.get('/accounts'),
       client.get('/categories'),
+      client.get('/recurring-transactions/due').catch(() => ({ data: [] })),
     ])
     setItems(itemsRes.data)
+    setDueIds(new Set(dueRes.data.map((d) => d.id)))
     setAccounts(accRes.data)
     setCategories(catRes.data)
     const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
@@ -42,6 +49,27 @@ export default function Recurring() {
   useEffect(() => {
     loadAll()
   }, [])
+
+  useEffect(() => {
+    const confirmId = searchParams.get('confirm')
+    if (!confirmId) return
+    let cancelled = false
+    ;(async () => {
+      setError('')
+      try {
+        await client.post(`/recurring-transactions/${confirmId}/confirm`)
+        if (!cancelled) {
+          notifyTransactionsChanged()
+          await loadAll()
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.response?.data?.message || t('Could not mark as paid'))
+      } finally {
+        if (!cancelled) setSearchParams({}, { replace: true })
+      }
+    })()
+    return () => { cancelled = true }
+  }, [searchParams, setSearchParams, t])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -106,6 +134,20 @@ export default function Recurring() {
     loadAll()
   }
 
+  async function markPaid(id) {
+    setConfirmingId(id)
+    setError('')
+    try {
+      await client.post(`/recurring-transactions/${id}/confirm`)
+      notifyTransactionsChanged()
+      await loadAll()
+    } catch (err) {
+      setError(err.response?.data?.message || t('Could not mark as paid'))
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
   async function handleAddCategory(e) {
     e.preventDefault()
     if (!newCategoryName.trim()) return
@@ -119,7 +161,10 @@ export default function Recurring() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-2">{t('Recurring transactions')}</h1>
-      <p className="text-sm text-slate-500 mb-6">{t('Mobile recharge, sending money to parents, rent, subscriptions, salary — anything that repeats monthly gets auto-logged on its day.')}</p>
+      <p className="text-sm text-slate-500 mb-6">
+        {t('When something is due, tap Mark paid here — or confirm in the popup when you open the app.')}
+      </p>
+      {error && !formOpen && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
 
       <CollapsibleSection title={t('Add recurring transaction')} addLabel={t('+ Add')} open={formOpen} onOpen={() => setFormOpen(true)}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -149,8 +194,12 @@ export default function Recurring() {
               value={form.categoryId}
               onChange={(e) => {
                 const picked = categories.find((c) => String(c.id) === e.target.value)
-                if (picked?.name === 'Other') setAddingCategory(true)
-                else setForm({ ...form, categoryId: e.target.value })
+                if (picked?.name === 'Other') {
+                  setAddingCategory(true)
+                  setForm({ ...form, categoryId: '' })
+                } else {
+                  setForm({ ...form, categoryId: e.target.value })
+                }
               }}
               className="w-full"
             >
@@ -225,6 +274,16 @@ export default function Recurring() {
             </div>
             <div className="flex items-center gap-3">
               <div className={`font-semibold ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-red-600'}`}>{money(r.amount)}</div>
+              {dueIds.has(r.id) && r.active && (
+                <button
+                  type="button"
+                  onClick={() => markPaid(r.id)}
+                  disabled={confirmingId === r.id}
+                  className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                >
+                  {confirmingId === r.id ? t('Saving…') : t('Mark paid')}
+                </button>
+              )}
               <button onClick={() => toggleActive(r)} className="text-sm text-brand-600">{r.active ? t('Pause') : t('Resume')}</button>
               <button onClick={() => startEdit(r)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
               <button onClick={() => handleDelete(r.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
