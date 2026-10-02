@@ -17,6 +17,10 @@ import {
 } from '../utils/upiQr.js'
 import { listSavedPayees, upsertSavedPayee } from '../utils/savedPayees.js'
 import { rememberLastPayAttempt } from '../utils/paymentNotify.js'
+import { addPendingP2pPay } from '../utils/pendingP2pPays.js'
+import { requestSmsPermission, isSmsPaySupported, checkSmsPermission } from '../utils/smsPayWatch.js'
+import { useNavigate } from 'react-router-dom'
+import { suppressResumeLock } from '../appLock.js'
 
 /** Simple brand marks (inline SVG) — no external logo assets needed. */
 const APPS = [
@@ -70,6 +74,7 @@ const APPS = [
 
 export default function Pay() {
   const { t } = useLanguage()
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [pa, setPa] = useState('')
   const [amount, setAmount] = useState('')
@@ -204,13 +209,26 @@ export default function Pay() {
       if (personal) {
         // GPay: native opens payee (no amount) — paste is unreliable in GPay.
         // PhonePe/Paytm: copies UPI ID for paste.
+        suppressResumeLock(15 * 60_000)
         await copyVpaAndOpenApp({ pa: cleanPa, amount: am, pn: name, app: appId })
+        addPendingP2pPay({
+          pa: cleanPa,
+          pn: name,
+          amount: Number(am),
+          personal: true,
+        })
+        // Ask SMS if needed so late bank SMS can auto-confirm
+        if (isSmsPaySupported()) {
+          const perm = await checkSmsPermission()
+          if (!perm?.granted) await requestSmsPermission().catch(() => {})
+        }
         if (appId === 'gpay') {
-          setHint(t('GPay should open this UPI ID — type ₹') + am + t(' in GPay, then pay.'))
+          setHint(t('GPay should open this UPI ID — type ₹') + am + t(' in GPay, then pay. Status waits for bank SMS (can be 5–15 min late).'))
         } else {
-          setHint(t('UPI ID copied. In the app: paste / search this ID, then type ₹') + am + t('.'))
+          setHint(t('UPI ID copied. Paste in app, type ₹') + am + t('. We hold this as Pending until bank SMS confirms.'))
         }
       } else {
+        suppressResumeLock(10 * 60_000)
         const built = buildUpiPayLink({
           pa: cleanPa,
           am,
@@ -410,9 +428,19 @@ export default function Pay() {
         </button>
       )}
 
+      {personal && (
+        <button
+          type="button"
+          onClick={() => navigate('/pending-pays')}
+          className="w-full mb-2 text-sm text-brand-400 font-medium py-2"
+        >
+          {t('View pending pays (SMS status)')} →
+        </button>
+      )}
+
       <p className="text-xs text-slate-500 leading-relaxed">
         {personal
-          ? t('GPay opens the UPI ID (you enter amount there — paste often fails in GPay). PhonePe/Paytm: paste the copied ID. To keep amount for GPay, use Save pay QR → Scan from gallery.')
+          ? t('GPay opens the UPI ID (you enter amount there). P2P status waits for bank SMS — even if SMS is 5–15 min late. Open Pending pays to see Waiting / Paid.')
           : t('Merchant: we open the UPI app with the payment link (amount already filled).')}
       </p>
     </div>

@@ -48,6 +48,26 @@ export default function PaymentCategoryPrompt() {
     if (pending) setPrompt(pending)
   }, [])
 
+  // SMS-confirmed P2P: show toast / category prompt (same path as notification auto-log)
+  useEffect(() => {
+    const onSmsConfirmed = (e) => {
+      const result = e?.detail?.logResult
+      if (result?.logged) {
+        setToast(t('Paid via SMS verified.') + (result.categoryName ? ` (${result.categoryName})` : ''))
+        setTimeout(() => setToast(''), 4500)
+      } else if (result?.needsCategory) {
+        setPrompt(readPendingCategoryPrompt())
+        setToast(t('Bank SMS matched — choose a category'))
+        setTimeout(() => setToast(''), 4000)
+      } else {
+        setToast(t('Bank SMS matched — marked Paid'))
+        setTimeout(() => setToast(''), 4000)
+      }
+    }
+    window.addEventListener('mm-p2p-sms-confirmed', onSmsConfirmed)
+    return () => window.removeEventListener('mm-p2p-sms-confirmed', onSmsConfirmed)
+  }, [t])
+
   useEffect(() => {
     if (!isPaymentNotifySupported() || !accounts.length) return undefined
     return listenForUpiPaymentNotifications(async (parsed) => {

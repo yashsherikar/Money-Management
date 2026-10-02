@@ -5,6 +5,8 @@ import client, { networkErrorMessage } from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import MoneyRow from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { countWaitingP2pPays } from '../utils/pendingP2pPays.js'
+import { scanInboxForPendingPays, isSmsPaySupported } from '../utils/smsPayWatch.js'
 
 const COLORS = ['#226DFF', '#00F5D4', '#f59e0b', '#FF5376', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
 
@@ -16,6 +18,7 @@ export default function Dashboard() {
   const { t } = useLanguage()
   const [summary, setSummary] = useState(null)
   const [loadError, setLoadError] = useState('')
+  const [waitingPays, setWaitingPays] = useState(() => countWaitingP2pPays())
 
   function load() {
     setLoadError('')
@@ -28,8 +31,18 @@ export default function Dashboard() {
   useEffect(() => {
     load()
     const onRefresh = () => load()
+    const onPending = () => setWaitingPays(countWaitingP2pPays())
     window.addEventListener('mm-transactions-changed', onRefresh)
-    return () => window.removeEventListener('mm-transactions-changed', onRefresh)
+    window.addEventListener('mm-pending-p2p-changed', onPending)
+    window.addEventListener('mm-p2p-sms-confirmed', onPending)
+    if (isSmsPaySupported() && countWaitingP2pPays() > 0) {
+      scanInboxForPendingPays().then(() => setWaitingPays(countWaitingP2pPays()))
+    }
+    return () => {
+      window.removeEventListener('mm-transactions-changed', onRefresh)
+      window.removeEventListener('mm-pending-p2p-changed', onPending)
+      window.removeEventListener('mm-p2p-sms-confirmed', onPending)
+    }
   }, [])
 
   if (loadError) {
@@ -60,6 +73,23 @@ export default function Dashboard() {
           {t('Pay')}
         </Link>
       </div>
+
+      {waitingPays > 0 && (
+        <Link
+          to="/pending-pays"
+          className="mb-4 flex items-center justify-between gap-3 rounded-xl px-4 py-3 bg-amber-500/10 border border-amber-500/25"
+        >
+          <div>
+            <div className="text-sm font-semibold text-amber-500">
+              {waitingPays} {t('P2P pay(s) waiting for bank SMS')}
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              {t('Late SMS is OK — tap to check status')}
+            </div>
+          </div>
+          <span className="text-amber-500 text-sm font-medium shrink-0">{t('Open')} →</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatCard label={t('Income')} value={money(summary.totalIncome)} tone="good" />
