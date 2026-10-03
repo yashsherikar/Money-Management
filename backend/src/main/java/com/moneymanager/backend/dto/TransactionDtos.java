@@ -27,6 +27,10 @@ public class TransactionDtos {
             TransactionType type,
             BigDecimal amount,
             String description,
-            LocalDate txnDate
+            LocalDate txnDate,
+            /** True when this expense can still be opened as a split (≤ 2 days, not already split). */
+            boolean canSplit,
+            /** Set when this expense is already linked to a split bill. */
+            Long splitBillId
     ) {}
 }

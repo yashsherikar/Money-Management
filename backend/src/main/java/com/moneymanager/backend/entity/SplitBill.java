@@ -30,6 +30,16 @@ public class SplitBill {
     @JoinColumn(name = "account_id")
     private Account account;
 
+    /** Original expense the user already logged, then split within 2 days. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_transaction_id")
+    private Transaction sourceTransaction;
+
+    /** Auto-created (or resized) expense row for the payer's own share. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "expense_transaction_id")
+    private Transaction expenseTransaction;
+
     @Column(nullable = false)
     private String title;
 

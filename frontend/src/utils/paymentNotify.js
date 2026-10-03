@@ -38,10 +38,6 @@ export async function getLastPaymentNotifyRaw() {
   }
 }
 
-/**
- * Listen for UPI payment notifications from the native listener.
- * Returns an unsubscribe function.
- */
 export function listenForUpiPaymentNotifications(onPayment) {
   if (!isPaymentNotifySupported()) return () => {}
 
@@ -74,102 +70,147 @@ function resolveOtherCategory(categories) {
   if (!categories?.length) return null
   const other = categories.find((c) => String(c.name).toLowerCase() === 'other')
   if (other) return other
-  // Prefer non-income categories
   const expense = categories.find((c) => String(c.name).toLowerCase() !== 'salary')
   return expense || categories[0]
 }
 
-function buildDescription({ pn, pa, source }) {
+function buildDescription({ pn, pa, source, kind }) {
   const name = String(pn || '').trim()
   const vpa = String(pa || '').trim()
   const base = name || vpa || 'UPI payment'
-  const tag = source === 'sms' ? 'UPI SMS' : source === 'manual' ? 'UPI' : 'UPI'
+  let tag = 'UPI'
+  if (source === 'sms') tag = 'UPI SMS'
+  else if (source === 'manual') tag = 'UPI'
+  else if (kind === 'merchant') tag = 'UPI Merchant'
+  else if (kind === 'request') tag = 'UPI Request'
   if (name && vpa && name.toLowerCase() !== vpa.toLowerCase()) {
     return `${tag}: ${name} (${vpa})`
   }
   return `${tag}: ${base}`
 }
 
+async function loadAccountsAndCategories() {
+  const [a, c] = await Promise.all([
+    client.get('/accounts'),
+    client.get('/categories'),
+  ])
+  return { accounts: a.data || [], categories: c.data || [] }
+}
+
 /**
- * Always create an EXPENSE transaction for a confirmed UPI pay.
- * - Known payee category → use it
- * - Else → "Other" (still logs), then optional category refine prompt
+ * Always create an EXPENSE in Transactions for a confirmed UPI pay.
+ * Category optional (Other / null) so SMS-confirmed pays never stay out of Transactions.
  */
-export async function handleDetectedUpiPayment(parsed, { accounts, categories }) {
+export async function handleDetectedUpiPayment(parsed, { accounts, categories } = {}) {
   const pa = (parsed.pa || sessionStorage.getItem('mm_last_pay_pa') || '').toLowerCase().trim()
-  const pn = parsed.payeeName || sessionStorage.getItem('mm_last_pay_pn') || pa
+  const pn = parsed.payeeName || parsed.pn || sessionStorage.getItem('mm_last_pay_pn') || pa
   const amount = Number(parsed.amount)
   const source = parsed.source || 'upi'
-  if (!Number.isFinite(amount) || amount < 1) return { logged: false }
-
-  const dedupeKey = `${pa}|${amount.toFixed(2)}|${Math.floor(Date.now() / 120_000)}`
-  if (recentKeys.has(dedupeKey)) return { logged: false, duplicate: true }
-  recentKeys.add(dedupeKey)
-  setTimeout(() => recentKeys.delete(dedupeKey), 130_000)
-
-  if (pa) upsertSavedPayee({ pa, pn })
-
-  const primary = accounts?.find((a) => a.isPrimary) || accounts?.[0]
-  if (!primary) {
-    savePendingCategoryPrompt({ pa, pn, amount, needsAccount: true, source })
-    return { logged: false, needsAccount: true, needsCategory: true }
+  const kind = parsed.kind || (parsed.personal === false ? 'merchant' : 'p2p')
+  if (!Number.isFinite(amount) || amount < 1) {
+    return { logged: false, error: 'invalid_amount' }
   }
 
-  const known = pa ? findPayeeByPa(pa) : null
-  let category = null
-  let usedFallback = false
-
-  if (known?.categoryId && categories?.some((c) => String(c.id) === String(known.categoryId))) {
-    category = categories.find((c) => String(c.id) === String(known.categoryId))
-  } else {
-    category = resolveOtherCategory(categories)
-    usedFallback = true
+  const dedupeKey = `${pa}|${amount.toFixed(2)}|${Math.floor(Date.now() / 180_000)}`
+  if (recentKeys.has(dedupeKey) && !parsed.forceLog) {
+    return { logged: false, duplicate: true }
   }
 
-  if (!category?.id) {
-    savePendingCategoryPrompt({ pa, pn, amount, accountId: primary.id, source })
-    return { logged: false, needsCategory: true }
-  }
-
-  const description = buildDescription({ pn, pa, source })
-  const res = await client.post('/transactions', {
-    accountId: Number(primary.id),
-    categoryId: Number(category.id),
-    type: 'EXPENSE',
-    amount,
-    description,
-    txnDate: new Date().toISOString().slice(0, 10),
-  })
-  const transactionId = res?.data?.id ?? res?.data?.transactionId ?? null
-
-  window.dispatchEvent(new Event('mm-transactions-changed'))
-
-  // New payee / fallback category → ask to refine (txn already saved)
-  if (usedFallback) {
-    savePendingCategoryPrompt({
-      pa,
-      pn,
-      amount,
-      accountId: primary.id,
-      transactionId,
-      description,
-      source,
-      refineOnly: true,
-    })
-    return {
-      logged: true,
-      transactionId,
-      categoryName: category.name,
-      needsCategory: true,
-      refineOnly: true,
+  let accs = accounts
+  let cats = categories
+  if (!accs?.length || cats == null) {
+    try {
+      const loaded = await loadAccountsAndCategories()
+      accs = accs?.length ? accs : loaded.accounts
+      cats = cats?.length ? cats : loaded.categories
+    } catch (err) {
+      return {
+        logged: false,
+        error: err?.response?.data?.message || err?.message || 'load_failed',
+        needsAccount: true,
+      }
     }
   }
 
-  return {
-    logged: true,
-    transactionId,
-    categoryName: category.name || known?.categoryName,
-    needsCategory: false,
+  const primary = accs?.find((a) => a.isPrimary) || accs?.[0]
+  if (!primary) {
+    savePendingCategoryPrompt({ pa, pn, amount, needsAccount: true, source, kind })
+    return { logged: false, needsAccount: true, error: 'no_account' }
+  }
+
+  if (pa) upsertSavedPayee({ pa, pn })
+
+  const known = pa ? findPayeeByPa(pa) : null
+  let category = null
+  let usedFallback = true
+
+  if (known?.categoryId && cats?.some((c) => String(c.id) === String(known.categoryId))) {
+    category = cats.find((c) => String(c.id) === String(known.categoryId))
+    usedFallback = false
+  } else {
+    category = resolveOtherCategory(cats)
+  }
+
+  // If still no category, try create "Other"
+  if (!category?.id) {
+    try {
+      const { data } = await client.post('/categories', { name: 'Other', essential: false })
+      category = data
+      cats = [...(cats || []), data]
+      usedFallback = true
+    } catch {
+      // API allows null categoryId — still log the expense
+      category = null
+      usedFallback = true
+    }
+  }
+
+  const description = buildDescription({ pn, pa, source, kind })
+  try {
+    const res = await client.post('/transactions', {
+      accountId: Number(primary.id),
+      categoryId: category?.id != null ? Number(category.id) : null,
+      type: 'EXPENSE',
+      amount,
+      description,
+      txnDate: new Date().toISOString().slice(0, 10),
+    })
+    const transactionId = res?.data?.id ?? res?.data?.transactionId ?? null
+    recentKeys.add(dedupeKey)
+    setTimeout(() => recentKeys.delete(dedupeKey), 190_000)
+
+    window.dispatchEvent(new Event('mm-transactions-changed'))
+
+    if (usedFallback && category?.id) {
+      savePendingCategoryPrompt({
+        pa,
+        pn,
+        amount,
+        accountId: primary.id,
+        transactionId,
+        description,
+        source,
+        kind,
+        refineOnly: true,
+      })
+      return {
+        logged: true,
+        transactionId,
+        categoryName: category?.name || 'Other',
+        needsCategory: true,
+        refineOnly: true,
+      }
+    }
+
+    return {
+      logged: true,
+      transactionId,
+      categoryName: category?.name || known?.categoryName || 'Uncategorized',
+      needsCategory: false,
+    }
+  } catch (err) {
+    const msg = err?.response?.data?.message || err?.message || 'save_failed'
+    return { logged: false, error: msg }
   }
 }
 
@@ -209,4 +250,49 @@ export function rememberLastPayAttempt({ pa, pn, amount }) {
     sessionStorage.setItem('mm_last_pay_am', String(amount || ''))
     sessionStorage.setItem('mm_last_pay_at', String(Date.now()))
   } catch { /* ignore */ }
+}
+
+/**
+ * Push any SMS/manual-confirmed pays that never made it into Transactions.
+ */
+export async function syncUnloggedConfirmedPays() {
+  const { listPendingP2pPays, updatePendingP2pPay } = await import('./pendingP2pPays.js')
+  const need = listPendingP2pPays().filter(
+    (p) => p.status === 'confirmed' && !p.transactionLogged,
+  )
+  if (!need.length) return []
+
+  let accounts = []
+  let categories = []
+  try {
+    const loaded = await loadAccountsAndCategories()
+    accounts = loaded.accounts
+    categories = loaded.categories
+  } catch {
+    return []
+  }
+
+  const results = []
+  for (const item of need) {
+    const logResult = await handleDetectedUpiPayment(
+      {
+        amount: item.amount,
+        pa: item.pa,
+        payeeName: item.pn,
+        source: item.source || 'sms',
+        kind: item.personal === false ? 'merchant' : 'p2p',
+        forceLog: true,
+      },
+      { accounts, categories },
+    )
+    updatePendingP2pPay(item.id, {
+      transactionLogged: !!logResult?.logged,
+      transactionId: logResult?.transactionId || item.transactionId || null,
+      logError: logResult?.logged
+        ? null
+        : (logResult?.error || (logResult?.duplicate ? 'duplicate' : 'log_failed')),
+    })
+    results.push({ id: item.id, ...logResult })
+  }
+  return results
 }

@@ -8,6 +8,8 @@ import {
   getPendingP2pPay,
 } from './pendingP2pPays.js'
 import { handleDetectedUpiPayment } from './paymentNotify.js'
+import { processAutopaySms, scanInboxForAutopays } from './autopayDetect.js'
+import { processAutopayStopSms, isAutopayStopSms } from './autopayStopDetect.js'
 import client from '../api/client'
 
 const SmsReader = registerPlugin('SmsReader')
@@ -16,6 +18,7 @@ let started = false
 let listenerHandle = null
 let scanTimer = null
 let processing = false
+let autopayScanBusy = false
 const processedKeys = new Set()
 
 function smsKey(msg, parsed) {
@@ -61,27 +64,43 @@ export async function requestSmsPermission() {
 }
 
 /**
- * Process one SMS body against waiting P2P pays.
- * On match → mark confirmed + auto-log expense (or category prompt).
+ * Process one SMS: pending P2P first, else autopay/savings.
  */
 export async function processIncomingSms(msg, { accounts, categories } = {}) {
+  // Autopay / mandate cancelled or failed → pause subscription in app
+  try {
+    if (isAutopayStopSms({ body: msg?.body || msg?.text || '', address: msg?.address || '' })) {
+      const stopped = await processAutopayStopSms(msg)
+      if (stopped?.paused) return { autopayStopped: stopped }
+    }
+  } catch { /* ignore */ }
+
   const parsed = parseBankPaymentSms({
     body: msg?.body || msg?.text || '',
     address: msg?.address || '',
     date: msg?.date || Date.now(),
   })
-  if (!parsed) return null
-
-  const key = smsKey(msg, parsed)
-  if (processedKeys.has(key)) return null
 
   const waiting = waitingP2pPays()
-  if (!waiting.length) return null
+  if (parsed && waiting.length) {
+    const key = smsKey(msg, parsed)
+    if (!processedKeys.has(key)) {
+      const match = pickBestPendingMatch(parsed, waiting)
+      if (match) {
+        return confirmPendingFromSms(msg, parsed, match, key, { accounts, categories })
+      }
+    }
+  }
 
-  const match = pickBestPendingMatch(parsed, waiting)
-  if (!match) return null
+  try {
+    const ap = await processAutopaySms(msg, { accounts, categories })
+    if (ap) return { autopay: ap }
+  } catch { /* ignore */ }
 
-  // Claim immediately so inbox rescan + live SMS can't double-confirm
+  return null
+}
+
+async function confirmPendingFromSms(msg, parsed, match, key, { accounts, categories } = {}) {
   rememberProcessed(key)
   markPendingP2pConfirmed(match.id, {
     smsRaw: parsed.raw,
@@ -93,6 +112,9 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
     pa: match.pa || parsed.pa,
     payeeName: match.pn || parsed.payeeName,
     source: 'sms',
+    personal: match.personal,
+    kind: match.personal === false ? 'merchant' : 'p2p',
+    forceLog: true,
   }
 
   let logResult = { logged: false }
@@ -107,17 +129,21 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
       accs = a.data || []
       cats = c.data || []
     }
-    logResult = await handleDetectedUpiPayment(forLog, { accounts: accs, categories: cats })
-    // Attach txn result onto pending so Pending pays + Transactions stay in sync
+    logResult = await handleDetectedUpiPayment(forLog, {
+      accounts: accs,
+      categories: cats,
+    })
     updatePendingP2pPay(match.id, {
       transactionLogged: !!logResult?.logged,
       transactionId: logResult?.transactionId || null,
-      logError: logResult?.logged ? null : (logResult?.needsAccount ? 'needs_account' : null),
+      logError: logResult?.logged
+        ? null
+        : (logResult?.error || (logResult?.needsAccount ? 'needs_account' : 'log_failed')),
     })
   } catch (err) {
     updatePendingP2pPay(match.id, {
       transactionLogged: false,
-      logError: err?.message || 'log_failed',
+      logError: err?.response?.data?.message || err?.message || 'log_failed',
     })
   }
 
@@ -151,12 +177,11 @@ export async function scanInboxForPendingPays(opts = {}) {
       limit: 100,
     })
     const confirmed = []
-    // Oldest first so earlier pays match first when amounts collide
     const ordered = [...(messages || [])].sort((a, b) => (a.date || 0) - (b.date || 0))
     for (const msg of ordered) {
       if (!waitingP2pPays().length) break
       const result = await processIncomingSms(msg, opts)
-      if (result) confirmed.push(result)
+      if (result?.pending) confirmed.push(result)
     }
     return confirmed
   } catch {
@@ -166,9 +191,30 @@ export async function scanInboxForPendingPays(opts = {}) {
   }
 }
 
+async function scanAutopaysQuietly() {
+  if (!isSmsPaySupported() || autopayScanBusy) return
+  if (!localStorage.getItem('token')) return
+  const perm = await checkSmsPermission()
+  if (!perm?.granted) return
+  autopayScanBusy = true
+  try {
+    await SmsReader.startWatch().catch(() => {})
+    const sinceMs = Date.now() - 3 * 24 * 60 * 60_000
+    const { messages } = await SmsReader.readRecent({ sinceMs, limit: 80 }).catch(() => ({ messages: [] }))
+    const ordered = [...(messages || [])].sort((a, b) => (a.date || 0) - (b.date || 0))
+    for (const msg of ordered) {
+      if (isAutopayStopSms({ body: msg?.body || msg?.text || '', address: msg?.address || '' })) {
+        await processAutopayStopSms(msg).catch(() => {})
+      }
+    }
+    await scanInboxForAutopays(SmsReader)
+  } catch { /* ignore */ } finally {
+    autopayScanBusy = false
+  }
+}
+
 /**
- * Start global SMS watch + periodic inbox scan while there are waiting pays.
- * Call once from App (native).
+ * Start global SMS watch + periodic inbox scan (P2P pending + autopay/savings).
  */
 export function startSmsPayWatcher() {
   if (!isSmsPaySupported() || started) return () => {}
@@ -184,17 +230,16 @@ export function startSmsPayWatcher() {
 
   const tick = async () => {
     try {
-      if (!waitingP2pPays().length) return
       const perm = await checkSmsPermission()
-      if (perm?.granted) {
-        await SmsReader.startWatch().catch(() => {})
-        await scanInboxForPendingPays()
-      }
+      if (!perm?.granted) return
+      await SmsReader.startWatch().catch(() => {})
+      if (waitingP2pPays().length) await scanInboxForPendingPays()
+      await scanAutopaysQuietly()
     } catch { /* ignore */ }
   }
 
   tick()
-  scanTimer = setInterval(tick, 30_000)
+  scanTimer = setInterval(tick, 45_000)
 
   const onVis = () => {
     if (document.visibilityState === 'visible') tick()

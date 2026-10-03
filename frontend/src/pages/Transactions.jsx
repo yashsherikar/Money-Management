@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
+import BillScanSheet from '../components/BillScanSheet.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { waitingP2pPays, countWaitingP2pPays } from '../utils/pendingP2pPays.js'
+import { waitingP2pPays, countWaitingP2pPays, listPendingP2pPays } from '../utils/pendingP2pPays.js'
+import { syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
+import { isBillOcrSupported } from '../utils/billScan.js'
+import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
@@ -22,6 +26,7 @@ function sortCategories(categories) {
 
 export default function Transactions() {
   const { t } = useLanguage()
+  const navigate = useNavigate()
   const [transactions, setTransactions] = useState([])
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
@@ -32,7 +37,9 @@ export default function Transactions() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categoryQuery, setCategoryQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  const [billScanOpen, setBillScanOpen] = useState(false)
   const [waitingPays, setWaitingPays] = useState(() => waitingP2pPays())
+  const [unloggedPays, setUnloggedPays] = useState([])
 
   async function loadAll() {
     const [txnRes, accRes, catRes] = await Promise.all([
@@ -44,12 +51,18 @@ export default function Transactions() {
     setAccounts(accRes.data)
     setCategories(catRes.data)
     setWaitingPays(waitingP2pPays())
+    setUnloggedPays(
+      listPendingP2pPays().filter((p) => p.status === 'confirmed' && !p.transactionLogged),
+    )
     const primary = accRes.data.find((a) => a.isPrimary) || accRes.data[0]
     if (primary) setForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
   }
 
   useEffect(() => {
     loadAll()
+    syncUnloggedConfirmedPays()
+      .then(() => loadAll())
+      .catch(() => {})
     const onRefresh = () => loadAll()
     window.addEventListener('mm-transactions-changed', onRefresh)
     window.addEventListener('mm-pending-p2p-changed', onRefresh)
@@ -141,9 +154,48 @@ export default function Transactions() {
     }
   }
 
+  async function saveBillScan(data) {
+    const payload = {
+      accountId: data.accountId,
+      categoryId: data.categoryId || null,
+      type: 'EXPENSE',
+      amount: data.amount,
+      description: data.description,
+      txnDate: data.txnDate,
+    }
+    await client.post('/transactions', payload)
+    window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
+    await loadAll()
+  }
+
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-5 sm:mb-6">{t('Transactions (this month)')}</h1>
+      <div className="flex items-start justify-between gap-3 mb-5 sm:mb-6">
+        <h1 className="text-2xl font-bold">{t('Transactions (this month)')}</h1>
+        {isBillOcrSupported() && (
+          <button
+            type="button"
+            onClick={() => setBillScanOpen(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold"
+            title={t('Scan bill')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+            {t('Scan bill')}
+          </button>
+        )}
+      </div>
+
+      <BillScanSheet
+        open={billScanOpen}
+        onClose={() => setBillScanOpen(false)}
+        accounts={accounts}
+        categories={categories}
+        defaultAccountId={form.accountId}
+        onSave={saveBillScan}
+      />
 
       {waitingPays.length > 0 && (
         <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
@@ -171,6 +223,27 @@ export default function Transactions() {
               className="shrink-0 text-xs font-semibold text-amber-500 px-2 py-1 rounded-md border border-amber-500/40"
             >
               {t('Open')} →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {unloggedPays.length > 0 && (
+        <div className="mb-4 rounded-xl border border-teal/30 bg-teal/10 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-teal">
+                {unloggedPays.length} {t('Paid pay(s) not yet in this list')}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {t('SMS marked them Paid. Tap to save into Transactions.')}
+              </p>
+            </div>
+            <Link
+              to="/pending-pays"
+              className="shrink-0 text-xs font-semibold text-teal px-2 py-1 rounded-md border border-teal/40"
+            >
+              {t('Fix')} →
             </Link>
           </div>
         </div>
@@ -262,13 +335,24 @@ export default function Transactions() {
         </Field>
 
         <Field label={t('Description')}>
-          <input
-            placeholder={t('Description')}
-            required={form.type === 'INCOME' && !form.categoryId}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full"
-          />
+          {(() => {
+            const liveBrand = brandFromTxnText(
+              form.description,
+              categories.find((c) => String(c.id) === form.categoryId)?.name,
+            )
+            return (
+              <div className="flex items-center gap-2">
+                {liveBrand && <MerchantLogo brand={liveBrand} size={36} />}
+                <input
+                  placeholder={t('Description')}
+                  required={form.type === 'INCOME' && !form.categoryId}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className="w-full"
+                />
+              </div>
+            )
+          })()}
         </Field>
 
         <Field label={t('Date')}>
@@ -287,12 +371,24 @@ export default function Transactions() {
 
       <MoneyList empty={t('No transactions this month.')}>
         {transactions.map((txn) => {
-          const title = txn.description || txn.categoryName || t('Transaction')
+          const desc = String(txn.description || '')
+          const isAutopay = /^Autopay:/i.test(desc)
+          const isSavings = /^Savings/i.test(desc)
+          const brand = brandFromTxnText(txn.description, txn.categoryName)
+          const title = brand?.name
+            || txn.description
+            || txn.categoryName
+            || t('Transaction')
           const isIncome = txn.type === 'INCOME'
           const meta = [
             txn.txnDate,
             txn.accountName,
-            txn.categoryName && txn.description ? txn.categoryName : null,
+            brand && txn.description && !new RegExp(brand.name, 'i').test(txn.description)
+              ? txn.description
+              : null,
+            isAutopay && t('Autopay · SMS'),
+            isSavings && t('Savings · SMS'),
+            txn.categoryName && txn.description && !isAutopay && !isSavings ? txn.categoryName : null,
           ].filter(Boolean).join(' · ')
           return (
             <MoneyRow
@@ -302,9 +398,20 @@ export default function Transactions() {
               amount={txn.amount}
               income={isIncome}
               type={txn.type}
-              iconText={`${txn.description || ''} ${txn.categoryName || ''}`}
+              icon={brand ? <MerchantLogo brand={brand} size={40} /> : null}
+              iconText={brand ? undefined : `${txn.description || ''} ${txn.categoryName || ''}`}
               actions={(
                 <>
+                  {txn.canSplit && (
+                    <RowAction onClick={() => navigate(`/split-bills?txnId=${txn.id}`)} tone="brand">
+                      <span>{t('Split')}</span>
+                    </RowAction>
+                  )}
+                  {txn.splitBillId && (
+                    <RowAction onClick={() => navigate('/split-bills')} tone="brand">
+                      <span>{t('Split ✓')}</span>
+                    </RowAction>
+                  )}
                   <RowAction onClick={() => startEdit(txn)} tone="brand">
                     <EditIcon />
                     <span>{t('Edit')}</span>

@@ -3,6 +3,9 @@ import { Routes, Route, useNavigate } from 'react-router-dom'
 import { listenForNotificationTaps } from './nativePush.js'
 import { startSmsPayWatcher } from './utils/smsPayWatch.js'
 import { startPendingPayReminderWatcher } from './utils/pendingPayReminders.js'
+import { syncUnloggedConfirmedPays } from './utils/paymentNotify.js'
+import { syncAllSubscriptionReminders } from './utils/subscriptionReminders.js'
+import client from './api/client'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
@@ -27,6 +30,7 @@ import Onboarding from './pages/Onboarding.jsx'
 import Pay from './pages/Pay.jsx'
 import PendingPays from './pages/PendingPays.jsx'
 import PaymentCategoryPrompt from './components/PaymentCategoryPrompt.jsx'
+import SmsMoneyReviewPrompt from './components/SmsMoneyReviewPrompt.jsx'
 
 function Protected({ children }) {
   return (
@@ -51,6 +55,33 @@ export default function App() {
     return startPendingPayReminderWatcher()
   }, [])
 
+  // Retry any Paid (SMS/manual) pays that never reached Transactions + reschedule subscription alerts
+  useEffect(() => {
+    const run = () => {
+      if (!localStorage.getItem('token')) return
+      syncUnloggedConfirmedPays().catch(() => {})
+      client.get('/recurring-transactions')
+        .then((res) => syncAllSubscriptionReminders(res.data || []))
+        .catch(() => {})
+    }
+    run()
+    const onAuth = () => run()
+    const onFocus = () => run()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') run()
+    }
+    window.addEventListener('mm-p2p-sms-confirmed', onAuth)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVis)
+    const t = setInterval(run, 90_000)
+    return () => {
+      window.removeEventListener('mm-p2p-sms-confirmed', onAuth)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVis)
+      clearInterval(t)
+    }
+  }, [])
+
   useEffect(() => {
     const onTap = (e) => {
       const url = e?.detail?.url
@@ -66,6 +97,7 @@ export default function App() {
     <DueReminders />
     <PendingPayConfirm />
     <PaymentCategoryPrompt />
+    <SmsMoneyReviewPrompt />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
