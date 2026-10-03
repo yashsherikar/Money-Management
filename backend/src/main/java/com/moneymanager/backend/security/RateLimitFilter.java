@@ -31,7 +31,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String path = request.getRequestURI();
-        if (!path.startsWith("/api/")) {
+        // Wake-up pings must never be rate-limited (cron-job.org keep-alive)
+        if ("/api/ping".equals(path) || "/ping".equals(path) || !path.startsWith("/api/")) {
             filterChain.doFilter(request, response);
             return;
         }

@@ -90,7 +90,7 @@ public class SecurityConfig {
                         // All auth routes (and CORS preflight) must be public — Capacitor hits these first
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/actuator/health", "/api/ping").permitAll()
+                        .requestMatchers("/actuator/health", "/api/ping", "/ping", "/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/internal/**").permitAll()
                         .anyRequest().authenticated()
                 )
