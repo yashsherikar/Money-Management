@@ -38,9 +38,9 @@ export default function TransactionDetailSheet({
   const isSubscription = /^Subscription:/i.test(desc)
 
   return (
-    <div className="fixed inset-0 z-[64] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[64] flex items-center justify-center p-4 pb-20">
       <div className="absolute inset-0 bg-black/45" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4 max-h-[92vh] overflow-y-auto">
+      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
         <div className="flex items-start gap-3 mb-4">
           {brand ? (
             <MerchantLogo brand={brand} size={48} />

@@ -1,6 +1,7 @@
 import client from '../api/client.js'
 import { removeLocalAppNotificationsForRelated } from './localAppNotifications.js'
 import { cancelSubscriptionReminders, scheduleSubscriptionReminders } from './subscriptionReminders.js'
+import { cancelEmergencyFundReminders, scheduleEmergencyFundReminders } from './emergencyFundReminders.js'
 
 export const RELATED = {
   RECURRING: 'RECURRING_TRANSACTION',
@@ -19,14 +20,21 @@ export function notifyTransactionsChanged() {
 /** After paid: drop due reminders so UI no longer says pay. */
 export async function clearPaidReminders(relatedType, relatedId) {
   if (relatedId == null) return
-  removeLocalAppNotificationsForRelated(relatedId, ['subscription', 'due', 'recurring'])
+  removeLocalAppNotificationsForRelated(relatedId, ['subscription', 'due', 'recurring', 'emergency_fund'])
   if (relatedType === RELATED.RECURRING) {
     await cancelSubscriptionReminders(relatedId)
-    // Reschedule next cycle if still active
     try {
       const { data } = await client.get('/recurring-transactions')
       const item = (data || []).find((r) => String(r.id) === String(relatedId))
       if (item?.active) await scheduleSubscriptionReminders(item)
+    } catch { /* ignore */ }
+  }
+  if (relatedType === RELATED.EMERGENCY_FUND) {
+    await cancelEmergencyFundReminders(relatedId)
+    try {
+      const { data } = await client.get('/emergency-fund')
+      const plan = (data || []).find((p) => String(p.id) === String(relatedId))
+      if (plan?.active) await scheduleEmergencyFundReminders(plan)
     } catch { /* ignore */ }
   }
 }

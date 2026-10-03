@@ -97,10 +97,19 @@ public class DueDateReminderScheduler {
 
         for (RecurringTransaction rt : recurringTransactionRepository.findByActiveTrue()) {
             if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+                Integer intervalDays = rt.getIntervalDays();
+                // Daily autopay / every-1-day: bank already debits — do not spam reminders
+                if (intervalDays == null || intervalDays <= 1) {
+                    continue;
+                }
+                // Advance window longer than the cycle is meaningless (e.g. 2d lead on a 2d cycle)
+                if (leadDays >= intervalDays) {
+                    continue;
+                }
                 LocalDate anchor = rt.getLastLoggedDate() != null
                         ? rt.getLastLoggedDate()
                         : rt.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate();
-                if (target.equals(anchor.plusDays(rt.getIntervalDays()))) {
+                if (target.equals(anchor.plusDays(intervalDays))) {
                     pushService.notifyUser(rt.getUser(), titlePrefix,
                             rt.getDescription() + " (" + money(rt.getAmount()) + ") " + whenLabel,
                             "/recurring?confirm=" + rt.getId(), PushService.ACTION_PAID_VIEW, null,

@@ -700,9 +700,9 @@ export default function ScanPay() {
       )}
 
       {payPreview && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-20">
           <div className="absolute inset-0 bg-black/50" onClick={() => !paying && !qrBusy && setPayPreview(null)} />
-          <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4 max-h-[92vh] overflow-y-auto">
+          <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
             <h2 className="font-bold text-lg mb-1">{t('Confirm payment')}</h2>
             <p className="text-sm text-slate-500 mb-4">
               {payPreview.personal
@@ -824,9 +824,9 @@ export default function ScanPay() {
       )}
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-20">
           <div className="absolute inset-0 bg-black/40" onClick={skipLog} />
-          <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4">
+          <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl">
             <h2 className="font-bold text-lg mb-2">{t('Did you pay?')}</h2>
             <p className="text-sm text-slate-600 mb-4">
               {t('Log')} ₹{Number(form.am || 0).toLocaleString('en-IN')} {t('to')} {form.description || form.pn || form.pa}?

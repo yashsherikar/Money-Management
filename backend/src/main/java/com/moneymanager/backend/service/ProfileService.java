@@ -48,11 +48,36 @@ public class ProfileService {
         if (StringUtils.hasText(request.name())) {
             user.setName(request.name());
         }
+        if (request.phone() != null) {
+            String phone = normalizePhone(request.phone());
+            if (phone == null) {
+                user.setPhone(null);
+            } else {
+                userRepository.findByPhone(phone).ifPresent(other -> {
+                    if (!other.getId().equals(user.getId())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                "That phone number is already on another account");
+                    }
+                });
+                user.setPhone(phone);
+            }
+        }
         if (request.upiId() != null) {
             user.setUpiId(StringUtils.hasText(request.upiId()) ? request.upiId().trim() : null);
         }
         userRepository.save(user);
         return toResponse(user);
+    }
+
+    /** Keep last 10 digits for Indian mobiles; null if empty/invalid. */
+    public static String normalizePhone(String raw) {
+        if (!StringUtils.hasText(raw)) return null;
+        String digits = raw.replaceAll("\\D", "");
+        if (digits.length() >= 10) {
+            digits = digits.substring(digits.length() - 10);
+        }
+        if (digits.length() < 10) return null;
+        return digits;
     }
 
     public ProfileResponse changePassword(User user, ChangePasswordRequest request) {
@@ -152,6 +177,14 @@ public class ProfileService {
     }
 
     private ProfileResponse toResponse(User u) {
-        return new ProfileResponse(u.getId(), u.getEmail(), u.getName(), u.getUpiId(), u.getPhoto(), u.getPinHash() != null);
+        return new ProfileResponse(
+                u.getId(),
+                u.getEmail(),
+                u.getName(),
+                u.getPhone(),
+                u.getUpiId(),
+                u.getPhoto(),
+                u.getPinHash() != null
+        );
     }
 }

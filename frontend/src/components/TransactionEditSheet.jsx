@@ -110,9 +110,9 @@ export default function TransactionEditSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 pb-20">
       <div className="absolute inset-0 bg-black/45" onClick={() => !busy && onClose?.()} />
-      <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4 max-h-[92vh] overflow-y-auto">
+      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
         <div className="flex items-center gap-2 mb-1">
           {brand && <MerchantLogo brand={brand} size={36} />}
           <h2 className="font-bold text-lg">{t('Edit transaction')}</h2>

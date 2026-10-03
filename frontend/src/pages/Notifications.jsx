@@ -11,13 +11,13 @@ import {
   clearNotificationPayAction,
   clearPaidReminders,
 } from '../utils/confirmDuePaid.js'
-import { openUpiPayLink, parseUpiQr, isPersonalUpi, copyVpaAndOpenApp, formatUpiAmount } from '../utils/upiQr.js'
+import { openUpiPayLink, parseUpiQr, isPersonalUpi, formatUpiAmount } from '../utils/upiQr.js'
 import {
   listLocalAppNotifications,
   markLocalAppNotificationViewed,
 } from '../utils/localAppNotifications.js'
 import { checkPendingPayRemindersDue } from '../utils/pendingPayReminders.js'
-import { savePendingUpiConfirm, suppressResumeLock } from '../appLock.js'
+import { startRequestPayWatch } from '../utils/requestPayWatch.js'
 
 function timeAgo(iso) {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -128,26 +128,21 @@ export default function Notifications() {
     if (!item.payUrl) return
     try {
       const parsed = parseUpiQr(item.payUrl)
-      suppressResumeLock(5 * 60_000)
-      // So after GPay we ask "Did you pay?" and can clear Pay now
-      savePendingUpiConfirm({
-        kind: item.relatedType === 'SPLIT_PARTICIPANT' ? 'split_bill'
-          : item.relatedType === 'CONTRIBUTION_REQUEST' ? 'contribution'
-            : 'payment_request',
-        requestId: item.relatedId,
-        participantId: item.relatedType === 'SPLIT_PARTICIPANT' ? item.relatedId : null,
-        notificationId: item.id,
-        pa: parsed.pa,
-        am: formatUpiAmount(parsed.am) || '1.00',
-        amount: formatUpiAmount(parsed.am) || '1.00',
-        name: parsed.pn || parsed.pa,
-        pn: parsed.pn || '',
-      })
-      if (isPersonalUpi(parsed.mc) || parsed.personal) {
-        await copyVpaAndOpenApp({
+      const kind = item.relatedType === 'SPLIT_PARTICIPANT' ? 'split_bill'
+        : item.relatedType === 'CONTRIBUTION_REQUEST' ? 'contribution'
+          : 'payment_request'
+      const am = formatUpiAmount(parsed.am) || '1.00'
+      const who = parsed.pn || ''
+      if (isPersonalUpi(parsed.mc) || parsed.personal !== false) {
+        await startRequestPayWatch({
+          kind,
+          requestId: item.relatedType === 'SPLIT_PARTICIPANT' ? null : item.relatedId,
+          participantId: item.relatedType === 'SPLIT_PARTICIPANT' ? item.relatedId : null,
+          notificationId: item.id,
           pa: parsed.pa,
-          amount: formatUpiAmount(parsed.am) || '1.00',
-          app: 'gpay',
+          amount: am,
+          name: who,
+          pn: who,
         })
       } else {
         await openUpiPayLink(item.payUrl, {

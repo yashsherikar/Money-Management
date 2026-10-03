@@ -24,6 +24,7 @@ public class EmergencyFundDtos {
             String targetAccountName,
             BigDecimal amount,
             int dayOfMonth,
-            boolean active
+            boolean active,
+            String lastLoggedMonth
     ) {}
 }

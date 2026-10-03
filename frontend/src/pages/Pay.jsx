@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { App as CapApp } from '@capacitor/app'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { isNativePlatform } from '../nativePush.js'
+import client from '../api/client'
 import QrScannerOverlay from '../components/QrScannerOverlay.jsx'
+import BillScanSheet from '../components/BillScanSheet.jsx'
+import { isBillOcrSupported } from '../utils/billScan.js'
 import { scanUpiQrNative, cancelUpiQrScan } from '../utils/scanUpiQr.js'
 import {
   parseUpiQr,
@@ -118,9 +121,25 @@ export default function Pay() {
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [scanned, setScanned] = useState(false)
+  const [billScanOpen, setBillScanOpen] = useState(false)
+  const [accounts, setAccounts] = useState([])
+  const [categories, setCategories] = useState([])
+  const [defaultAccountId, setDefaultAccountId] = useState('')
 
   useEffect(() => {
     setPayees(listSavedPayees())
+  }, [])
+
+  useEffect(() => {
+    Promise.all([client.get('/accounts'), client.get('/categories')])
+      .then(([a, c]) => {
+        const accs = a.data || []
+        setAccounts(accs)
+        setCategories(c.data || [])
+        const primary = accs.find((x) => x.isPrimary) || accs[0]
+        if (primary) setDefaultAccountId(String(primary.id))
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -291,6 +310,19 @@ export default function Pay() {
     }
   }
 
+  async function saveBillScan(data) {
+    await client.post('/transactions', {
+      accountId: data.accountId,
+      categoryId: data.categoryId || null,
+      type: 'EXPENSE',
+      amount: data.amount,
+      description: data.description,
+      txnDate: data.txnDate,
+    })
+    window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
+    setHint(t('Bill saved to Transactions'))
+  }
+
   async function saveQrWithAmount() {
     setError('')
     const cleanPa = normalizeVpa(pa)
@@ -343,7 +375,30 @@ export default function Pay() {
         >
           {scanBusy || scanning ? t('Scanning…') : t('Scan QR')}
         </button>
+        {isBillOcrSupported() && (
+          <button
+            type="button"
+            onClick={() => setBillScanOpen(true)}
+            disabled={scanning}
+            className="inline-flex items-center gap-1.5 bg-white border border-slate-300 hover:border-brand-400 text-slate-800 rounded-md px-4 py-3 text-sm font-semibold disabled:opacity-60"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+            {t('Scan bill')}
+          </button>
+        )}
       </div>
+
+      <BillScanSheet
+        open={billScanOpen}
+        onClose={() => setBillScanOpen(false)}
+        accounts={accounts}
+        categories={categories}
+        defaultAccountId={defaultAccountId}
+        onSave={saveBillScan}
+      />
       {!isNativePlatform() && (
         <p className="text-xs text-amber-600 mb-3">{t('Camera scan needs the Android app. On web, paste the UPI link from the QR.')}</p>
       )}

@@ -9,6 +9,7 @@ import {
   checkBillPaidInSms,
 } from '../utils/billScan.js'
 import { requestSmsPermission, isSmsPaySupported } from '../utils/smsPayWatch.js'
+import { suppressResumeLock } from '../appLock.js'
 import Field from './Field.jsx'
 
 /**
@@ -91,7 +92,10 @@ export default function BillScanSheet({
     setSmsStatus(null)
     try {
       if (Capacitor.isNativePlatform()) {
+        // Before camera: avoid app-lock biometric when returning from the photo screen
+        suppressResumeLock(10 * 60_000)
         const result = await captureBillPhoto({ categories })
+        suppressResumeLock(10 * 60_000)
         await applyScanResult(result)
       } else {
         // Web fallback: file input with capture
@@ -130,7 +134,9 @@ export default function BillScanSheet({
     setSmsStatus(null)
     try {
       if (Capacitor.isNativePlatform()) {
+        suppressResumeLock(10 * 60_000)
         const result = await pickBillPhoto({ categories })
+        suppressResumeLock(10 * 60_000)
         await applyScanResult(result)
       } else {
         const input = document.createElement('input')
@@ -241,9 +247,9 @@ export default function BillScanSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[67] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[67] flex items-center justify-center p-4 pb-20">
       <div className="absolute inset-0 bg-black/45" onClick={() => !busy && onClose?.()} />
-      <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4 max-h-[92vh] overflow-y-auto">
+      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
         <h2 className="font-bold text-lg mb-1">{t('Scan bill')}</h2>
         <p className="text-sm text-slate-600 mb-4">
           {t('Photo or upload a bill — we read amount, category, payment mode, then check SMS before save.')}

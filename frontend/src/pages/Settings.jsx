@@ -249,7 +249,7 @@ export default function Settings() {
               <div>
                 <h2 className="font-semibold">{t('Bank SMS')}</h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  {t('Only new debit/credit SMS (not old inbox). Ads, scam, and spam are ignored. Name accounts like “HDFC Salary” so the right bank is matched.')}
+                  {t('Live debit/credit SMS only — works even if the app was closed. Past inbox is never imported. Ads, scam, and spam are ignored.')}
                 </p>
                 <p className={`text-xs mt-2 font-medium ${smsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {smsOk ? t('SMS permission on') : t('SMS permission off')}

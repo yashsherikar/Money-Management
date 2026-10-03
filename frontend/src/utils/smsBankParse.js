@@ -1,6 +1,7 @@
 /**
  * Parse Indian bank SMS for autopay / mandate / savings transfers / credit+debit.
- * Returns null for OTP, scam/spam, or unrelated messages.
+ * Covers formats like Paytm Cash/ICICI:
+ * "Acct XX043 is credited with Rs 2.00 on 03-Oct-26 from ONE97 COMMUNICA. UPI:307983112766-ICICI Bank."
  */
 import { shouldIgnoreMoneySms } from './smsScamFilter.js'
 
@@ -19,6 +20,7 @@ const BANK_HINTS = [
   { id: 'indusind', labels: ['indusind', 'indusb'], keywords: ['indus'] },
   { id: 'federal', labels: ['federal', 'fedbank'], keywords: ['federal'] },
   { id: 'rbl', labels: ['rbl', 'rblbank'], keywords: ['rbl'] },
+  { id: 'paytm', labels: ['paytm', 'one97', 'paytmbank'], keywords: ['paytm'] },
 ]
 
 // Do NOT treat bare "subscription" as autopay — promo ads say that without a real debit.
@@ -26,6 +28,11 @@ const AUTOPAY_RE = /\bauto[- ]?pay\b|\bauto[- ]?debit\b|\bmandate\b|\bstanding i
 const SAVINGS_RE = /\bsavings?\b|\bppf\b|\brd\b|\brecurring deposit\b|\bsukanya\b|\bnps\b|\bemergency fund\b|\bsweep\b|\bto your (?:savings|rd|ppf)\b|\bsaved\b/i
 const CREDIT_RE = /\bcredited\b|\breceived\b|\bdeposited\b|\binward\b|\brefund\b|\bsalary\b/i
 const DEBIT_RE = /\bdebited\b|\bspent\b|\bpaid\s+(?:to|from|via|using|rs|₹|inr)\b|\bhas\s+been\s+paid\b|\bsent\b|\bwithdrawn\b|\bpurchase\b|\bauto[- ]?debit\b|\bemi\b/i
+
+const MONTHS = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+}
 
 export function detectBankFromSms({ body = '', address = '' } = {}) {
   const hay = `${address} ${body}`.toLowerCase()
@@ -78,13 +85,12 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   if (!amount || Number(amount) < 1) return null
 
   const isCredit = CREDIT_RE.test(lower) && !DEBIT_RE.test(lower)
-  // Require real money verbs — bare "₹99 + UPI" promo ads must not count as debit
   const isDebit = DEBIT_RE.test(lower)
     || (/\b(?:debited|spent|withdrawn|auto[- ]?debit)\b/i.test(lower))
     || (!isCredit
       && /\b(?:upi\s*ref|txn\s*(?:id|ref)|imps|neft|rtgs)\b/i.test(lower)
       && /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text)
-      && /\ba\/c\b|\baccount\b|\bupi\b/i.test(lower))
+      && /\ba\/c\b|\bacct\b|\baccount\b|\bupi\b/i.test(lower))
   if (!isCredit && !isDebit) return null
 
   const direction = isCredit ? 'CREDIT' : 'DEBIT'
@@ -92,29 +98,51 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   const isAutopay = AUTOPAY_RE.test(lower)
   const isSavings = SAVINGS_RE.test(lower)
 
+  // "from ONE97 COMMUNICA." / "to MERCHANT" / "paid to X"
+  let merchant =
+    capture(text, /\bfrom\s+([A-Za-z0-9][A-Za-z0-9 ._'&@-]{1,47}?)(?:\s*\.|,\s*UPI|\s+UPI\b|\s+on\b|\s+via\b|\s+Ref\b|$)/i)
+    || capture(text, /(?:to|towards|paid to|sent to|for)\s+([A-Za-z0-9 ._'&@-]{2,48}?)(?:\s+on\b|\s+via\b|\s+using\b|\s+upi\b|\s+ref\b|[.,]|$)/i)
+    || ''
+  merchant = cleanMerchant(merchant)
+
+  const isCashback = isCredit && isCashbackCredit({ lower, merchant, text })
+
+  const isTransferWording = /\bneft\b|\bimps\b|\brtgs\b|\btransferred\b|\btransfer\b|\bself\s*transfer\b|\bto\s+self\b|\bown\s+a\/c\b|\bown\s+account\b/i.test(lower)
+
   let kind = 'payment'
-  if (isAutopay && isSavings) kind = 'savings'
+  if (isCashback) kind = 'cashback'
+  else if (isAutopay && isSavings) kind = 'savings'
   else if (isAutopay) kind = 'autopay'
   else if (isSavings) kind = 'savings'
-  else if (/\bneft\b|\bimps\b|\brtgs\b|\btransferred\b|\btransfer\b/i.test(lower)) kind = 'transfer'
+  else if (isTransferWording) kind = 'transfer'
 
   // Plain UPI one-offs: skip unless caller already tried P2P match (includeUpiPayment)
-  if (kind === 'payment' && /\bupi\b/i.test(lower) && !isAutopay && !isSavings && !includeUpiPayment) {
+  // Credits / cashback with UPI always parse
+  if (kind === 'payment' && /\bupi\b/i.test(lower) && !isAutopay && !isSavings && !isCredit && !includeUpiPayment) {
     return null
   }
 
-  const merchant =
-    capture(text, /(?:to|towards|paid to|sent to|for)\s+([A-Za-z0-9 ._'&@-]{2,48}?)(?:\s+on\b|\s+via\b|\s+using\b|\s+upi\b|\s+ref\b|[.,]|$)/i)
-    || capture(text, /(?:from)\s+([A-Za-z0-9 ._'&@-]{2,48}?)(?:\s+on\b|\s+via\b|[.,]|$)/i)
+  // Acct XX043 / A/c XX1234 / account ending 1234
+  const accountLast4 =
+    capture(text, /\b(?:a\/c|acct|account)\s*(?:no\.?\s*)?(?:x+|X+)?(\d{3,4})\b/i)
+    || capture(text, /\b(?:xx|x{2,})(\d{3,4})\b/i)
     || ''
 
-  const accountLast4 = capture(text, /(?:a\/c|acct|account|xx|x{2,})[^\d]*(\d{4})\b/i)
+  const upiRef =
+    capture(text, /\bupi\s*[:\-]?\s*([0-9]{6,22})/i)
+    || capture(text, /\bupi\s*ref(?:erence)?\s*(?:no\.?|number)?\s*[:\-]?\s*([a-z0-9]{6,22})/i)
+    || ''
 
-  const bankLabel = bank ? bank.id.toUpperCase() : guessBankLabel(address)
+  const smsDateMs = parseSmsDate(text) || Number(date) || Date.now()
+  const bankLabel = bank
+    ? (bank.id === 'paytm' ? 'PAYTM' : bank.id.toUpperCase())
+    : (guessBankFromBody(text) || guessBankLabel(address))
+
   const infoParts = [
     bankLabel && `Bank: ${bankLabel}`,
     accountLast4 && `A/c …${accountLast4}`,
-    direction === 'CREDIT' ? 'Credit' : 'Debit',
+    kind === 'cashback' ? 'Cashback' : (direction === 'CREDIT' ? 'Credit' : 'Debit'),
+    upiRef && `UPI ${upiRef}`,
     kind === 'autopay' && 'Autopay',
     kind === 'savings' && 'Savings',
     kind === 'transfer' && 'Transfer',
@@ -127,13 +155,70 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
     bank,
     bankLabel,
     accountLast4: accountLast4 || '',
-    merchant: merchant.replace(/\s+/g, ' ').trim(),
+    upiRef: upiRef || '',
+    merchant,
     info: infoParts.join(' · '),
     raw: text.slice(0, 500),
     address: String(address || ''),
-    date: Number(date) || Date.now(),
+    date: smsDateMs,
     source: 'sms',
   }
+}
+
+function cleanMerchant(raw) {
+  return String(raw || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[.,;:]+$/g, '')
+    .replace(/\bUPI\b.*$/i, '')
+    .trim()
+}
+
+/**
+ * Paytm / PhonePe / wallet cashback credits often look like:
+ * "credited with Rs 2.00 … from ONE97 COMMUNICA. UPI:…"
+ * (may not literally say "cashback" in the SMS).
+ */
+function isCashbackCredit({ lower = '', merchant = '', text = '' } = {}) {
+  if (/\bcash\s*back\b|\bcashback\b|\breward\s+point|\breward\s+credit\b|\bcashback\s+credited\b/i.test(lower)) {
+    return true
+  }
+  const from = `${merchant} ${text}`.toLowerCase()
+  // Corporate / wallet senders that credit small UPI amounts as cashback
+  if (/\bone97\b|\bpaytm\b|\bphonepe\b|\bgoogle pay\b|\bgpay\b|\bamazon\s*pay\b|\bmobikwik\b|\bfreecharge\b/i.test(from)
+      && /\bupi\b/i.test(lower)) {
+    return true
+  }
+  return false
+}
+
+/** "on 03-Oct-26" / "on 03-Oct-2026" / "on 03/10/26" */
+function parseSmsDate(text) {
+  const m1 = text.match(/\bon\s+(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/ ](\d{2,4})\b/i)
+  if (m1) {
+    const day = Number(m1[1])
+    const mon = MONTHS[m1[2].slice(0, 3).toLowerCase()]
+    let year = Number(m1[3])
+    if (year < 100) year += 2000
+    if (mon != null && day >= 1 && day <= 31) {
+      const d = new Date(year, mon, day, 12, 0, 0)
+      if (!Number.isNaN(d.getTime())) return d.getTime()
+    }
+  }
+  const m2 = text.match(/\bon\s+(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/)
+  if (m2) {
+    const day = Number(m2[1])
+    const mon = Number(m2[2]) - 1
+    let year = Number(m2[3])
+    if (year < 100) year += 2000
+    const d = new Date(year, mon, day, 12, 0, 0)
+    if (!Number.isNaN(d.getTime())) return d.getTime()
+  }
+  return 0
+}
+
+function guessBankFromBody(text) {
+  const m = text.match(/\b(ICICI|HDFC|SBI|AXIS|KOTAK|YES|IDFC|PNB|Paytm)\s*Bank\b/i)
+  return m ? m[1].toUpperCase() : ''
 }
 
 function guessBankLabel(address) {
@@ -154,4 +239,103 @@ function matchAmount(text, re) {
 function capture(text, re) {
   const m = text.match(re)
   return m ? String(m[1]).trim() : ''
+}
+
+/**
+ * True when SMS looks like money moved between banks (IMPS/NEFT/RTGS/transfer),
+ * not cashback / autopay / merchant spend.
+ */
+export function isSelfTransferCandidate(parsed) {
+  if (!parsed) return false
+  if (parsed.kind === 'cashback' || parsed.kind === 'autopay' || parsed.kind === 'savings') {
+    return false
+  }
+  if (parsed.kind === 'transfer' || parsed.kind === 'self_transfer') return true
+  const lower = String(parsed.raw || '').toLowerCase()
+  return /\bneft\b|\bimps\b|\brtgs\b|\bself\s*transfer\b|\bto\s+self\b|\bown\s+a\/c\b|\bown\s+account\b/i.test(lower)
+}
+
+/**
+ * Find another of the user's accounts mentioned in the SMS (destination / source bank).
+ */
+export function findLinkedAccountInSms(parsed, accounts, excludeAccountId = null) {
+  if (!parsed || !accounts?.length) return null
+  const hay = `${parsed.merchant || ''} ${parsed.raw || ''} ${parsed.bankLabel || ''}`.toLowerCase()
+  const excl = excludeAccountId != null ? String(excludeAccountId) : null
+
+  // Prefer bank keyword that appears in SMS and matches a different account name
+  for (const b of BANK_HINTS) {
+    if (!b.keywords.some((k) => hay.includes(k)) && !b.labels.some((l) => hay.includes(l))) {
+      continue
+    }
+    const hit = accounts.find((a) => {
+      if (excl && String(a.id) === excl) return false
+      const name = String(a.name || '').toLowerCase()
+      return b.keywords.some((k) => name.includes(k))
+    })
+    if (hit) return hit
+  }
+
+  // Account name token present in SMS body
+  for (const a of accounts) {
+    if (excl && String(a.id) === excl) continue
+    const name = String(a.name || '').toLowerCase().trim()
+    if (name.length < 3) continue
+    if (hay.includes(name)) return a
+    const token = name.split(/\s+/)[0]
+    if (token.length >= 4 && hay.includes(token)) return a
+  }
+  return null
+}
+
+/**
+ * Classify SMS as a self-transfer between the user's own accounts (2+ accounts required).
+ * @returns {null | { fromAccount, toAccount, smsAccount, needsDestination }}
+ */
+export function classifySelfTransfer(parsed, accounts) {
+  if (!parsed || !accounts?.length || accounts.length < 2) return null
+  if (parsed.kind === 'cashback' || parsed.kind === 'autopay' || parsed.kind === 'savings') {
+    return null
+  }
+
+  const explicit = isSelfTransferCandidate(parsed)
+  const smsAccount = matchAccountToBank(accounts, parsed.bank, { preferSavings: false })
+    || matchAccountToBank(accounts, parsed.bank, { preferSavings: true })
+  if (!smsAccount) return null
+
+  let other = findLinkedAccountInSms(parsed, accounts, smsAccount.id)
+
+  // Plain UPI without transfer wording: only if another of our banks is named
+  if (!explicit && !other) return null
+
+  // Exactly two accounts + transfer wording → counterpart is the other account
+  if (!other && explicit && accounts.length === 2) {
+    other = accounts.find((a) => String(a.id) !== String(smsAccount.id)) || null
+  }
+
+  if (parsed.direction === 'DEBIT') {
+    return {
+      fromAccount: smsAccount,
+      toAccount: other || null,
+      smsAccount,
+      needsDestination: !other,
+    }
+  }
+  return {
+    fromAccount: other || null,
+    toAccount: smsAccount,
+    smsAccount,
+    needsDestination: !other,
+  }
+}
+
+/** Description used for both legs — excluded from income/expense dashboard totals. */
+export function transferDescription(fromName, toName) {
+  const a = String(fromName || 'Bank').trim() || 'Bank'
+  const b = String(toName || 'Bank').trim() || 'Bank'
+  return `Transfer: ${a} → ${b}`.slice(0, 220)
+}
+
+export function isTransferDescription(description) {
+  return /^transfer\s*:/i.test(String(description || '').trim())
 }

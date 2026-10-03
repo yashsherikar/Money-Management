@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
@@ -127,6 +127,7 @@ export default function Layout({ children }) {
   const location = useLocation()
   const [moreOpen, setMoreOpen] = useState(false)
   const [moreClosing, setMoreClosing] = useState(false)
+  const closeTimer = useRef(null)
   const [pendingCount, setPendingCount] = useState(() => countWaitingP2pPays())
   const moreActive = moreOpen || moreLinks.some((l) => location.pathname === l.to)
 
@@ -141,29 +142,55 @@ export default function Layout({ children }) {
     }
   }, [])
 
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+  }, [])
+
   function handleLogout() {
     logout()
     navigate('/login')
   }
 
+  function openMore() {
+    if (moreClosing) return
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+    setMoreClosing(false)
+    setMoreOpen(true)
+  }
+
   function closeMore() {
+    if (!moreOpen || moreClosing) return
     setMoreClosing(true)
-    setTimeout(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => {
       setMoreOpen(false)
       setMoreClosing(false)
+      closeTimer.current = null
     }, 200)
   }
 
+  useEffect(() => {
+    if (!moreOpen) return undefined
+    function onKey(e) {
+      if (e.key === 'Escape') closeMore()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moreOpen, moreClosing])
+
   return (
     <div className="min-h-screen min-h-[100dvh] flex flex-col overflow-x-hidden">
-      <header className="app-header sticky top-0 z-40 bg-white border-b border-slate-200 py-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <img src="/logo-32.png" alt="" className="w-7 h-7 rounded-lg shrink-0" />
-          <span className="font-bold text-brand-700 tracking-tight text-[0.95rem] sm:text-base truncate">Money Manager</span>
+      <header className="app-header sticky top-0 z-40 py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img src="/logo-32.png" alt="" className="w-8 h-8 rounded-xl shrink-0 ring-1 ring-white/10" />
+          <span className="brand-mark text-[0.95rem] sm:text-base truncate">Money Manager</span>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
           <NotificationBell />
-          <button type="button" onClick={() => setLang(lang === 'mr' ? 'en' : 'mr')} className="w-9 h-9 flex items-center justify-center rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" title={lang === 'mr' ? 'English' : 'मराठी'}>
+          <button type="button" onClick={() => setLang(lang === 'mr' ? 'en' : 'mr')} className="w-9 h-9 flex items-center justify-center rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" title={lang === 'mr' ? 'English' : 'मराठी'} aria-label={lang === 'mr' ? 'English' : 'Marathi'}>
             {lang === 'mr' ? 'EN' : 'मर'}
           </button>
           <button type="button" onClick={handleLogout} className="w-9 h-9 flex items-center justify-center rounded-lg text-red-600 hover:bg-red-50" title={t('Log out')} aria-label={t('Log out')}>
@@ -180,9 +207,9 @@ export default function Layout({ children }) {
       </main>
 
       {moreOpen && (
-        <div className="fixed inset-0 z-50 flex items-end">
+        <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true" aria-label={t('More')}>
           <div
-            className={`absolute inset-0 bg-black/50 ${moreClosing ? '' : 'animate-backdrop-in'}`}
+            className={`absolute inset-0 bg-black/55 backdrop-blur-[1px] ${moreClosing ? '' : 'animate-backdrop-in'}`}
             style={moreClosing ? { opacity: 0, transition: 'opacity 0.2s ease-in' } : undefined}
             onClick={closeMore}
           />
@@ -231,9 +258,10 @@ export default function Layout({ children }) {
 
           <button
             type="button"
-            onClick={() => setMoreOpen(true)}
+            onClick={() => (moreOpen ? closeMore() : openMore())}
             className={`nav-item ${moreActive ? 'nav-item-active' : ''}`}
             aria-label={t('More')}
+            aria-expanded={moreOpen}
           >
             <span className={`nav-icon-wrap ${moreActive ? 'nav-icon-active' : ''}`}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

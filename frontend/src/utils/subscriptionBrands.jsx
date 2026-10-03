@@ -61,7 +61,14 @@ export const SUBSCRIPTION_BRANDS = [
   { id: 'vi', name: 'Vi', color: '#EE2737', letter: 'V', keywords: ['vodafone idea', 'vi recharge', 'myvi'] },
   { id: 'phonepe', name: 'PhonePe', color: '#5F259F', letter: 'पे', keywords: ['phonepe'] },
   { id: 'gpay', name: 'Google Pay', color: '#4285F4', letter: 'G', keywords: ['google pay', 'gpay'] },
-  { id: 'paytm', name: 'Paytm', color: '#00BAF2', letter: 'P', keywords: ['paytm'] },
+  {
+    id: 'paytm',
+    name: 'Paytm',
+    color: '#00BAF2',
+    letter: 'P',
+    // ONE97 = Paytm corporate sender on bank credit SMS
+    keywords: ['paytm', 'one97', 'one97 communica', 'paytmbank', 'paytm bank'],
+  },
   // CRED app only — NEVER match bank "credit" / "credited" / "CREDIT".
   {
     id: 'cred',

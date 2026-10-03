@@ -23,6 +23,11 @@ function uid() {
   return `smr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+function captureUpiRef(raw) {
+  const m = String(raw || '').match(/\bupi\s*[:\-]?\s*([0-9]{6,22})/i)
+  return m ? m[1] : ''
+}
+
 function notifIdForReview(id) {
   let h = 0
   const s = String(id || '')
@@ -95,12 +100,15 @@ async function notifyForgotExpense(item) {
     ? ''
     : when.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
   const isCredit = item.direction === 'CREDIT'
-  const title = isCredit ? 'You were credited' : 'You forgot to add an expense'
+  const isSelfTransfer = item.kind === 'self_transfer' || item.reason === 'needs_destination'
+  const title = isSelfTransfer
+    ? 'Moved to your other bank?'
+    : isCredit ? 'You were credited' : 'You forgot to add an expense'
   const body = [
     `₹${amt}`,
-    who,
+    isSelfTransfer ? (item.bankLabel || 'Transfer') : who,
     dateStr && timeStr ? `${dateStr} ${timeStr}` : dateStr || timeStr,
-    '— open app: Add or Scam',
+    isSelfTransfer ? '— open app: pick account' : '— open app: Add or Scam',
   ].filter(Boolean).join(' · ')
 
   addLocalAppNotification({
@@ -157,6 +165,8 @@ export function enqueueSmsMoneyReview({
   address,
   suggestedAccountId = null,
   suggestedCategoryId = null,
+  suggestedToAccountId = null,
+  pendingSelfTransferId = null,
   reason = 'needs_confirm',
   date = Date.now(),
 }) {
@@ -168,6 +178,27 @@ export function enqueueSmsMoneyReview({
   }
   // Detect brand from merchant + raw only — not from info ("Credit"/"Debit" labels).
   const brand = detectMerchantBrand(merchant, raw)
+  const upiRef = captureUpiRef(raw)
+  const isCashback = kind === 'cashback'
+    || /\bcash\s*back\b|\bone97\b/i.test(String(raw || ''))
+  const isSelfTransfer = kind === 'self_transfer' || reason === 'needs_destination'
+  const bankBit = bankLabel && bankLabel !== 'PAYTM'
+    ? `${String(bankLabel).replace(/\s*bank\s*$/i, '').trim().toUpperCase()} Bank`
+    : ''
+  const suggestedDescription = isSelfTransfer
+    ? 'Transfer between my accounts'
+    : direction === 'CREDIT'
+      ? (isCashback
+        // Cashback: Paytm · ICICI Bank  (no UPI / A/c)
+        ? [`Cashback: ${brand?.name || merchant || 'Wallet'}`, bankBit].filter(Boolean).join(' · ')
+        : [
+          brand?.name || merchant || 'Credit',
+          upiRef && `UPI ${upiRef}`,
+          bankBit,
+          accountLast4 && `A/c …${accountLast4}`,
+        ].filter(Boolean).join(' · '))
+      : (brand ? brand.name : (merchant || ''))
+
   const item = {
     id: uid(),
     userId,
@@ -180,11 +211,14 @@ export function enqueueSmsMoneyReview({
     info: info || '',
     bankLabel: bankLabel || '',
     accountLast4: accountLast4 || '',
+    upiRef: upiRef || '',
     raw: String(raw || '').slice(0, 400),
     address: address || '',
     suggestedAccountId,
     suggestedCategoryId,
-    suggestedDescription: brand ? brand.name : (merchant || ''),
+    suggestedToAccountId,
+    pendingSelfTransferId,
+    suggestedDescription,
     reason,
     date: Number(date) || Date.now(),
     createdAt: Date.now(),
@@ -207,6 +241,35 @@ export function updateSmsMoneyReview(id, patch) {
 
 export function dismissSmsMoneyReview(id) {
   return updateSmsMoneyReview(id, { status: 'dismissed' })
+}
+
+/**
+ * After Pay-now SMS is logged, clear any forgot-expense popup for that same debit.
+ */
+export function dismissSmsMoneyReviewsForSms({ body = '', address = '', amount = null } = {}) {
+  const amt = amount != null ? Number(amount) : null
+  const normBody = String(body || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 90)
+  const addr = String(address || '').toLowerCase().slice(0, 24)
+  const all = loadAll()
+  let changed = false
+  for (let i = 0; i < all.length; i++) {
+    const x = all[i]
+    if (!x || x.status !== 'pending') continue
+    if (x.direction === 'CREDIT') continue
+    const sameAmt = amt == null || Math.abs(Number(x.amount) - amt) < 0.011
+    const sameBody = normBody
+      && String(x.raw || '').toLowerCase().replace(/\s+/g, ' ').includes(normBody.slice(0, 40))
+    const sameAddr = !addr || String(x.address || '').toLowerCase().includes(addr)
+      || addr.includes(String(x.address || '').toLowerCase().slice(0, 8))
+    const sameKey = x.dedupeKey && amt != null
+      && x.dedupeKey.startsWith(`${Number(amt).toFixed(2)}|DEBIT|`)
+    if (sameAmt && (sameBody || sameKey || (sameAddr && sameAmt))) {
+      all[i] = { ...x, status: 'dismissed', updatedAt: Date.now(), dismissReason: 'pay_now_sms' }
+      changed = true
+    }
+  }
+  if (changed) saveAll(all)
+  return changed
 }
 
 export function markSmsMoneyReviewSaved(id, transactionId) {

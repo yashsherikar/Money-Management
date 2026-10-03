@@ -6,6 +6,7 @@ import { startSmsPayWatcher } from './utils/smsPayWatch.js'
 import { startPendingPayReminderWatcher } from './utils/pendingPayReminders.js'
 import { syncUnloggedConfirmedPays } from './utils/paymentNotify.js'
 import { syncAllSubscriptionReminders } from './utils/subscriptionReminders.js'
+import { syncAllEmergencyFundReminders } from './utils/emergencyFundReminders.js'
 import client from './api/client'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -69,6 +70,9 @@ export default function App() {
       syncUnloggedConfirmedPays().catch(() => {})
       client.get('/recurring-transactions')
         .then((res) => syncAllSubscriptionReminders(res.data || []))
+        .catch(() => {})
+      client.get('/emergency-fund')
+        .then((res) => syncAllEmergencyFundReminders(res.data || []))
         .catch(() => {})
     }
     run()

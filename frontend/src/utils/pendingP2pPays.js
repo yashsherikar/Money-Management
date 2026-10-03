@@ -51,8 +51,18 @@ function saveAll(list) {
 
 /**
  * Create a waiting-SMS pending after user opens UPI.
+ * Optional kind/requestId → auto confirm-sent when SMS matches name+amount+time.
  */
-export function addPendingP2pPay({ pa, pn, amount, personal = true }) {
+export function addPendingP2pPay({
+  pa,
+  pn,
+  amount,
+  personal = true,
+  kind = null,
+  requestId = null,
+  participantId = null,
+  notificationId = null,
+} = {}) {
   if (!isLoggedIn()) return null
   const now = Date.now()
   const item = {
@@ -62,6 +72,10 @@ export function addPendingP2pPay({ pa, pn, amount, personal = true }) {
     pn: String(pn || '').trim(),
     amount: Number(Number(amount).toFixed(2)),
     personal: !!personal,
+    kind: kind || null,
+    requestId: requestId || null,
+    participantId: participantId || null,
+    notificationId: notificationId || null,
     status: 'waiting_sms',
     createdAt: now,
     updatedAt: now,

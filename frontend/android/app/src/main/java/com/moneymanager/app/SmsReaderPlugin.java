@@ -1,18 +1,12 @@
 package com.moneymanager.app;
 
 import android.Manifest;
-import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Build;
-import android.os.Bundle;
 import android.provider.Telephony;
-import android.telephony.SmsMessage;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -25,8 +19,8 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
 /**
- * Reads bank/UPI debit SMS for P2P pay confirmation.
- * Late SMS (5–15 min) are picked up via RECEIVE_SMS and by scanning inbox.
+ * Live bank/UPI SMS via manifest RECEIVE_SMS (works when app is killed).
+ * Inbox readRecent is only for explicit bill-match checks — money flow never scans history.
  */
 @CapacitorPlugin(
         name = "SmsReader",
@@ -43,24 +37,14 @@ import com.getcapacitor.annotation.PermissionCallback;
 public class SmsReaderPlugin extends Plugin {
 
     private static SmsReaderPlugin instance;
-    private BroadcastReceiver smsReceiver;
-    private boolean receiverRegistered = false;
 
     @Override
     public void load() {
         instance = this;
-        ensureReceiver();
-    }
-
-    @Override
-    protected void handleOnResume() {
-        super.handleOnResume();
-        ensureReceiver();
     }
 
     @Override
     protected void handleOnDestroy() {
-        unregisterReceiverQuietly();
         if (instance == this) instance = null;
         super.handleOnDestroy();
     }
@@ -76,10 +60,11 @@ public class SmsReaderPlugin extends Plugin {
     @PluginMethod
     public void requestPermissions(PluginCall call) {
         if (hasSmsPermission()) {
+            // Arm live listen window at now if first grant path
+            SmsLiveStore.ensureListenFrom(getContext());
             JSObject ret = new JSObject();
             ret.put("sms", "granted");
             ret.put("granted", true);
-            ensureReceiver();
             call.resolve(ret);
             return;
         }
@@ -92,11 +77,48 @@ public class SmsReaderPlugin extends Plugin {
         boolean ok = getPermissionState("sms") == PermissionState.GRANTED;
         ret.put("sms", getPermissionState("sms").toString());
         ret.put("granted", ok);
-        if (ok) ensureReceiver();
+        if (ok) {
+            // First allow → only SMS from this moment forward (native side)
+            SmsLiveStore.setListenFrom(getContext(), System.currentTimeMillis());
+        }
         call.resolve(ret);
     }
 
-    /** Scan inbox for recent SMS (covers late delivery while app was backgrounded). */
+    /** Sync JS listen-from so killed-app queue ignores older live SMS. */
+    @PluginMethod
+    public void setListenFrom(PluginCall call) {
+        long ms = 0L;
+        try {
+            Double v = call.getDouble("sinceMs");
+            if (v != null) ms = v.longValue();
+        } catch (Exception ignored) { }
+        if (ms <= 0) ms = System.currentTimeMillis();
+        SmsLiveStore.setListenFrom(getContext(), ms);
+        JSObject ret = new JSObject();
+        ret.put("sinceMs", ms);
+        call.resolve(ret);
+    }
+
+    /**
+     * Drain live SMS captured while app was killed.
+     * Not an inbox history read — only RECEIVE_SMS queue.
+     */
+    @PluginMethod
+    public void drainLiveQueue(PluginCall call) {
+        if (!hasSmsPermission()) {
+            call.reject("SMS permission not granted");
+            return;
+        }
+        JSArray messages = SmsLiveStore.drain(getContext());
+        JSObject ret = new JSObject();
+        ret.put("messages", messages);
+        call.resolve(ret);
+    }
+
+    /**
+     * Optional inbox read for bill-scan match only (JS money watcher must not call this).
+     * Still filtered by sinceMs (listen-from).
+     */
     @PluginMethod
     public void readRecent(PluginCall call) {
         if (!hasSmsPermission()) {
@@ -109,13 +131,19 @@ public class SmsReaderPlugin extends Plugin {
             if (since != null) sinceMs = since.longValue();
         } catch (Exception ignored) { }
         if (sinceMs <= 0) {
-            // default: last 24 hours
-            sinceMs = System.currentTimeMillis() - 24L * 60L * 60L * 1000L;
+            sinceMs = SmsLiveStore.getListenFrom(getContext());
         }
-        int limit = 80;
+        if (sinceMs <= 0) {
+            // Not armed — refuse to dump inbox history
+            JSObject ret = new JSObject();
+            ret.put("messages", new JSArray());
+            call.resolve(ret);
+            return;
+        }
+        int limit = 40;
         try {
             Integer lim = call.getInt("limit");
-            if (lim != null && lim > 0) limit = Math.min(lim, 200);
+            if (lim != null && lim > 0) limit = Math.min(lim, 80);
         } catch (Exception ignored) { }
 
         try {
@@ -134,9 +162,19 @@ public class SmsReaderPlugin extends Plugin {
             call.reject("SMS permission not granted");
             return;
         }
-        ensureReceiver();
+        try {
+            Double since = call.getDouble("sinceMs");
+            if (since != null && since > 0) {
+                SmsLiveStore.setListenFrom(getContext(), since.longValue());
+            } else {
+                SmsLiveStore.ensureListenFrom(getContext());
+            }
+        } catch (Exception ignored) {
+            SmsLiveStore.ensureListenFrom(getContext());
+        }
+        // Manifest receiver handles live SMS; nothing else to register.
         JSObject ret = new JSObject();
-        ret.put("watching", receiverRegistered);
+        ret.put("watching", true);
         call.resolve(ret);
     }
 
@@ -145,71 +183,6 @@ public class SmsReaderPlugin extends Plugin {
         if (ctx == null) return false;
         return ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
                 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void ensureReceiver() {
-        if (!hasSmsPermission() || receiverRegistered || getContext() == null) return;
-        if (smsReceiver == null) {
-            smsReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    if (intent == null || intent.getAction() == null) return;
-                    if (!Telephony.Sms.Intents.SMS_RECEIVED_ACTION.equals(intent.getAction())
-                            && !"android.provider.Telephony.SMS_RECEIVED".equals(intent.getAction())) {
-                        return;
-                    }
-                    try {
-                        Bundle bundle = intent.getExtras();
-                        if (bundle == null) return;
-                        Object[] pdus = (Object[]) bundle.get("pdus");
-                        if (pdus == null || pdus.length == 0) return;
-                        String format = bundle.getString("format");
-                        StringBuilder body = new StringBuilder();
-                        String address = "";
-                        long ts = System.currentTimeMillis();
-                        for (Object pdu : pdus) {
-                            SmsMessage msg;
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && format != null) {
-                                msg = SmsMessage.createFromPdu((byte[]) pdu, format);
-                            } else {
-                                msg = SmsMessage.createFromPdu((byte[]) pdu);
-                            }
-                            if (msg == null) continue;
-                            if (address.isEmpty() && msg.getDisplayOriginatingAddress() != null) {
-                                address = msg.getDisplayOriginatingAddress();
-                            }
-                            if (msg.getTimestampMillis() > 0) ts = msg.getTimestampMillis();
-                            String part = msg.getMessageBody();
-                            if (part != null) body.append(part);
-                        }
-                        String text = body.toString().trim();
-                        if (text.isEmpty()) return;
-                        if (!looksLikePaymentSms(text)) return;
-                        emitSms(address, text, ts);
-                    } catch (Exception ignored) { }
-                }
-            };
-        }
-        try {
-            IntentFilter filter = new IntentFilter(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
-            filter.setPriority(999);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                getContext().registerReceiver(smsReceiver, filter, Context.RECEIVER_EXPORTED);
-            } else {
-                getContext().registerReceiver(smsReceiver, filter);
-            }
-            receiverRegistered = true;
-        } catch (Exception e) {
-            receiverRegistered = false;
-        }
-    }
-
-    private void unregisterReceiverQuietly() {
-        if (!receiverRegistered || smsReceiver == null || getContext() == null) return;
-        try {
-            getContext().unregisterReceiver(smsReceiver);
-        } catch (Exception ignored) { }
-        receiverRegistered = false;
     }
 
     private JSArray queryInbox(long sinceMs, int limit) {
@@ -249,11 +222,19 @@ public class SmsReaderPlugin extends Plugin {
         if (body == null) return false;
         String b = body.toLowerCase();
         if (b.contains("otp") || b.contains("one time") || b.contains("verification code")) return false;
-        boolean money = b.contains("rs.") || b.contains("rs ") || b.contains("inr") || b.contains("₹")
-                || b.contains("debited") || b.contains("spent") || b.contains("paid")
-                || b.contains("sent") || b.contains("upi") || b.contains("txn")
-                || b.contains("transaction") || b.contains("withdrawn");
-        return money;
+        return b.contains("rs.") || b.contains("rs ") || b.contains("inr") || b.contains("₹")
+                || b.contains("debited") || b.contains("credited") || b.contains("spent") || b.contains("paid")
+                || b.contains("received") || b.contains("deposited") || b.contains("sent")
+                || b.contains("upi") || b.contains("txn") || b.contains("transaction")
+                || b.contains("withdrawn") || b.contains("imps") || b.contains("neft") || b.contains("rtgs");
+    }
+
+    /** @return true if delivered to a live WebView bridge */
+    static boolean emitIfAlive(String address, String body, long date) {
+        SmsReaderPlugin plugin = instance;
+        if (plugin == null) return false;
+        emitSms(address, body, date);
+        return true;
     }
 
     static void emitSms(String address, String body, long date) {

@@ -3,12 +3,15 @@
  * Strong dedupe; if we can't auto-save cleanly → queue for app-open review.
  */
 import client from '../api/client'
-import { parseBankMoneySms, matchAccountToBank } from './smsBankParse.js'
+import { parseBankMoneySms, matchAccountToBank, classifySelfTransfer } from './smsBankParse.js'
+import { tryProcessSelfTransferSms } from './selfTransferDetect.js'
 import {
   smsDedupeKey,
   enqueueSmsMoneyReview,
   hasSmsMoneyReview,
+  dismissSmsMoneyReviewsForSms,
 } from './smsMoneyReview.js'
+import { listPendingP2pPays } from './pendingP2pPays.js'
 import {
   detectSubscriptionBrand,
   subscriptionLabel,
@@ -52,12 +55,52 @@ function loadSeen() {
 }
 
 function rememberSeen(key) {
-  if (!isLoggedIn()) return
+  if (!isLoggedIn() || !key) return
   const seen = loadSeen()
   seen.add(key)
   const arr = [...seen]
   while (arr.length > 300) arr.shift()
   userSetItem(SEEN_KEY, JSON.stringify(arr))
+}
+
+/**
+ * Call after Pay-now / P2P SMS is already logged — stops forgot-expense popup
+ * for the same bank debit SMS.
+ */
+export function markSmsConsumedByPayConfirm({
+  body = '',
+  address = '',
+  amount = null,
+  date = Date.now(),
+} = {}) {
+  if (!isLoggedIn()) return
+  const text = String(body || '')
+  const parsed = parseBankMoneySms({
+    body: text,
+    address,
+    date,
+    includeUpiPayment: true,
+  })
+  const amt = amount != null ? Number(amount) : (parsed ? Number(parsed.amount) : null)
+  const dir = parsed?.direction || 'DEBIT'
+  // Mark both raw + full body so reopen/re-parse cannot miss the seen key
+  if (amt != null) {
+    rememberSeen(smsDedupeKey({ amount: amt, direction: dir, body: text, address }))
+    if (parsed?.raw && parsed.raw !== text) {
+      rememberSeen(smsDedupeKey({
+        amount: amt,
+        direction: dir,
+        body: parsed.raw,
+        address,
+      }))
+    }
+  }
+  // Drop any already-queued "forgot expense" for this SMS
+  dismissSmsMoneyReviewsForSms({
+    body: text,
+    address,
+    amount: amount ?? parsed?.amount,
+  })
 }
 
 export function listAutopayHistory() {
@@ -68,45 +111,96 @@ function historyHasDedupe(dedupeKey) {
   return loadHistory().some((h) => h.dedupeKey === dedupeKey)
 }
 
+/** Same debit already confirmed via Pay now / payment request SMS match. */
+function matchesConfirmedPayNow(parsed) {
+  if (!parsed || parsed.direction !== 'DEBIT') return false
+  const amt = Number(parsed.amount)
+  const smsDate = Number(parsed.date) || Date.now()
+  const smsName = String(parsed.merchant || parsed.payeeName || '').toLowerCase()
+  return listPendingP2pPays().some((p) => {
+    if (p.status !== 'confirmed' && p.status !== 'waiting_sms') return false
+    if (Math.abs(Number(p.amount) - amt) > 0.011) return false
+    const created = Number(p.createdAt) || 0
+    const confirmed = Number(p.confirmedAt) || created
+    // SMS within pay window (2 min before create → 24h after)
+    if (smsDate < created - 2 * 60_000) return false
+    if (smsDate > confirmed + 24 * 60 * 60_000) return false
+    // Confirmed pays always block; waiting pays block if name/VPA hints match
+    if (p.status === 'confirmed') return true
+    const pn = String(p.pn || p.name || '').toLowerCase()
+    if (pn && smsName && (smsName.includes(pn.slice(0, 4)) || pn.includes(smsName.slice(0, 4)))) return true
+    if (p.pa && parsed.pa && String(p.pa).toLowerCase() === String(parsed.pa).toLowerCase()) return true
+    return false
+  })
+}
+
 function txnDateFromSms(parsed) {
   const d = parsed?.date ? new Date(parsed.date) : new Date()
   if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10)
   return d.toISOString().slice(0, 10)
 }
 
+function formatBankLabel(label) {
+  const raw = String(label || '').trim()
+  if (!raw || /^paytm$/i.test(raw)) return ''
+  const name = raw.replace(/\s*bank\s*$/i, '').trim().toUpperCase()
+  if (!name) return ''
+  return `${name} Bank`
+}
+
 function buildDescription(parsed, accountName, brand) {
   const who = brand?.name || parsed.merchant || (parsed.kind === 'savings' ? 'Savings' : 'Bank')
-  const prefix = brand
-    ? 'Subscription'
-    : parsed.kind === 'savings'
-      ? 'Savings'
-      : parsed.kind === 'autopay'
-        ? 'Autopay'
-        : parsed.kind === 'transfer'
-          ? 'Transfer'
-          : 'Bank SMS'
+
+  // Cashback: Paytm · ICICI Bank  (no UPI ref / A/c)
+  if (parsed.kind === 'cashback') {
+    const bank = formatBankLabel(parsed.bankLabel || parsed.bank?.id)
+    return [`Cashback: ${who}`, bank].filter(Boolean).join(' · ').slice(0, 220)
+  }
+
+  const prefix = parsed.direction === 'CREDIT'
+    ? 'Credit'
+    : brand
+      ? 'Subscription'
+      : parsed.kind === 'savings'
+        ? 'Savings'
+        : parsed.kind === 'autopay'
+          ? 'Autopay'
+          : parsed.kind === 'transfer'
+            ? 'Transfer'
+            : 'Bank SMS'
+
   const bits = [
     `${prefix}: ${who}`,
-    parsed.info,
+    parsed.upiRef && `UPI ${parsed.upiRef}`,
+    parsed.bankLabel && parsed.bankLabel !== 'PAYTM' && String(parsed.bankLabel),
+    parsed.accountLast4 && `A/c …${parsed.accountLast4}`,
     accountName && `via ${accountName}`,
   ].filter(Boolean)
+
   return bits.join(' · ').slice(0, 220)
 }
 
 /** Confident category = named match, not bare Other / first fallback. */
 function resolveCategory(categories, parsed) {
   if (!categories?.length) return { id: null, confident: false, name: null }
-  const preferred = parsed.kind === 'savings'
-    ? ['Savings', 'Investment']
-    : parsed.kind === 'autopay'
-      ? ['Subscription', 'Bills']
-      : parsed.direction === 'CREDIT'
-        ? ['Salary', 'Freelance', 'Other']
-        : ['Bills', 'Food', 'Shopping', 'Travel']
+  const preferred = parsed.kind === 'cashback'
+    ? ['Cashback', 'Freelance', 'Other']
+    : parsed.kind === 'savings'
+      ? ['Savings', 'Investment']
+      : parsed.kind === 'autopay'
+        ? ['Subscription', 'Bills']
+        : parsed.direction === 'CREDIT'
+          ? (/\bsalary\b/i.test(String(parsed.raw || ''))
+            ? ['Salary', 'Freelance', 'Other']
+            : ['Freelance', 'Other', 'Salary'])
+          : ['Bills', 'Food', 'Shopping', 'Travel']
 
   for (const name of preferred) {
     const hit = categories.find((c) => String(c.name).toLowerCase() === name.toLowerCase())
-    if (hit && String(hit.name).toLowerCase() !== 'other') {
+    if (!hit) continue
+    const isOther = String(hit.name).toLowerCase() === 'other'
+    // Cashback may only have Other — still auto-save to Transactions
+    if (!isOther || parsed.kind === 'cashback') {
       return { id: hit.id, confident: true, name: hit.name }
     }
   }
@@ -134,7 +228,7 @@ async function alreadyLoggedSimilar(accountId, amount, direction, txnDate) {
       && Number(t.amount) === Number(amount)
       && t.type === type
       && t.txnDate === txnDate
-      && /^(Autopay|Savings|Transfer|Bank SMS)/i.test(String(t.description || '')),
+      && /^(Cashback|Credit|Autopay|Savings|Transfer|Bank SMS|Subscription)/i.test(String(t.description || '')),
     )
   } catch {
     return false
@@ -181,10 +275,6 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
   if (!parsed) return null
 
   const brand = detectSubscriptionBrand(parsed.raw, parsed.merchant, body, address)
-  if (brand && parsed.direction === 'DEBIT') {
-    parsed.kind = 'autopay'
-    if (!parsed.merchant) parsed.merchant = brand.name
-  }
 
   const dedupeKey = smsDedupeKey({
     amount: parsed.amount,
@@ -199,6 +289,18 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
   if (inFlight.has(flightKey) || loadSeen().has(dedupeKey) || historyHasDedupe(dedupeKey) || hasSmsMoneyReview(dedupeKey)) {
     return null
   }
+
+  // Already handled as Pay-now / payment-request / P2P → never ask category again
+  if (matchesConfirmedPayNow(parsed)) {
+    rememberSeen(dedupeKey)
+    dismissSmsMoneyReviewsForSms({
+      body: parsed.raw || body,
+      address,
+      amount: parsed.amount,
+    })
+    return null
+  }
+
   inFlight.add(flightKey)
   rememberSeen(dedupeKey)
 
@@ -217,6 +319,27 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
     if (!accs.length) {
       queueReview(parsed, dedupeKey, 'no_account', null, null)
       return { queued: true, reason: 'no_account' }
+    }
+
+    // Own bank → own bank (2+ accounts): Transfer: A → B, not spend/earn
+    // Run before brand→autopay so IMPS/UPI self-moves are not treated as subscriptions
+    if (accs.length >= 2 && (parsed.kind === 'transfer' || classifySelfTransfer(parsed, accs))) {
+      try {
+        const stx = await tryProcessSelfTransferSms(parsed, {
+          accounts: accs,
+          categories: cats,
+          dedupeKey,
+        })
+        if (stx?.selfTransfer) {
+          return stx
+        }
+      } catch { /* fall through to normal path */ }
+    }
+
+    if (brand && parsed.direction === 'DEBIT'
+        && parsed.kind !== 'transfer' && parsed.kind !== 'self_transfer') {
+      parsed.kind = 'autopay'
+      if (!parsed.merchant) parsed.merchant = brand.name
     }
 
     if (brand && parsed.kind === 'autopay') {
@@ -239,7 +362,16 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
     const bankMatched = !!(parsed.bank && account && parsed.bank.keywords.some((k) =>
       String(account.name || '').toLowerCase().includes(k),
     ))
-    const canAuto = !!(account && cat.confident && (bankMatched || accs.length === 1 || account.isPrimary))
+    // Cashback credits: prefer auto-post to Transactions (INCOME) when we have account+category
+    if (parsed.kind === 'cashback' && account && cat.id) {
+      cat = { ...cat, confident: true }
+    }
+    const canAuto = !!(account && cat.confident && (
+      bankMatched
+      || accs.length === 1
+      || account.isPrimary
+      || parsed.kind === 'cashback'
+    ))
 
     if (!canAuto) {
       queueReview(
@@ -414,9 +546,9 @@ async function upsertAutopaySubscription({ account, amount, merchant, categoryId
 }
 
 /**
- * Past inbox scan disabled — money SMS is handled only when a new message arrives
- * (live RECEIVE_SMS via smsPayWatch). Kept so old imports do not pull history.
+ * Drain live SMS queued while app was killed (not inbox history).
  */
 export async function scanInboxForAutopays() {
-  return []
+  const { drainLiveSmsQueue } = await import('./smsPayWatch.js')
+  return drainLiveSmsQueue()
 }

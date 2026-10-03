@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import {
@@ -13,33 +13,17 @@ import { clearNotificationPayAction } from '../utils/confirmDuePaid.js'
  * After the user leaves for UPI (and even if both apps are killed), we ask
  * "Did you pay?" from localStorage and let them confirm.
  *
- * Scan&Pay detail confirm stays on /scan-pay; this handles request / other kinds
- * and also re-routes cold starts with a pending scan_pay payload.
+ * Handles request / split / scan&pay / generic UPI confirms in one place.
  */
 export default function PendingPayConfirm() {
   const { t } = useLanguage()
   const navigate = useNavigate()
-  const location = useLocation()
   const [pending, setPending] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   function refresh() {
-    const data = readPendingUpiConfirm()
-    if (!data) {
-      setPending(null)
-      return
-    }
-    // Scan&Pay has its own richer confirm UI on that page
-    if ((!data.kind || data.kind === 'scan_pay') && location.pathname === '/scan-pay') {
-      setPending(null)
-      return
-    }
-    if ((!data.kind || data.kind === 'scan_pay') && location.pathname !== '/scan-pay') {
-      navigate('/scan-pay', { replace: true })
-      return
-    }
-    setPending(data)
+    setPending(readPendingUpiConfirm())
   }
 
   useEffect(() => {
@@ -53,7 +37,7 @@ export default function PendingPayConfirm() {
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('focus', refresh)
     }
-  }, [location.pathname, navigate])
+  }, [])
 
   async function confirmYes() {
     if (!pending || busy) return
@@ -63,15 +47,26 @@ export default function PendingPayConfirm() {
       if (pending.kind === 'payment_request' && pending.requestId) {
         await client.patch(`/payment-requests/${pending.requestId}/confirm-sent`)
       }
-      // Clear "Pay now" on the notification that started this pay
       if (pending.notificationId) {
         await clearNotificationPayAction(pending.notificationId)
       }
-      // split_bill / contribution: friend still marks received; we just drop Pay now
+      try {
+        const { handleDetectedUpiPayment } = await import('../utils/paymentNotify.js')
+        await handleDetectedUpiPayment({
+          amount: Number(pending.am || pending.amount),
+          pa: pending.pa,
+          payeeName: pending.pn || pending.name,
+          source: 'manual',
+          personal: true,
+          kind: pending.kind === 'scan_pay' ? 'scan_pay' : 'p2p',
+          forceLog: true,
+        })
+      } catch { /* ignore log failure */ }
       clearPendingUpiConfirm()
       setPending(null)
       try {
         window.dispatchEvent(new CustomEvent('mm-local-notifications-changed'))
+        window.dispatchEvent(new Event('mm-transactions-changed'))
       } catch { /* ignore */ }
       if (pending.kind === 'payment_request' || pending.kind === 'split_bill' || pending.kind === 'contribution') {
         navigate('/notifications', { replace: true })
@@ -89,16 +84,16 @@ export default function PendingPayConfirm() {
     setError('')
   }
 
-  if (!pending || !pending.kind || pending.kind === 'scan_pay') return null
+  if (!pending) return null
 
   const amount = pending.am || pending.amount
   const label = pending.name || pending.pn || pending.pa || t('this payment')
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={confirmNo} />
-      <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4">
-        <h2 className="font-bold text-lg mb-2">{t('Did you pay?')}</h2>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pb-20" role="dialog" aria-modal="true" aria-labelledby="pending-pay-title">
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" onClick={confirmNo} />
+      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl border border-slate-200">
+        <h2 id="pending-pay-title" className="font-bold text-lg mb-2">{t('Did you pay?')}</h2>
         <p className="text-sm text-slate-600 mb-2">
           {t('GPay does not tell this app if payment succeeded. Confirm only if money was sent.')}
         </p>

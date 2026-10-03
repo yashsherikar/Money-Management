@@ -15,9 +15,10 @@ public class SplitBillDtos {
     public record ParticipantRequest(
             @NotBlank String name,
             @NotNull @DecimalMin("0.01") BigDecimal shareAmount,
-            /** Optional 0.01–99.99 of the bill total. */
+            /** Optional percent of the bill total. */
             BigDecimal sharePercent,
-            String email
+            String email,
+            String phone
     ) {}
 
     public record SplitBillRequest(
@@ -39,7 +40,9 @@ public class SplitBillDtos {
             BigDecimal sharePercent,
             boolean paid,
             LocalDate paidDate,
-            boolean linked
+            boolean linked,
+            String email,
+            String phone
     ) {}
 
     /** What a linked participant sees on their own Requests page. */

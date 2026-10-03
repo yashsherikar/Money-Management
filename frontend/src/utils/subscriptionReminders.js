@@ -50,11 +50,36 @@ function whenLabel(leadDays) {
   return `is due in ${leadDays} days`
 }
 
+/** Daily / every-1-day autopay: bank already debits — no reminder spam. */
+export function isDailyRecurring(item) {
+  if (!item || item.recurrenceType !== 'INTERVAL_DAYS') return false
+  const days = Number(item.intervalDays)
+  return !Number.isFinite(days) || days <= 1
+}
+
+function shouldScheduleRecurringReminder(item) {
+  if (!item?.active || !item?.id) return false
+  if (isDailyRecurring(item)) return false
+  // Subscriptions / autopay brands, monthly dues, or multi-day interval cycles
+  if (isSubscriptionRecurring(item)) return true
+  if (item.recurrenceType === 'MONTHLY') return true
+  if (item.recurrenceType === 'INTERVAL_DAYS' && Number(item.intervalDays) > 1) return true
+  return false
+}
+
+function titleForLead(item, lead) {
+  const sub = isSubscriptionRecurring(item)
+  if (lead === 0) return sub ? 'Subscription due today' : 'Due today'
+  if (lead === 1) return sub ? 'Subscription due tomorrow' : 'Due tomorrow'
+  return sub ? `Subscription due in ${lead} days` : `Due in ${lead} days`
+}
+
 /**
- * Schedule local notifications for one subscription (2d / 1d / due day @ 9am).
+ * Schedule local notifications for recurring / subscription / autopay
+ * (2d / 1d / due day @ 9am). Skips daily autopay.
  */
 export async function scheduleSubscriptionReminders(item) {
-  if (!isSubscriptionRecurring(item) || !item?.active) {
+  if (!shouldScheduleRecurringReminder(item)) {
     await cancelSubscriptionReminders(item?.id)
     return
   }
@@ -62,8 +87,12 @@ export async function scheduleSubscriptionReminders(item) {
   if (!due || Number.isNaN(due.getTime())) return
 
   const brand = brandFromRecurringDescription(item.description)
-  const name = brand?.name || item.description || 'Subscription'
+  const name = brand?.name || item.description || 'Payment'
   const amt = Number(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const intervalDays = item.recurrenceType === 'INTERVAL_DAYS'
+    ? Number(item.intervalDays) || 999
+    : 999
+  const leads = [2, 1, 0].filter((lead) => lead < intervalDays)
 
   const LN = await getLN()
   if (LN) {
@@ -76,12 +105,12 @@ export async function scheduleSubscriptionReminders(item) {
         try { await LN.cancel({ notifications: toCancel }) } catch { /* ignore */ }
 
         const notifications = []
-        for (const lead of [2, 1, 0]) {
+        for (const lead of leads) {
           const at = new Date(due.getTime() - lead * 24 * 60 * 60_000)
           if (at.getTime() <= Date.now() + 30_000) continue
           notifications.push({
             id: notifId(item.id, lead),
-            title: lead === 0 ? 'Subscription due today' : `Subscription due in ${lead} day${lead > 1 ? 's' : ''}`,
+            title: titleForLead(item, lead),
             body: `${name} (₹${amt}) ${whenLabel(lead)}. Tap to mark paid.`,
             schedule: { at, allowWhileIdle: true },
             extra: { url: `/recurring?confirm=${item.id}`, recurringId: item.id },
@@ -95,18 +124,20 @@ export async function scheduleSubscriptionReminders(item) {
     } catch { /* ignore */ }
   }
 
-  // In-app bell: if due within 2 days, surface now
+  // In-app bell: if due within 2 days, surface now (not for daily)
   const msUntil = due.getTime() - Date.now()
   const twoDays = 2 * 24 * 60 * 60_000
   if (msUntil >= 0 && msUntil <= twoDays) {
     const lead = msUntil <= 12 * 60 * 60_000 ? 0 : msUntil <= 36 * 60 * 60_000 ? 1 : 2
-    addLocalAppNotification({
-      title: lead === 0 ? 'Subscription due today' : `Subscription due in ${lead} day${lead > 1 ? 's' : ''}`,
-      body: `${name} (₹${amt}) ${whenLabel(lead)}`,
-      url: `/recurring?confirm=${item.id}`,
-      kind: 'subscription',
-      relatedId: String(item.id),
-    })
+    if (lead < intervalDays) {
+      addLocalAppNotification({
+        title: titleForLead(item, lead),
+        body: `${name} (₹${amt}) ${whenLabel(lead)}`,
+        url: `/recurring?confirm=${item.id}`,
+        kind: isSubscriptionRecurring(item) ? 'subscription' : 'recurring',
+        relatedId: String(item.id),
+      })
+    }
   }
 }
 
@@ -122,10 +153,13 @@ export async function cancelSubscriptionReminders(recurringId) {
   } catch { /* ignore */ }
 }
 
-/** Reschedule all subscription recurring items. */
+/** Reschedule all recurring / subscription / autopay dues (skips daily). */
 export async function syncAllSubscriptionReminders(items) {
-  const list = (items || []).filter(isSubscriptionRecurring)
-  for (const item of list) {
+  for (const item of items || []) {
+    if (isDailyRecurring(item)) {
+      await cancelSubscriptionReminders(item.id)
+      continue
+    }
     await scheduleSubscriptionReminders(item)
   }
 }

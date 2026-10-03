@@ -162,9 +162,9 @@ export default function PaymentCategoryPrompt() {
         </div>
       )}
       {prompt && (
-        <div className="fixed inset-0 z-[65] flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 pb-20">
           <div className="absolute inset-0 bg-black/40" onClick={skip} />
-          <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4">
+          <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl">
             <h2 className="font-bold text-lg mb-1">
               {prompt.refineOnly ? t('Update category') : t('Choose a category')}
             </h2>

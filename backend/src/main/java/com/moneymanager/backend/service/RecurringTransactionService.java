@@ -77,13 +77,22 @@ public class RecurringTransactionService {
         LocalDate today = LocalDate.now();
         return recurringTransactionRepository.findByUserIdOrderByDayOfMonthAsc(user.getId()).stream()
                 .filter(RecurringTransaction::isActive)
+                .filter(rt -> !isDailyInterval(rt)) // daily autopay — no "did you pay?" nag
                 .filter(rt -> isDue(rt, today))
                 .map(this::toResponse)
                 .toList();
     }
 
+    /** Every 1 day (or missing) — bank SMS already covers these; reminders are noise. */
+    private boolean isDailyInterval(RecurringTransaction rt) {
+        if (rt.getRecurrenceType() != RecurrenceType.INTERVAL_DAYS) return false;
+        Integer days = rt.getIntervalDays();
+        return days == null || days <= 1;
+    }
+
     private boolean isDue(RecurringTransaction rt, LocalDate today) {
         if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            if (isDailyInterval(rt)) return false;
             return !today.isBefore(nextDueDate(rt));
         }
         String currentMonth = YearMonth.from(today).toString();

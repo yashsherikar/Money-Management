@@ -43,10 +43,7 @@ public class PaymentRequestService {
 
     @Transactional
     public PaymentRequestResponse create(User requester, PaymentRequestCreate request) {
-        String email = request.email().trim().toLowerCase();
-        User payer = userRepository.findByIgnoreCaseEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No Money Manager user with email " + email));
+        User payer = resolvePayer(request);
         if (payer.getId().equals(requester.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You can't ask yourself for money");
         }
@@ -184,8 +181,12 @@ public class PaymentRequestService {
                 pr.getRequester().getId(),
                 pr.getRequester().getName(),
                 upiId,
+                pr.getRequester().getEmail(),
+                pr.getRequester().getPhone(),
                 pr.getPayer().getId(),
                 pr.getPayer().getName(),
+                pr.getPayer().getEmail(),
+                pr.getPayer().getPhone(),
                 pr.getAmount(),
                 pr.getNote(),
                 pr.getStatus().name(),
@@ -209,6 +210,22 @@ public class PaymentRequestService {
     private static String reasonLabel(PaymentRequest pr) {
         if (StringUtils.hasText(pr.getNote())) return pr.getNote().trim();
         return "Money for " + pr.getRequester().getName();
+    }
+
+    private User resolvePayer(PaymentRequestCreate request) {
+        String email = blankToNull(request.email());
+        String phone = ProfileService.normalizePhone(request.phone());
+        if (email == null && phone == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter friend's email or phone");
+        }
+        if (email != null) {
+            return userRepository.findByIgnoreCaseEmail(email.toLowerCase())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "No Money Manager user with email " + email));
+        }
+        return userRepository.findByPhone(phone)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "No Money Manager user with that phone number"));
     }
 
     private static String blankToNull(String s) {

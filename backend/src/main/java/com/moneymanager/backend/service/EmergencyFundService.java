@@ -123,7 +123,8 @@ public class EmergencyFundService {
                 p.getTargetAccount().getName(),
                 p.getAmount(),
                 p.getDayOfMonth(),
-                p.isActive()
+                p.isActive(),
+                p.getLastLoggedMonth()
         );
     }
 }
