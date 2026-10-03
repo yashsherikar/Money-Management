@@ -167,6 +167,8 @@ public class PaymentRequestService {
             pr.setRespondedAt(Instant.now());
             paymentRequestRepository.save(pr);
         }
+        // Payer already paid — remove "Pay now" from their notifications / tray
+        pushService.resolveRelated(PushService.RELATED_PAYMENT_REQUEST, pr.getId());
         pushService.notifyUser(pr.getRequester(), "Payment sent?",
                 payer.getName() + " says they paid ₹" + pr.getAmount().toPlainString()
                         + " — mark as received if money arrived",

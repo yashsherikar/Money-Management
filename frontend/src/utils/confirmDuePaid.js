@@ -1,4 +1,6 @@
 import client from '../api/client.js'
+import { removeLocalAppNotificationsForRelated } from './localAppNotifications.js'
+import { cancelSubscriptionReminders, scheduleSubscriptionReminders } from './subscriptionReminders.js'
 
 export const RELATED = {
   RECURRING: 'RECURRING_TRANSACTION',
@@ -9,6 +11,24 @@ export const RELATED = {
 /** Tell Dashboard / Transactions to reload after a confirm-from-paid action. */
 export function notifyTransactionsChanged() {
   window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
+  try {
+    window.dispatchEvent(new CustomEvent('mm-local-notifications-changed'))
+  } catch { /* ignore */ }
+}
+
+/** After paid: drop due reminders so UI no longer says pay. */
+export async function clearPaidReminders(relatedType, relatedId) {
+  if (relatedId == null) return
+  removeLocalAppNotificationsForRelated(relatedId, ['subscription', 'due', 'recurring'])
+  if (relatedType === RELATED.RECURRING) {
+    await cancelSubscriptionReminders(relatedId)
+    // Reschedule next cycle if still active
+    try {
+      const { data } = await client.get('/recurring-transactions')
+      const item = (data || []).find((r) => String(r.id) === String(relatedId))
+      if (item?.active) await scheduleSubscriptionReminders(item)
+    } catch { /* ignore */ }
+  }
 }
 
 /** Logs the due item as a real transaction (recurring, EMI, emergency fund). */
@@ -29,7 +49,19 @@ export async function confirmDuePaid(relatedType, relatedId) {
     default:
       throw new Error('unsupported notification type')
   }
+  await clearPaidReminders(relatedType, relatedId)
   notifyTransactionsChanged()
+}
+
+/** Clear Pay now on a server notification after user paid. */
+export async function clearNotificationPayAction(notificationId) {
+  if (!notificationId || String(notificationId).startsWith('local_')) return null
+  try {
+    const { data } = await client.patch(`/notifications/${notificationId}/clear-pay-action`)
+    return data
+  } catch {
+    return null
+  }
 }
 
 /** Parse ?confirm= from reminder URLs (older pushes without related fields). */

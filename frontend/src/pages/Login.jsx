@@ -3,8 +3,8 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { EyeIcon, EyeOffIcon } from '../components/icons.jsx'
-import client, { networkErrorMessage } from '../api/client'
-import { promptNativePushIfNeeded } from '../nativePush.js'
+import { networkErrorMessage } from '../api/client'
+import { bootstrapNotifications } from '../utils/notificationBootstrap.js'
 
 export default function Login() {
   const { user, login } = useAuth()
@@ -24,8 +24,8 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email.trim(), password)
-      // Don't block login on push registration failures
-      promptNativePushIfNeeded(client).catch(() => {})
+      // Don't block login on push / local notification setup
+      bootstrapNotifications({ refreshPush: true }).catch(() => {})
       navigate('/', { replace: true })
     } catch (err) {
       setError(networkErrorMessage(err, t('Login failed')))

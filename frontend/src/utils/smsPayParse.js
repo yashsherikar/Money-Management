@@ -17,8 +17,8 @@ export function parseBankPaymentSms({ body = '', address = '', date = 0 } = {}) 
     return null
   }
 
-  const isDebit = /\bdebited\b|\bspent\b|\bpaid\b|\bsent\b|\bwithdrawn\b|\bpurchase\b|\bupi\b|\bimps\b|\bneft\b/i.test(lower)
-    || /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text)
+  // Real debit only — ignore promo SMS that just mention ₹ / UPI / "paid"
+  const isDebit = /\bdebited\b|\bspent\b|\bpaid\s+(?:to|from|via|using|rs|₹|inr)\b|\bhas\s+been\s+paid\b|\bsent\b|\bwithdrawn\b|\bpurchase\b|\bupi\s*ref\b|\bimps\b|\bneft\b/i.test(lower)
   if (!isDebit) return null
 
   const amount =

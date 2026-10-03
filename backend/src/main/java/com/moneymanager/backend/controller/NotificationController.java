@@ -4,6 +4,7 @@ import com.moneymanager.backend.dto.AppNotificationDtos.*;
 import com.moneymanager.backend.entity.AppNotification;
 import com.moneymanager.backend.entity.User;
 import com.moneymanager.backend.repository.AppNotificationRepository;
+import com.moneymanager.backend.service.PushService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +16,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class NotificationController {
 
     private final AppNotificationRepository notificationRepository;
+    private final PushService pushService;
 
-    public NotificationController(AppNotificationRepository notificationRepository) {
+    public NotificationController(AppNotificationRepository notificationRepository, PushService pushService) {
         this.notificationRepository = notificationRepository;
+        this.pushService = pushService;
     }
 
     @GetMapping
@@ -37,6 +40,26 @@ public class NotificationController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "notification not found"));
         n.setViewed(true);
         notificationRepository.save(n);
+    }
+
+    /**
+     * User already paid — clear "Pay now" / "Paid" actions on this notification (and related ones).
+     */
+    @PatchMapping("/{id}/clear-pay-action")
+    @Transactional
+    public NotificationResponse clearPayAction(@AuthenticationPrincipal User user, @PathVariable Long id) {
+        AppNotification n = notificationRepository.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "notification not found"));
+        if (n.getRelatedType() != null && n.getRelatedId() != null) {
+            pushService.resolveRelated(n.getRelatedType(), n.getRelatedId());
+            n = notificationRepository.findByIdAndUserId(id, user.getId()).orElse(n);
+        } else {
+            n.setActionType(PushService.ACTION_VIEW_ONLY);
+            n.setPayUrl(null);
+            n.setViewed(true);
+            notificationRepository.save(n);
+        }
+        return toResponse(n);
     }
 
     private NotificationResponse toResponse(AppNotification n) {

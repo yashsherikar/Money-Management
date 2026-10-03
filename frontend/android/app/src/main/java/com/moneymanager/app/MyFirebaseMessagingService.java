@@ -61,6 +61,9 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
                 .setColor(getColor(R.color.notification_color))
                 .setContentTitle(title)
                 .setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setAutoCancel(true)
                 .setContentIntent(openApp);
 
@@ -80,6 +83,9 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         }
 
         NotificationManagerCompat manager = NotificationManagerCompat.from(this);
+        if (!manager.areNotificationsEnabled()) {
+            return;
+        }
         if (tagged) {
             manager.notify(tag, RELATED_NOTIFICATION_ID, builder.build());
         } else {
@@ -87,10 +93,23 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
+    @Override
+    public void onNewToken(@NonNull String token) {
+        super.onNewToken(token);
+        // Capacitor re-registers on next app open via enableNativePush; keep SharedPreferences
+        // so a cold start can refresh the backend even if the registration event is skipped.
+        getSharedPreferences("CapacitorStorage", MODE_PRIVATE)
+                .edit()
+                .putString("fcmToken", token)
+                .apply();
+    }
+
     private void ensureChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager = getSystemService(NotificationManager.class);
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Money Manager", NotificationManager.IMPORTANCE_HIGH);
+            channel.enableVibration(true);
+            channel.setShowBadge(true);
             manager.createNotificationChannel(channel);
         }
     }

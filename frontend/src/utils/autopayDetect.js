@@ -14,6 +14,9 @@ import {
   subscriptionLabel,
 } from './subscriptionBrands.jsx'
 import { scheduleSubscriptionReminders } from './subscriptionReminders.js'
+import { currentUserId, isLoggedIn, userGetItem, userSetItem } from './userStorage.js'
+import { isSmsFromPresent } from './smsListenGate.js'
+import { shouldIgnoreMoneySms } from './smsScamFilter.js'
 
 const HISTORY_KEY = 'mm_autopay_history'
 const SEEN_KEY = 'mm_autopay_seen'
@@ -21,8 +24,9 @@ const MAX_HISTORY = 60
 const inFlight = new Set()
 
 function loadHistory() {
+  if (!isLoggedIn()) return []
   try {
-    const list = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+    const list = JSON.parse(userGetItem(HISTORY_KEY) || '[]')
     return Array.isArray(list) ? list : []
   } catch {
     return []
@@ -30,15 +34,17 @@ function loadHistory() {
 }
 
 function saveHistory(list) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)))
+  if (!isLoggedIn()) return
+  userSetItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)))
   try {
     window.dispatchEvent(new CustomEvent('mm-autopay-changed', { detail: { list } }))
   } catch { /* ignore */ }
 }
 
 function loadSeen() {
+  if (!isLoggedIn()) return new Set()
   try {
-    const list = JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')
+    const list = JSON.parse(userGetItem(SEEN_KEY) || '[]')
     return new Set(Array.isArray(list) ? list : [])
   } catch {
     return new Set()
@@ -46,11 +52,12 @@ function loadSeen() {
 }
 
 function rememberSeen(key) {
+  if (!isLoggedIn()) return
   const seen = loadSeen()
   seen.add(key)
   const arr = [...seen]
   while (arr.length > 300) arr.shift()
-  localStorage.setItem(SEEN_KEY, JSON.stringify(arr))
+  userSetItem(SEEN_KEY, JSON.stringify(arr))
 }
 
 export function listAutopayHistory() {
@@ -157,10 +164,14 @@ function queueReview(parsed, dedupeKey, reason, suggestedAccountId, suggestedCat
  * Process one SMS for bank money (after P2P pending match fails).
  */
 export async function processAutopaySms(msg, { accounts, categories } = {}) {
-  if (!localStorage.getItem('token')) return null
+  // Only the logged-in user — never populate another account's SMS queue
+  if (!isLoggedIn()) return null
+  if (!isSmsFromPresent(msg)) return null
 
   const body = msg?.body || msg?.text || ''
   const address = msg?.address || ''
+  if (shouldIgnoreMoneySms({ body, address })) return null
+
   const parsed = parseBankMoneySms({
     body,
     address,
@@ -181,12 +192,14 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
     body: parsed.raw || body,
     address,
   })
+  // Scope in-flight lock per user so two accounts on one phone don't collide
+  const flightKey = `${currentUserId()}|${dedupeKey}`
 
-  // Hard dedupe: seen / history / review / in-flight
-  if (inFlight.has(dedupeKey) || loadSeen().has(dedupeKey) || historyHasDedupe(dedupeKey) || hasSmsMoneyReview(dedupeKey)) {
+  // Hard dedupe: seen / history / review / in-flight (this user only)
+  if (inFlight.has(flightKey) || loadSeen().has(dedupeKey) || historyHasDedupe(dedupeKey) || hasSmsMoneyReview(dedupeKey)) {
     return null
   }
-  inFlight.add(dedupeKey)
+  inFlight.add(flightKey)
   rememberSeen(dedupeKey)
 
   try {
@@ -313,6 +326,7 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
 
     const entry = {
       id: `ap_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      userId: currentUserId(),
       dedupeKey,
       kind: parsed.kind,
       direction: parsed.direction,
@@ -346,7 +360,7 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
     queueReview(parsed, dedupeKey, 'save_failed', null, null)
     return { queued: true, reason: 'save_failed', error: err?.message }
   } finally {
-    inFlight.delete(dedupeKey)
+    inFlight.delete(flightKey)
   }
 }
 
@@ -399,20 +413,10 @@ async function upsertAutopaySubscription({ account, amount, merchant, categoryId
   return data
 }
 
-/** Scan recent inbox for bank money SMS (last 3 days). */
-export async function scanInboxForAutopays(SmsReader, { accounts, categories } = {}) {
-  if (!SmsReader) return []
-  try {
-    const sinceMs = Date.now() - 3 * 24 * 60 * 60_000
-    const { messages } = await SmsReader.readRecent({ sinceMs, limit: 80 })
-    const found = []
-    const ordered = [...(messages || [])].sort((a, b) => (a.date || 0) - (b.date || 0))
-    for (const msg of ordered) {
-      const r = await processAutopaySms(msg, { accounts, categories })
-      if (r && (r.entry || r.queued)) found.push(r)
-    }
-    return found
-  } catch {
-    return []
-  }
+/**
+ * Past inbox scan disabled — money SMS is handled only when a new message arrives
+ * (live RECEIVE_SMS via smsPayWatch). Kept so old imports do not pull history.
+ */
+export async function scanInboxForAutopays() {
+  return []
 }

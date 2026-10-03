@@ -143,7 +143,7 @@ export default function Dashboard() {
                 return (
                   <MoneyRow
                     key={u.transactionId}
-                    title={brand?.name || u.description || u.categoryName}
+                    title={u.description || u.categoryName}
                     meta={u.categoryName}
                     amount={u.amount}
                     type="EXPENSE"

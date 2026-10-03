@@ -3,7 +3,7 @@
  * (same cadence as backend push reminders).
  */
 import { Capacitor } from '@capacitor/core'
-import { addLocalAppNotification } from './localAppNotifications.js'
+import { addLocalAppNotification, removeLocalAppNotificationsForRelated } from './localAppNotifications.js'
 import { isSubscriptionRecurring, brandFromRecurringDescription } from './subscriptionBrands.jsx'
 
 const NOTIF_BASE = 82000
@@ -83,7 +83,7 @@ export async function scheduleSubscriptionReminders(item) {
             id: notifId(item.id, lead),
             title: lead === 0 ? 'Subscription due today' : `Subscription due in ${lead} day${lead > 1 ? 's' : ''}`,
             body: `${name} (₹${amt}) ${whenLabel(lead)}. Tap to mark paid.`,
-            schedule: { at },
+            schedule: { at, allowWhileIdle: true },
             extra: { url: `/recurring?confirm=${item.id}`, recurringId: item.id },
             channelId: CHANNEL,
           })
@@ -112,6 +112,7 @@ export async function scheduleSubscriptionReminders(item) {
 
 export async function cancelSubscriptionReminders(recurringId) {
   if (!recurringId) return
+  removeLocalAppNotificationsForRelated(recurringId, ['subscription', 'due', 'recurring'])
   const LN = await getLN()
   if (!LN) return
   try {

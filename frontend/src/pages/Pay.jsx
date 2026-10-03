@@ -45,8 +45,18 @@ const APPS = [
     logoBg: 'bg-[#5f259f]',
     logo: (
       <svg viewBox="0 0 24 24" className="w-8 h-8" aria-hidden>
-        <circle cx="12" cy="12" r="10" fill="#5f259f" />
-        <path fill="#fff" d="M13.2 6.2h-2.1c-2.6 0-4.3 1.5-4.3 3.9 0 2.6 1.8 3.9 4.5 3.9h.7v1.3c0 .7-.3 1-1 1H9.2v1.9h2.1c2.3 0 3.6-1.2 3.6-3.1v-6.2c0-1.5-.9-2.7-1.7-2.7zm-.5 5.8h-.6c-1.3 0-2.1-.6-2.1-1.8s.8-1.8 2.1-1.8h.6v3.6z" />
+        <circle cx="12" cy="12" r="12" fill="#5f259f" />
+        <text
+          x="12"
+          y="16.5"
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="13"
+          fontWeight="700"
+          fontFamily="'Noto Sans Devanagari', 'Mangal', 'Nirmala UI', sans-serif"
+        >
+          पे
+        </text>
       </svg>
     ),
   },
@@ -58,7 +68,18 @@ const APPS = [
     logo: (
       <svg viewBox="0 0 24 24" className="w-8 h-8" aria-hidden>
         <rect width="24" height="24" rx="6" fill="#00BAF2" />
-        <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="7" fontWeight="700" fontFamily="Arial,sans-serif">Paytm</text>
+        <text
+          x="12"
+          y="15.2"
+          textAnchor="middle"
+          fill="#fff"
+          fontSize="7.2"
+          fontWeight="800"
+          fontFamily="Arial,sans-serif"
+          letterSpacing="-0.5"
+        >
+          Paytm
+        </text>
       </svg>
     ),
   },

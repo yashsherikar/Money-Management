@@ -8,6 +8,7 @@ import { isSubscriptionRecurring } from './subscriptionBrands.jsx'
 import { cancelSubscriptionReminders } from './subscriptionReminders.js'
 import { addLocalAppNotification } from './localAppNotifications.js'
 import { smsDedupeKey } from './smsMoneyReview.js'
+import { isLoggedIn, userGetItem, userSetItem } from './userStorage.js'
 
 const SEEN_KEY = 'mm_autopay_stop_seen'
 const PAUSE_META_KEY = 'mm_subscription_pause_meta'
@@ -23,8 +24,9 @@ const STOP_PATTERNS = [
 ]
 
 function loadSeen() {
+  if (!isLoggedIn()) return new Set()
   try {
-    const list = JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')
+    const list = JSON.parse(userGetItem(SEEN_KEY) || '[]')
     return new Set(Array.isArray(list) ? list : [])
   } catch {
     return new Set()
@@ -32,16 +34,18 @@ function loadSeen() {
 }
 
 function rememberSeen(key) {
+  if (!isLoggedIn()) return
   const seen = loadSeen()
   seen.add(key)
   const arr = [...seen]
   while (arr.length > 200) arr.shift()
-  localStorage.setItem(SEEN_KEY, JSON.stringify(arr))
+  userSetItem(SEEN_KEY, JSON.stringify(arr))
 }
 
 export function getSubscriptionPauseMeta(recurringId) {
+  if (!isLoggedIn()) return null
   try {
-    const map = JSON.parse(localStorage.getItem(PAUSE_META_KEY) || '{}')
+    const map = JSON.parse(userGetItem(PAUSE_META_KEY) || '{}')
     return map[String(recurringId)] || null
   } catch {
     return null
@@ -49,19 +53,21 @@ export function getSubscriptionPauseMeta(recurringId) {
 }
 
 function setPauseMeta(recurringId, meta) {
+  if (!isLoggedIn()) return
   try {
-    const map = JSON.parse(localStorage.getItem(PAUSE_META_KEY) || '{}')
+    const map = JSON.parse(userGetItem(PAUSE_META_KEY) || '{}')
     map[String(recurringId)] = { ...meta, at: Date.now() }
-    localStorage.setItem(PAUSE_META_KEY, JSON.stringify(map))
+    userSetItem(PAUSE_META_KEY, JSON.stringify(map))
     window.dispatchEvent(new CustomEvent('mm-subscription-pause-changed'))
   } catch { /* ignore */ }
 }
 
 export function clearSubscriptionPauseMeta(recurringId) {
+  if (!isLoggedIn()) return
   try {
-    const map = JSON.parse(localStorage.getItem(PAUSE_META_KEY) || '{}')
+    const map = JSON.parse(userGetItem(PAUSE_META_KEY) || '{}')
     delete map[String(recurringId)]
-    localStorage.setItem(PAUSE_META_KEY, JSON.stringify(map))
+    userSetItem(PAUSE_META_KEY, JSON.stringify(map))
   } catch { /* ignore */ }
 }
 
@@ -83,7 +89,7 @@ function matchAmount(text) {
  * Pause matching subscription when SMS says autopay stopped/cancelled.
  */
 export async function processAutopayStopSms(msg) {
-  if (!localStorage.getItem('token')) return null
+  if (!isLoggedIn()) return null
   const body = msg?.body || msg?.text || ''
   const address = msg?.address || ''
   if (!isAutopayStopSms({ body, address })) return null

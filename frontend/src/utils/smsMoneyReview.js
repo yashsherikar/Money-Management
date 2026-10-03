@@ -6,6 +6,14 @@ import { Capacitor } from '@capacitor/core'
 import { addLocalAppNotification } from './localAppNotifications.js'
 import { blockSmsSender } from './smsScamFilter.js'
 import { detectMerchantBrand } from './subscriptionBrands.jsx'
+import {
+  currentUserId,
+  isLoggedIn,
+  userGetItem,
+  userSetItem,
+  userSessionGetItem,
+  userSessionSetItem,
+} from './userStorage.js'
 
 const KEY = 'mm_sms_money_review'
 const MAX = 25
@@ -23,17 +31,22 @@ function notifIdForReview(id) {
 }
 
 export function listSmsMoneyReviews() {
+  if (!isLoggedIn()) return []
+  const uid = currentUserId()
   try {
-    const list = JSON.parse(localStorage.getItem(KEY) || '[]')
-    return Array.isArray(list) ? list.filter((x) => x && x.status === 'pending') : []
+    const list = JSON.parse(userGetItem(KEY) || '[]')
+    return Array.isArray(list)
+      ? list.filter((x) => x && x.status === 'pending' && (!x.userId || String(x.userId) === uid))
+      : []
   } catch {
     return []
   }
 }
 
 function loadAll() {
+  if (!isLoggedIn()) return []
   try {
-    const list = JSON.parse(localStorage.getItem(KEY) || '[]')
+    const list = JSON.parse(userGetItem(KEY) || '[]')
     return Array.isArray(list) ? list : []
   } catch {
     return []
@@ -41,7 +54,8 @@ function loadAll() {
 }
 
 function saveAll(list) {
-  localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)))
+  if (!isLoggedIn()) return
+  userSetItem(KEY, JSON.stringify(list.slice(0, MAX)))
   try {
     window.dispatchEvent(new CustomEvent('mm-sms-money-review-changed', { detail: { list } }))
   } catch { /* ignore */ }
@@ -66,15 +80,28 @@ export function hasSmsMoneyReview(dedupeKey) {
 }
 
 async function notifyForgotExpense(item) {
-  if (!item || item.direction === 'CREDIT') return
+  if (!item) return
   const amt = Number(item.amount || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-  const brand = detectMerchantBrand(item.merchant, item.raw, item.info)
-  const who = brand?.name || item.merchant || 'this payment'
-  const title = 'You forgot to add an expense'
-  const body = `₹${amt} · ${who} — open app, add category & description`
+  const brand = detectMerchantBrand(item.merchant, item.raw)
+  const who = brand?.name || item.merchant || 'merchant'
+  const when = new Date(item.date || Date.now())
+  const dateStr = Number.isNaN(when.getTime())
+    ? ''
+    : when.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  const timeStr = Number.isNaN(when.getTime())
+    ? ''
+    : when.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+  const isCredit = item.direction === 'CREDIT'
+  const title = isCredit ? 'You were credited' : 'You forgot to add an expense'
+  const body = [
+    `₹${amt}`,
+    who,
+    dateStr && timeStr ? `${dateStr} ${timeStr}` : dateStr || timeStr,
+    '— open app: Add or Scam',
+  ].filter(Boolean).join(' · ')
 
   addLocalAppNotification({
     title,
@@ -106,7 +133,7 @@ async function notifyForgotExpense(item) {
         id,
         title,
         body,
-        schedule: { at: new Date(Date.now() + 1500) },
+        schedule: { at: new Date(Date.now() + 1500), allowWhileIdle: true },
         extra: { url: '/transactions', reviewId: item.id },
         channelId: 'sms_money_review',
       }],
@@ -133,14 +160,17 @@ export function enqueueSmsMoneyReview({
   reason = 'needs_confirm',
   date = Date.now(),
 }) {
-  if (!dedupeKey || !amount) return null
+  if (!dedupeKey || !amount || !isLoggedIn()) return null
+  const userId = currentUserId()
   const all = loadAll()
   if (all.some((x) => x.dedupeKey === dedupeKey && (x.status === 'pending' || x.status === 'saved' || x.status === 'scam'))) {
     return null
   }
-  const brand = detectMerchantBrand(merchant, raw, info)
+  // Detect brand from merchant + raw only — not from info ("Credit"/"Debit" labels).
+  const brand = detectMerchantBrand(merchant, raw)
   const item = {
     id: uid(),
+    userId,
     dedupeKey,
     status: 'pending',
     amount: Number(Number(amount).toFixed(2)),
@@ -204,7 +234,7 @@ const SESSION_SNOOZE_KEY = 'mm_sms_review_session_snooze'
 
 function loadSessionSnooze() {
   try {
-    const list = JSON.parse(sessionStorage.getItem(SESSION_SNOOZE_KEY) || '[]')
+    const list = JSON.parse(userSessionGetItem(SESSION_SNOOZE_KEY) || '[]')
     return new Set(Array.isArray(list) ? list : [])
   } catch {
     return new Set()
@@ -212,9 +242,7 @@ function loadSessionSnooze() {
 }
 
 function saveSessionSnooze(set) {
-  try {
-    sessionStorage.setItem(SESSION_SNOOZE_KEY, JSON.stringify([...set]))
-  } catch { /* ignore */ }
+  userSessionSetItem(SESSION_SNOOZE_KEY, JSON.stringify([...set]))
 }
 
 /** Hide for this app session only — still pending, re-asks on next open. */

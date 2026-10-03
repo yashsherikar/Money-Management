@@ -8,17 +8,22 @@ import {
   getPendingP2pPay,
 } from './pendingP2pPays.js'
 import { handleDetectedUpiPayment } from './paymentNotify.js'
-import { processAutopaySms, scanInboxForAutopays } from './autopayDetect.js'
+import { processAutopaySms } from './autopayDetect.js'
 import { processAutopayStopSms, isAutopayStopSms } from './autopayStopDetect.js'
+import { shouldIgnoreMoneySms } from './smsScamFilter.js'
+import {
+  ensureSmsListenFrom,
+  markSmsListenFromNow,
+  isSmsFromPresent,
+} from './smsListenGate.js'
 import client from '../api/client'
+import { isLoggedIn } from './userStorage.js'
 
 const SmsReader = registerPlugin('SmsReader')
 
 let started = false
 let listenerHandle = null
-let scanTimer = null
-let processing = false
-let autopayScanBusy = false
+let watchTimer = null
 const processedKeys = new Set()
 
 function smsKey(msg, parsed) {
@@ -56,7 +61,10 @@ export async function requestSmsPermission() {
   try {
     const ret = await SmsReader.requestPermissions()
     const granted = !!(ret?.granted || ret?.sms === 'granted' || ret?.sms === 'GRANTED')
-    if (granted) await SmsReader.startWatch().catch(() => {})
+    if (granted) {
+      markSmsListenFromNow()
+      await SmsReader.startWatch().catch(() => {})
+    }
     return { ...ret, granted }
   } catch {
     return { granted: false }
@@ -64,20 +72,31 @@ export async function requestSmsPermission() {
 }
 
 /**
- * Process one SMS: pending P2P first, else autopay/savings.
+ * Process one LIVE SMS only: ignore past, ads, scam, spam, non debit/credit.
  */
 export async function processIncomingSms(msg, { accounts, categories } = {}) {
-  // Autopay / mandate cancelled or failed → pause subscription in app
+  if (!isLoggedIn()) return null
+
+  const body = msg?.body || msg?.text || ''
+  const address = msg?.address || ''
+
+  // Never process old inbox / history SMS
+  if (!isSmsFromPresent(msg)) return null
+
+  // Autopay cancelled / failed → pause subscription (not a debit/credit txn)
   try {
-    if (isAutopayStopSms({ body: msg?.body || msg?.text || '', address: msg?.address || '' })) {
+    if (isAutopayStopSms({ body, address })) {
       const stopped = await processAutopayStopSms(msg)
       if (stopped?.paused) return { autopayStopped: stopped }
     }
   } catch { /* ignore */ }
 
+  // Ads / scam / spam / no real debit or credit → ignore
+  if (shouldIgnoreMoneySms({ body, address })) return null
+
   const parsed = parseBankPaymentSms({
-    body: msg?.body || msg?.text || '',
-    address: msg?.address || '',
+    body,
+    address,
     date: msg?.date || Date.now(),
   })
 
@@ -158,105 +177,69 @@ async function confirmPendingFromSms(msg, parsed, match, key, { accounts, catego
   return { pending: updated, parsed, logResult }
 }
 
-/** Scan inbox since earliest waiting pay (handles 5–15 min late SMS). */
-export async function scanInboxForPendingPays(opts = {}) {
+/**
+ * Past inbox scan disabled — only live SMS after listen-from.
+ * Kept as a no-op so older callers (Dashboard / PendingPays) don't pull history.
+ */
+export async function scanInboxForPendingPays() {
   if (!isSmsPaySupported()) return []
   const perm = await checkSmsPermission()
   if (!perm?.granted) return []
-
-  const waiting = waitingP2pPays()
-  if (!waiting.length) return []
-
-  if (processing) return []
-  processing = true
-  try {
-    const earliest = Math.min(...waiting.map((w) => (w.createdAt || Date.now()) - 2 * 60_000))
-    await SmsReader.startWatch().catch(() => {})
-    const { messages } = await SmsReader.readRecent({
-      sinceMs: earliest,
-      limit: 100,
-    })
-    const confirmed = []
-    const ordered = [...(messages || [])].sort((a, b) => (a.date || 0) - (b.date || 0))
-    for (const msg of ordered) {
-      if (!waitingP2pPays().length) break
-      const result = await processIncomingSms(msg, opts)
-      if (result?.pending) confirmed.push(result)
-    }
-    return confirmed
-  } catch {
-    return []
-  } finally {
-    processing = false
-  }
-}
-
-async function scanAutopaysQuietly() {
-  if (!isSmsPaySupported() || autopayScanBusy) return
-  if (!localStorage.getItem('token')) return
-  const perm = await checkSmsPermission()
-  if (!perm?.granted) return
-  autopayScanBusy = true
-  try {
-    await SmsReader.startWatch().catch(() => {})
-    const sinceMs = Date.now() - 3 * 24 * 60 * 60_000
-    const { messages } = await SmsReader.readRecent({ sinceMs, limit: 80 }).catch(() => ({ messages: [] }))
-    const ordered = [...(messages || [])].sort((a, b) => (a.date || 0) - (b.date || 0))
-    for (const msg of ordered) {
-      if (isAutopayStopSms({ body: msg?.body || msg?.text || '', address: msg?.address || '' })) {
-        await processAutopayStopSms(msg).catch(() => {})
-      }
-    }
-    await scanInboxForAutopays(SmsReader)
-  } catch { /* ignore */ } finally {
-    autopayScanBusy = false
-  }
+  ensureSmsListenFrom()
+  await SmsReader.startWatch().catch(() => {})
+  return []
 }
 
 /**
- * Start global SMS watch + periodic inbox scan (P2P pending + autopay/savings).
+ * Start live SMS watch only — no past inbox fetch, no periodic history scan.
  */
 export function startSmsPayWatcher() {
   if (!isSmsPaySupported() || started) return () => {}
   started = true
+  ensureSmsListenFrom()
 
   const onSms = async (event) => {
     try {
-      await processIncomingSms(event)
+      // Live broadcast: stamp "now" if native omitted date
+      const msg = {
+        ...event,
+        date: event?.date || Date.now(),
+        body: event?.body || event?.text || '',
+        address: event?.address || '',
+      }
+      await processIncomingSms(msg)
     } catch { /* ignore */ }
   }
 
   SmsReader.addListener('bankSms', onSms).then((h) => { listenerHandle = h }).catch(() => {})
 
-  const tick = async () => {
+  const keepWatchAlive = async () => {
     try {
+      if (!isLoggedIn()) return
       const perm = await checkSmsPermission()
       if (!perm?.granted) return
+      ensureSmsListenFrom()
       await SmsReader.startWatch().catch(() => {})
-      if (waitingP2pPays().length) await scanInboxForPendingPays()
-      await scanAutopaysQuietly()
     } catch { /* ignore */ }
   }
 
-  tick()
-  scanTimer = setInterval(tick, 45_000)
+  keepWatchAlive()
+  watchTimer = setInterval(keepWatchAlive, 60_000)
 
   const onVis = () => {
-    if (document.visibilityState === 'visible') tick()
+    if (document.visibilityState === 'visible') keepWatchAlive()
   }
   document.addEventListener('visibilitychange', onVis)
-  window.addEventListener('focus', tick)
-  window.addEventListener('mm-pending-p2p-changed', tick)
+  window.addEventListener('focus', keepWatchAlive)
 
   return () => {
     started = false
     listenerHandle?.remove?.()
     listenerHandle = null
-    if (scanTimer) clearInterval(scanTimer)
-    scanTimer = null
+    if (watchTimer) clearInterval(watchTimer)
+    watchTimer = null
     document.removeEventListener('visibilitychange', onVis)
-    window.removeEventListener('focus', tick)
-    window.removeEventListener('mm-pending-p2p-changed', tick)
+    window.removeEventListener('focus', keepWatchAlive)
   }
 }
 

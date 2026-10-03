@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { suppressResumeLock } from '../appLock.js'
 import {
   isBillOcrSupported,
+  captureBillPhoto,
+  pickBillPhoto,
   scanBillFromFile,
   checkBillPaidInSms,
 } from '../utils/billScan.js'
@@ -10,7 +12,7 @@ import { requestSmsPermission, isSmsPaySupported } from '../utils/smsPayWatch.js
 import Field from './Field.jsx'
 
 /**
- * Camera / gallery bill upload → OCR fields → SMS paid check → save callback.
+ * Native camera / gallery bill upload → OCR fields → SMS paid check → save callback.
  */
 export default function BillScanSheet({
   open,
@@ -21,8 +23,6 @@ export default function BillScanSheet({
   onSave,
 }) {
   const { t } = useLanguage()
-  const cameraRef = useRef(null)
-  const galleryRef = useRef(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState('')
@@ -54,62 +54,111 @@ export default function BillScanSheet({
 
   if (!open) return null
 
-  async function onPickedFile(file) {
-    if (!file) return
-    if (!isBillOcrSupported()) {
-      setError(t('Bill scan needs the Android app'))
-      return
+  async function applyScanResult(result) {
+    setPreview(result.previewDataUrl || '')
+    setAmount(result.amount || '')
+    setMerchant(result.merchant || '')
+    setPaymentMode(result.paymentMode?.label || 'Other')
+    if (result.categoryId) setCategoryId(String(result.categoryId))
+    if (result.txnDate) setTxnDate(result.txnDate)
+    const desc = [
+      result.merchant || t('Bill'),
+      result.paymentMode?.label && `via ${result.paymentMode.label}`,
+      'from bill photo',
+    ].filter(Boolean).join(' · ')
+    setDescription(desc.slice(0, 200))
+    setStep('review')
+
+    if (result.amount) {
+      let sms = await checkBillPaidInSms({
+        amount: result.amount,
+        merchant: result.merchant,
+      })
+      if (!sms.checked && sms.reason === 'sms_permission' && isSmsPaySupported()) {
+        await requestSmsPermission().catch(() => {})
+        sms = await checkBillPaidInSms({
+          amount: result.amount,
+          merchant: result.merchant,
+        })
+      }
+      setSmsStatus(sms)
     }
+  }
+
+  async function takePhoto() {
     setBusy(true)
     setError('')
     setSmsStatus(null)
     try {
-      const result = await scanBillFromFile(file, { categories })
-      setPreview(result.previewDataUrl || '')
-      setAmount(result.amount || '')
-      setMerchant(result.merchant || '')
-      setPaymentMode(result.paymentMode?.label || 'Other')
-      if (result.categoryId) setCategoryId(String(result.categoryId))
-      if (result.txnDate) setTxnDate(result.txnDate)
-      const desc = [
-        result.merchant || t('Bill'),
-        result.paymentMode?.label && `via ${result.paymentMode.label}`,
-        'from bill photo',
-      ].filter(Boolean).join(' · ')
-      setDescription(desc.slice(0, 200))
-      setStep('review')
-
-      // SMS check before user saves
-      if (result.amount) {
-        let sms = await checkBillPaidInSms({
-          amount: result.amount,
-          merchant: result.merchant,
-        })
-        if (!sms.checked && sms.reason === 'sms_permission' && isSmsPaySupported()) {
-          await requestSmsPermission().catch(() => {})
-          sms = await checkBillPaidInSms({
-            amount: result.amount,
-            merchant: result.merchant,
-          })
+      if (Capacitor.isNativePlatform()) {
+        const result = await captureBillPhoto({ categories })
+        await applyScanResult(result)
+      } else {
+        // Web fallback: file input with capture
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.capture = 'environment'
+        input.onchange = async () => {
+          const file = input.files?.[0]
+          if (!file) { setBusy(false); return }
+          try {
+            await applyScanResult(await scanBillFromFile(file, { categories }))
+          } catch (err) {
+            setError(err?.message || t('Could not read bill'))
+            setStep('pick')
+          } finally {
+            setBusy(false)
+          }
         }
-        setSmsStatus(sms)
+        input.click()
+        return
       }
     } catch (err) {
-      setError(err?.message || t('Could not read bill'))
+      if (err?.message !== 'User cancelled photos app' && !/cancel/i.test(err?.message || '')) {
+        setError(err?.message || t('Could not open camera'))
+      }
       setStep('pick')
     } finally {
       setBusy(false)
     }
   }
 
-  function pickCamera() {
-    suppressResumeLock(5 * 60_000)
-    cameraRef.current?.click()
-  }
-
-  function pickGallery() {
-    suppressResumeLock(5 * 60_000)
-    galleryRef.current?.click()
+  async function uploadGallery() {
+    setBusy(true)
+    setError('')
+    setSmsStatus(null)
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const result = await pickBillPhoto({ categories })
+        await applyScanResult(result)
+      } else {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = async () => {
+          const file = input.files?.[0]
+          if (!file) { setBusy(false); return }
+          try {
+            await applyScanResult(await scanBillFromFile(file, { categories }))
+          } catch (err) {
+            setError(err?.message || t('Could not read bill'))
+            setStep('pick')
+          } finally {
+            setBusy(false)
+          }
+        }
+        input.click()
+        return
+      }
+    } catch (err) {
+      if (err?.message !== 'User cancelled photos app' && !/cancel/i.test(err?.message || '')) {
+        setError(err?.message || t('Could not open gallery'))
+      }
+      setStep('pick')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function recheckSms() {
@@ -132,7 +181,6 @@ export default function BillScanSheet({
     setBusy(true)
     setError('')
     try {
-      // Final SMS check right before save
       let sms = smsStatus
       if (!sms?.matched) {
         sms = await checkBillPaidInSms({ amount, merchant })
@@ -201,40 +249,29 @@ export default function BillScanSheet({
           {t('Photo or upload a bill — we read amount, category, payment mode, then check SMS before save.')}
         </p>
 
-        <input
-          ref={cameraRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => onPickedFile(e.target.files?.[0])}
-        />
-        <input
-          ref={galleryRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => onPickedFile(e.target.files?.[0])}
-        />
-
         {step === 'pick' && (
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              disabled={busy}
-              onClick={pickCamera}
+              disabled={busy || !isBillOcrSupported()}
+              onClick={takePhoto}
               className="w-full bg-brand-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
             >
-              {busy ? t('Reading bill…') : t('Take photo')}
+              {busy ? t('Opening camera…') : t('Take photo')}
             </button>
             <button
               type="button"
               disabled={busy}
-              onClick={pickGallery}
+              onClick={uploadGallery}
               className="w-full border border-slate-300 rounded-md py-3 font-medium disabled:opacity-60"
             >
-              {t('Upload from gallery')}
+              {busy ? t('Reading bill…') : t('Upload from gallery')}
             </button>
+            {!isBillOcrSupported() && (
+              <p className="text-xs text-amber-600 text-center">
+                {t('Bill scan needs the Android app')}
+              </p>
+            )}
             <button type="button" onClick={onClose} className="w-full text-sm text-slate-500 py-2">
               {t('Cancel')}
             </button>
@@ -291,7 +328,12 @@ export default function BillScanSheet({
               >
                 {busy ? t('Saving…') : t('Save to Transactions')}
               </button>
-              <button type="button" disabled={busy} onClick={() => setStep('pick')} className="px-3 py-2.5 border border-slate-300 rounded-md text-sm">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => { setStep('pick'); setError('') }}
+                className="px-3 py-2.5 border border-slate-300 rounded-md text-sm"
+              >
                 {t('Retake')}
               </button>
             </div>

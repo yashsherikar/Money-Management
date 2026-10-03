@@ -94,12 +94,9 @@ export default function PendingPays() {
 
     if (!isSmsPaySupported()) return undefined
     checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
-    scanInboxForPendingPays().then(async (found) => {
+    scanInboxForPendingPays().then(async () => {
       await syncUnloggedConfirmedPays().catch(() => {})
       refresh()
-      if (found?.length) {
-        setHint(t('Matched') + ` ${found.length} ` + t('payment(s) from SMS — check Transactions.'))
-      }
     })
     const onChange = () => refresh()
     window.addEventListener('mm-pending-p2p-changed', onChange)
@@ -116,7 +113,7 @@ export default function PendingPays() {
     const ret = await requestSmsPermission()
     setSmsOk(!!ret?.granted)
     if (ret?.granted) {
-      setHint(t('SMS permission on. We will match bank debit SMS automatically (even if late).'))
+      setHint(t('SMS on. Only new debit/credit SMS are used — ads, scam, and old inbox are ignored.'))
       await runScan()
     } else {
       setHint(t('SMS permission is required to auto-confirm P2P pays from bank messages.'))
@@ -125,14 +122,13 @@ export default function PendingPays() {
 
   async function runScan() {
     setScanning(true)
-    setHint(t('Checking recent bank SMS…'))
+    setHint(t('Listening for new bank SMS…'))
     try {
-      const found = await scanInboxForPendingPays()
+      // Live watch only — does not read old inbox history
+      await scanInboxForPendingPays()
       refresh()
-      if (found.length) {
-        setHint(t('Matched') + ` ${found.length} ` + t('payment(s) from SMS.'))
-      } else if (waitingP2pPays().length) {
-        setHint(t('No matching SMS yet. Bank SMS can take 5–15 minutes — we keep checking.'))
+      if (waitingP2pPays().length) {
+        setHint(t('Waiting for a new debit SMS. Ads, scam, and spam are ignored.'))
       } else {
         setHint(t('No payments waiting for SMS.'))
       }
@@ -253,7 +249,7 @@ export default function PendingPays() {
               onClick={runScan}
               className="border border-slate-300 rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50"
             >
-              {scanning ? t('Checking…') : t('Check SMS now')}
+              {scanning ? t('Listening…') : t('Listen for new SMS')}
             </button>
           </div>
         </div>
