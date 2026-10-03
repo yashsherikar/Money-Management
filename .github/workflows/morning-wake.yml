@@ -1,0 +1,39 @@
+# Morning cold-start wake for Render free tier.
+# cron-job.org free plan times out at ~30s — too short for a cold start (~30–60s+).
+# This workflow waits up to 120s and retries, then daytime cron-job.org keep-alives take over.
+name: Morning Render wake
+
+on:
+  schedule:
+    # 07:45 Asia/Kolkata = 02:15 UTC (IST is UTC+5:30)
+    - cron: '15 2 * * *'
+  workflow_dispatch: # allow manual "Run workflow" from GitHub UI
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ping /api/ping until awake
+        env:
+          PING_URL: https://moneymanager-backend-498b.onrender.com/api/ping
+        run: |
+          set -e
+          echo "Waking: $PING_URL"
+          for attempt in 1 2 3 4 5; do
+            echo "Attempt $attempt…"
+            if curl -fsS --max-time 120 --retry 0 -o /tmp/ping-body -w "http=%{http_code} time=%{time_total}s\n" "$PING_URL"; then
+              body="$(cat /tmp/ping-body)"
+              echo "Body: $body"
+              if [ "$body" = "OK" ]; then
+                echo "Wake succeeded."
+                exit 0
+              fi
+              echo "Unexpected body, retrying…"
+            else
+              echo "curl failed (cold start / 502), retrying in 20s…"
+            fi
+            sleep 20
+          done
+          echo "Wake failed after retries."
+          exit 1
