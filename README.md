@@ -67,7 +67,13 @@ Run backend tests: `cd backend; mvn test`
 - Push this repo to GitHub.
 - On render.com, "New > Blueprint", point it at the repo — it picks up `render.yaml`.
 - Fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` in the Render dashboard. `JWT_SECRET` is auto-generated. Capacitor Android (`https://localhost`) is allowed in code for CORS.
-- Free tier spins down after 15 min idle; first request after that takes ~30s to wake up.
+- Free tier spins down after 15 min idle; first request after that takes ~30–60s to wake up.
+- **Keep-alive (cron-job.org):** point the job at the tiny ping URL only — not `/actuator/health` and not a wrong hostname:
+  - URL: `https://moneymanager-backend-498b.onrender.com/api/ping`
+  - Method: `GET`
+  - Timeout: **90 seconds** (cold start is slow)
+  - Expected response: plain `OK` (2 bytes)
+  - If logs say `Failed (output too large)`, the job URL is wrong or the job was disabled after repeated failures — fix the URL, re-enable the job, save.
 
 **3. Android APK (primary client — no Vercel / web app)**
 - Build from `frontend`:

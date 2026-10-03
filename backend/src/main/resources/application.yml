@@ -28,6 +28,21 @@ spring:
 
 server:
   port: ${PORT:8080}
+  error:
+    # Avoid bulky HTML error pages — cron-job.org marks those as "output too large"
+    whitelabel:
+      enabled: false
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoint:
+    health:
+      show-details: never
+  endpoints:
+    web:
+      exposure:
+        include: health
 
 app:
   jwt:
