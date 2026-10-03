@@ -68,12 +68,16 @@ Run backend tests: `cd backend; mvn test`
 - On render.com, "New > Blueprint", point it at the repo — it picks up `render.yaml`.
 - Fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` in the Render dashboard. `JWT_SECRET` is auto-generated. Capacitor Android (`https://localhost`) is allowed in code for CORS.
 - Free tier spins down after 15 min idle; first request after that takes ~30–60s to wake up.
-- **Keep-alive (cron-job.org):** point the job at the tiny ping URL only — not `/actuator/health` and not a wrong hostname:
-  - URL: `https://moneymanager-backend-498b.onrender.com/api/ping`
-  - Method: `GET`
-  - Timeout: **90 seconds** (cold start is slow)
-  - Expected response: plain `OK` (2 bytes)
-  - If logs say `Failed (output too large)`, the job URL is wrong or the job was disabled after repeated failures — fix the URL, re-enable the job, save.
+- **Hybrid keep-alive (recommended):**
+  1. **Morning wake (long timeout)** — GitHub Action `.github/workflows/morning-wake.yml` runs ~07:45 IST, waits up to 120s + retries. (cron-job.org free times out at ~30s, so it is a bad first wake.) Push to GitHub → Actions → enable workflows → “Morning Render wake” → Run workflow once to test.
+  2. **Daytime keep-alive (cron-job.org)** — after the morning wake, ping every 14 minutes so Render never hits the 15‑minute sleep:
+     - URL: `https://moneymanager-backend-498b.onrender.com/api/ping`
+     - Method: `GET`
+     - Schedule (Asia/Kolkata): `*/14 8-23 * * *` (every 14 min, 08:00–23:59)
+     - Expected body: `OK` (2 bytes)
+     - Re-enable the job if it was auto-disabled after failures
+  3. Optional instead of GitHub Action for morning: [Pipedream](https://pipedream.com) scheduled HTTP GET to the same `/api/ping` URL with a long timeout; then keep cron-job.org for daytime only.
+  - If cron logs say `Failed (output too large)`, the URL is wrong (HTML 404/502 page) — fix to `/api/ping` on the `-498b` host and re-enable.
 
 **3. Android APK (primary client — no Vercel / web app)**
 - Build from `frontend`:
