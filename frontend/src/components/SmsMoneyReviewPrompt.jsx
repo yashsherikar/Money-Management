@@ -3,7 +3,6 @@ import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import {
   peekNextSmsMoneyReview,
-  askLaterSmsMoneyReview,
   markSmsMoneyReviewSaved,
   markSmsMoneyReviewScam,
   countPendingSmsMoneyReviews,
@@ -15,16 +14,24 @@ function money(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function formatWhen(ts) {
+  const d = new Date(ts || Date.now())
+  if (Number.isNaN(d.getTime())) return { date: '', time: '' }
+  return {
+    date: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+  }
+}
+
 /**
- * Forgot-to-add expense (or confirm credit): Ask later / Add / Mark scam.
- * Add stays disabled until category + description are filled.
+ * Forgot-to-add SMS: show amount / date / time / merchant,
+ * category + description, then Add or Scam (block that sender).
  */
 export default function SmsMoneyReviewPrompt() {
   const { t } = useLanguage()
   const [item, setItem] = useState(null)
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
-  const [direction, setDirection] = useState('DEBIT')
   const [accountId, setAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [description, setDescription] = useState('')
@@ -40,10 +47,14 @@ export default function SmsMoneyReviewPrompt() {
       return
     }
     setItem(next)
-    setDirection(next.direction === 'CREDIT' ? 'CREDIT' : 'DEBIT')
     setAccountId(next.suggestedAccountId ? String(next.suggestedAccountId) : '')
     setCategoryId(next.suggestedCategoryId ? String(next.suggestedCategoryId) : '')
-    setDescription(next.suggestedDescription || next.merchant || '')
+    const liveBrand = detectMerchantBrand(next.merchant, next.raw)
+    let desc = next.suggestedDescription || next.merchant || ''
+    if (/^cred$/i.test(String(desc).trim()) && !liveBrand) {
+      desc = next.merchant || ''
+    }
+    setDescription(desc)
     setError('')
   }
 
@@ -80,9 +91,10 @@ export default function SmsMoneyReviewPrompt() {
   }, [item, accounts, accountId])
 
   const brand = item
-    ? detectMerchantBrand(description, item.merchant, item.raw, item.info)
+    ? detectMerchantBrand(description, item.merchant, item.raw)
     : null
 
+  const isCredit = item?.direction === 'CREDIT'
   const canAdd = !!(
     accountId
     && categoryId
@@ -95,12 +107,11 @@ export default function SmsMoneyReviewPrompt() {
     setBusy(true)
     setError('')
     try {
-      const type = direction === 'CREDIT' ? 'INCOME' : 'EXPENSE'
-      const who = brand?.name || item.merchant || (direction === 'CREDIT' ? 'Credit' : 'Expense')
+      const type = isCredit ? 'INCOME' : 'EXPENSE'
+      const who = item.merchant || (brand && brand.id !== 'cred' ? brand.name : '') || ''
       const desc = [
         String(description).trim(),
         who && !String(description).toLowerCase().includes(String(who).toLowerCase()) ? who : null,
-        item.info,
       ].filter(Boolean).join(' · ').slice(0, 220)
 
       const { data } = await client.post('/transactions', {
@@ -121,40 +132,32 @@ export default function SmsMoneyReviewPrompt() {
     }
   }
 
-  function askLater() {
-    if (!item) return
-    askLaterSmsMoneyReview(item.id)
-    setItem(null)
-    const next = peekNextSmsMoneyReview()
-    if (next) showNext()
-  }
-
   function markScam() {
-    if (!item) return
-    if (!confirm(t('Mark this SMS as scam/spam? Messages from this sender will be ignored next time.'))) return
+    if (!item || busy) return
     markSmsMoneyReviewScam(item.id)
     showNext()
   }
 
   if (!item) return null
 
-  const isExpense = direction === 'DEBIT'
-  const catList = isExpense
-    ? categories.filter((c) => String(c.name).toLowerCase() !== 'salary')
-    : categories
+  const { date: whenDate, time: whenTime } = formatWhen(item.date)
+  const merchantName = brand?.name || item.merchant || t('Unknown merchant')
+  const catList = isCredit
+    ? categories
+    : categories.filter((c) => String(c.name).toLowerCase() !== 'salary')
+
+  const headline = isCredit
+    ? t('You were credited')
+    : t('You were debited')
 
   return (
     <div className="fixed inset-0 z-[66] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/45" />
       <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0">
             {brand && <MerchantLogo brand={brand} size={36} />}
-            <h2 className="font-bold text-lg leading-tight">
-              {isExpense
-                ? t('You forgot to add this expense')
-                : t('Confirm bank SMS credit')}
-            </h2>
+            <h2 className="font-bold text-lg leading-tight">{headline}</h2>
           </div>
           {pendingCount > 1 && (
             <span className="text-xs font-semibold text-slate-500 shrink-0">
@@ -162,64 +165,48 @@ export default function SmsMoneyReviewPrompt() {
             </span>
           )}
         </div>
-        <p className="text-sm text-slate-600 mb-3">
-          {isExpense
-            ? t('Add where you paid (category + description). Until then Add stays disabled.')
-            : t('We found this in SMS but it was not saved yet. Confirm and add details.')}
-        </p>
 
-        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 mb-4">
-          <div className="text-2xl font-bold tabular-nums">{money(item.amount)}</div>
-          <div className="text-xs text-slate-500 mt-1 space-y-0.5">
-            {item.info && <div>{item.info}</div>}
-            {item.merchant && <div>{t('To/From')}: {item.merchant}</div>}
-            {item.bankLabel && <div>{t('Bank')}: {item.bankLabel}</div>}
-            {item.date && <div>{new Date(item.date).toLocaleString()}</div>}
-          </div>
-          {item.raw && (
-            <p className="text-[11px] text-slate-500 mt-2 leading-snug line-clamp-3">{item.raw}</p>
-          )}
-        </div>
-
-        <div className="mb-3">
-          <div className="text-[13px] font-bold text-muted mb-1.5">{t('This was')}</div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setDirection('DEBIT')}
-              className={`rounded-lg py-2.5 text-sm font-semibold border ${
-                direction === 'DEBIT'
-                  ? 'bg-red-50 border-red-300 text-red-700'
-                  : 'border-slate-200 text-slate-600'
-              }`}
-            >
-              {t('Debit (expense)')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDirection('CREDIT')}
-              className={`rounded-lg py-2.5 text-sm font-semibold border ${
-                direction === 'CREDIT'
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                  : 'border-slate-200 text-slate-600'
-              }`}
-            >
-              {t('Credit (income)')}
-            </button>
-          </div>
-        </div>
-
-        <label className="block text-[13px] font-bold text-muted mb-1">{t('Account')}</label>
-        <select
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          className="w-full mb-3"
+        <div className={`rounded-xl border p-3 mb-4 ${
+          isCredit ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+        }`}
         >
-          <option value="">{t('Account...')}</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
+          <div className={`text-2xl font-bold tabular-nums ${
+            isCredit ? 'text-emerald-800' : 'text-red-800'
+          }`}
+          >
+            {money(item.amount)}
+          </div>
+          <div className="text-sm text-slate-700 mt-2 space-y-1">
+            {whenDate && (
+              <div>
+                <span className="text-slate-500">{t('Date')}: </span>
+                {whenDate}
+              </div>
+            )}
+            {whenTime && (
+              <div>
+                <span className="text-slate-500">{t('Time')}: </span>
+                {whenTime}
+              </div>
+            )}
+            <div>
+              <span className="text-slate-500">{t('Merchant')}: </span>
+              <span className="font-semibold">{merchantName}</span>
+            </div>
+            {item.bankLabel && (
+              <div>
+                <span className="text-slate-500">{t('Bank')}: </span>
+                {item.bankLabel}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="text-sm text-slate-600 mb-3">
+          {isCredit
+            ? t('Add category and description to save this credit, or mark Scam to ignore this sender.')
+            : t('You forgot to add this. Pick category and description, or mark Scam to block this sender.')}
+        </p>
 
         <label className="block text-[13px] font-bold text-muted mb-1">
           {t('Category')} <span className="text-red-500">*</span>
@@ -237,11 +224,6 @@ export default function SmsMoneyReviewPrompt() {
 
         <label className="block text-[13px] font-bold text-muted mb-1">
           {t('Description')} <span className="text-red-500">*</span>
-          {brand && (
-            <span className="ml-2 inline-flex items-center gap-1 font-medium text-slate-500 normal-case">
-              <MerchantLogo brand={brand} size={18} /> {brand.name}
-            </span>
-          )}
         </label>
         <input
           value={description}
@@ -252,37 +234,31 @@ export default function SmsMoneyReviewPrompt() {
 
         {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
 
-        <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             disabled={!canAdd}
             onClick={save}
-            className={`w-full rounded-md py-2.5 font-medium ${
+            className={`rounded-md py-3 font-semibold ${
               canAdd
                 ? 'bg-brand-600 text-white'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
-            {busy ? t('Saving…') : t('Add this')}
+            {busy ? t('Saving…') : t('Add')}
           </button>
           <button
             type="button"
-            onClick={askLater}
-            className="w-full border border-slate-300 rounded-md py-2.5 font-medium"
-          >
-            {t('Ask me later')}
-          </button>
-          <button
-            type="button"
+            disabled={busy}
             onClick={markScam}
-            className="w-full text-sm text-red-600 py-2 font-medium"
+            className="rounded-md py-3 font-semibold border border-red-300 text-red-700 bg-red-50"
           >
-            {t('Mark scam')}
+            {t('Scam')}
           </button>
         </div>
         {!canAdd && (
           <p className="text-[11px] text-slate-500 mt-2 text-center">
-            {t('Pick category and description to enable Add this.')}
+            {t('Pick category and description to enable Add.')}
           </p>
         )}
         {listActiveSmsMoneyReviews().length > 1 && (

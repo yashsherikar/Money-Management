@@ -6,6 +6,7 @@ import {
   readPendingUpiConfirm,
   clearPendingUpiConfirm,
 } from '../appLock.js'
+import { clearNotificationPayAction } from '../utils/confirmDuePaid.js'
 
 /**
  * GPay/PhonePe never tell us if a P2P payment succeeded.
@@ -62,11 +63,18 @@ export default function PendingPayConfirm() {
       if (pending.kind === 'payment_request' && pending.requestId) {
         await client.patch(`/payment-requests/${pending.requestId}/confirm-sent`)
       }
-      // split_bill / contribution: no auto-status from GPay — friend marks received
+      // Clear "Pay now" on the notification that started this pay
+      if (pending.notificationId) {
+        await clearNotificationPayAction(pending.notificationId)
+      }
+      // split_bill / contribution: friend still marks received; we just drop Pay now
       clearPendingUpiConfirm()
       setPending(null)
+      try {
+        window.dispatchEvent(new CustomEvent('mm-local-notifications-changed'))
+      } catch { /* ignore */ }
       if (pending.kind === 'payment_request' || pending.kind === 'split_bill' || pending.kind === 'contribution') {
-        navigate('/requests', { replace: true })
+        navigate('/notifications', { replace: true })
       }
     } catch (err) {
       setError(err.response?.data?.message || err.message || t('Could not confirm'))

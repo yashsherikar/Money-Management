@@ -61,7 +61,7 @@ export async function schedulePendingPayReminder(pending) {
           id,
           title: 'Pending UPI pay',
           body: `Still waiting for bank SMS — ₹${amt} to ${who}. Tap to check.`,
-          schedule: { at: new Date(remindAt) },
+          schedule: { at: new Date(remindAt), allowWhileIdle: true },
           extra: { url: '/pending-pays', pendingId: pending.id },
           channelId: 'pending_pays',
         },
@@ -118,7 +118,7 @@ export async function checkPendingPayRemindersDue() {
                 id: notifIdForPending(p.id),
                 title: 'Pending UPI pay',
                 body: `Still waiting for bank SMS — ₹${amt} to ${who}.`,
-                schedule: { at: new Date(Date.now() + 2000) },
+                schedule: { at: new Date(Date.now() + 2000), allowWhileIdle: true },
                 extra: { url: '/pending-pays', pendingId: p.id },
                 channelId: 'pending_pays',
               },
@@ -162,25 +162,7 @@ export function startPendingPayReminderWatcher() {
     if (document.visibilityState === 'visible') checkPendingPayRemindersDue()
   })
 
-  // Tap on local notification → open pending pays
-  ;(async () => {
-    const LN = await getLocalNotifications()
-    if (!LN) return
-    try {
-      await LN.createChannel?.({
-        id: 'pending_pays',
-        name: 'Pending pays',
-        importance: 4,
-        description: 'Reminders when bank SMS for a UPI pay is still missing',
-      })
-    } catch { /* ignore */ }
-    LN.addListener('localNotificationActionPerformed', (event) => {
-      const url = event?.notification?.extra?.url || '/pending-pays'
-      try {
-        window.dispatchEvent(new CustomEvent('mm-notification-tap', { detail: { url } }))
-      } catch { /* ignore */ }
-    })
-  })()
+  // Channel + tap routing: notificationBootstrap.bootstrapNotifications()
 
   return () => {
     if (reminderTimer) clearInterval(reminderTimer)

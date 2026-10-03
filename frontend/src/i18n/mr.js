@@ -529,11 +529,27 @@ export const mr = {
   'Take photo': 'फोटो काढा',
   'Upload from gallery': 'गॅलरीतून अपलोड',
   'Reading bill…': 'बिल वाचत आहे…',
+  'Opening camera…': 'कॅमेरा उघडत आहे…',
+  'Could not open camera': 'कॅमेरा उघडता आला नाही',
+  'Could not open gallery': 'गॅलरी उघडता आली नाही',
   'Bill scan needs the Android app': 'बिल स्कॅनसाठी Android अॅप हवा',
   'Could not read bill': 'बिल वाचता आले नाही',
+  'Camera permission is required. Enable Camera in phone Settings → Apps → Money Manager.':
+    'कॅमेरा परवानगी हवी. फोन Settings → Apps → Money Manager मध्ये Camera चालू करा.',
+  'Photos permission is required. Enable Photos in phone Settings → Apps → Money Manager.':
+    'फोटो परवानगी हवी. फोन Settings → Apps → Money Manager मध्ये Photos चालू करा.',
   'Enter amount and account': 'रक्कम आणि खाते टाका',
   'Enable SMS to verify this bill was paid.': 'हे बिल भरले आहे का ते तपासण्यासाठी SMS चालू करा.',
   'Check SMS now': 'आता SMS तपासा',
+  'Listen for new SMS': 'नवीन SMS साठी ऐका',
+  'Listening…': 'ऐकत आहे…',
+  'Listening for new bank SMS…': 'नवीन बँक SMS साठी ऐकत आहे…',
+  'Waiting for a new debit SMS. Ads, scam, and spam are ignored.':
+    'नवीन डेबिट SMS ची वाट — जाहिरात, स्कॅम आणि स्पॅम दुर्लक्षित.',
+  'SMS on. Only new debit/credit SMS are used — ads, scam, and old inbox are ignored.':
+    'SMS चालू. फक्त नवीन डेबिट/क्रेडिट SMS — जाहिरात, स्कॅम आणि जुना inbox दुर्लक्षित.',
+  'Only new debit/credit SMS (not old inbox). Ads, scam, and spam are ignored. Name accounts like “HDFC Salary” so the right bank is matched.':
+    'फक्त नवीन डेबिट/क्रेडिट SMS (जुना inbox नाही). जाहिरात, स्कॅम, स्पॅम दुर्लक्षित. खाते नाव “HDFC Salary” सारखे ठेवा.',
   'Check SMS again': 'पुन्हा SMS तपासा',
   'SMS found — bill amount matches a bank debit.': 'SMS सापडला — बिल रक्कम बँक डेबिटशी जुळते.',
   'merchant match': 'दुकान जुळले',
@@ -555,15 +571,42 @@ export const mr = {
 
   // Forgot expense / scam SMS
   'You forgot to add this expense': 'तुम्ही हा खर्च जोडायला विसरलात',
+  'You were credited': 'तुमच्या खात्यात जमा झाले',
+  'You were debited': 'तुमच्या खात्यातून कापले',
   'Confirm bank SMS credit': 'बँक SMS क्रेडिट पुष्टी करा',
   'Add where you paid (category + description). Until then Add stays disabled.':
     'कुठे दिले ते लिहा (श्रेणी + वर्णन). तोपर्यंत Add बंद राहील.',
+  'Add category and description to save this credit, or mark Scam to ignore this sender.':
+    'हे क्रेडिट जतन करण्यासाठी श्रेणी आणि वर्णन भरा, किंवा या पाठवणाऱ्याला दुर्लक्षित करण्यासाठी Scam दाबा.',
+  'You forgot to add this. Pick category and description, or mark Scam to block this sender.':
+    'तुम्ही हे जोडायला विसरलात. श्रेणी आणि वर्णन निवडा, किंवा या पाठवणाऱ्याला ब्लॉक करण्यासाठी Scam दाबा.',
   'Add this': 'हे जोडा',
+  Add: 'जोडा',
+  Scam: 'स्कॅम',
+  Merchant: 'व्यापारी',
+  Date: 'तारीख',
+  Time: 'वेळ',
+  Bank: 'बँक',
+  'Unknown merchant': 'अज्ञात व्यापारी',
   'Mark scam': 'स्कॅम म्हणून चिन्हांकित करा',
   'Mark this SMS as scam/spam? Messages from this sender will be ignored next time.':
     'हा SMS स्कॅम/स्पॅम म्हणून चिन्हांकित करायचा? या पाठवणाऱ्याकडून पुढील SMS दुर्लक्षित होतील.',
   'Pick category and description to enable Add this.':
     'Add this चालू करण्यासाठी श्रेणी आणि वर्णन निवडा.',
+  'Pick category and description to enable Add.':
+    'Add चालू करण्यासाठी श्रेणी आणि वर्णन निवडा.',
+  'More SMS waiting after this one.': 'यानंतर आणखी SMS प्रतीक्षेत आहेत.',
   'Select category…': 'श्रेणी निवडा…',
   'e.g. Uber to office, Zomato dinner': 'उदा. ऑफिससाठी Uber, Zomato जेवण',
+  'Edit transaction': 'व्यवहार संपादित करा',
+  'Update details for this transaction.': 'या व्यवहाराचे तपशील अपडेट करा.',
+  'I already paid': 'मी आधीच दिले',
+  'Marked as paid — Pay now removed': 'पेड म्हणून चिन्हांकित — Pay now काढले',
+  Brand: 'ब्रँड',
+  Source: 'स्रोत',
+  Subscription: 'सबस्क्रिप्शन',
+  'Split bill': 'बिल विभागणी',
+  'View split': 'विभागणी पहा',
+  'Delete this transaction? Account balance and dashboard will be updated.':
+    'हा व्यवहार हटवायचा? खाते शिल्लक आणि डॅशबोर्ड अपडेट होतील.',
 }

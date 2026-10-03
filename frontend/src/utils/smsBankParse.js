@@ -21,10 +21,11 @@ const BANK_HINTS = [
   { id: 'rbl', labels: ['rbl', 'rblbank'], keywords: ['rbl'] },
 ]
 
-const AUTOPAY_RE = /\bauto[- ]?pay\b|\bauto[- ]?debit\b|\bmandate\b|\bstanding instruction\b|\bsi debit\b|\be[- ]?nach\b|\bnach\b|\bsubscription\b|\brecurring\b/i
+// Do NOT treat bare "subscription" as autopay — promo ads say that without a real debit.
+const AUTOPAY_RE = /\bauto[- ]?pay\b|\bauto[- ]?debit\b|\bmandate\b|\bstanding instruction\b|\bsi debit\b|\be[- ]?nach\b|\bnach\b|\brecurring\s+(?:payment|debit)\b/i
 const SAVINGS_RE = /\bsavings?\b|\bppf\b|\brd\b|\brecurring deposit\b|\bsukanya\b|\bnps\b|\bemergency fund\b|\bsweep\b|\bto your (?:savings|rd|ppf)\b|\bsaved\b/i
 const CREDIT_RE = /\bcredited\b|\breceived\b|\bdeposited\b|\binward\b|\brefund\b|\bsalary\b/i
-const DEBIT_RE = /\bdebited\b|\bspent\b|\bpaid\b|\bsent\b|\bwithdrawn\b|\bpurchase\b|\bauto[- ]?debit\b|\bemi\b/i
+const DEBIT_RE = /\bdebited\b|\bspent\b|\bpaid\s+(?:to|from|via|using|rs|₹|inr)\b|\bhas\s+been\s+paid\b|\bsent\b|\bwithdrawn\b|\bpurchase\b|\bauto[- ]?debit\b|\bemi\b/i
 
 export function detectBankFromSms({ body = '', address = '' } = {}) {
   const hay = `${address} ${body}`.toLowerCase()
@@ -77,8 +78,13 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   if (!amount || Number(amount) < 1) return null
 
   const isCredit = CREDIT_RE.test(lower) && !DEBIT_RE.test(lower)
+  // Require real money verbs — bare "₹99 + UPI" promo ads must not count as debit
   const isDebit = DEBIT_RE.test(lower)
-    || (!isCredit && /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text) && /\ba\/c\b|\baccount\b|\bupi\b/i.test(lower))
+    || (/\b(?:debited|spent|withdrawn|auto[- ]?debit)\b/i.test(lower))
+    || (!isCredit
+      && /\b(?:upi\s*ref|txn\s*(?:id|ref)|imps|neft|rtgs)\b/i.test(lower)
+      && /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text)
+      && /\ba\/c\b|\baccount\b|\bupi\b/i.test(lower))
   if (!isCredit && !isDebit) return null
 
   const direction = isCredit ? 'CREDIT' : 'DEBIT'

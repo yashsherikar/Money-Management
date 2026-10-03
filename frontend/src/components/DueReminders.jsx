@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import client from '../api/client'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { notifyTransactionsChanged } from '../utils/confirmDuePaid.js'
+import { notifyTransactionsChanged, clearPaidReminders, RELATED } from '../utils/confirmDuePaid.js'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
@@ -22,6 +22,7 @@ export default function DueReminders() {
 
   async function confirmPaid(id) {
     await client.post(`/recurring-transactions/${id}/confirm`)
+    await clearPaidReminders(RELATED.RECURRING, id)
     setItems((prev) => prev.filter((i) => i.id !== id))
     notifyTransactionsChanged()
   }

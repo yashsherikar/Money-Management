@@ -43,40 +43,73 @@ export async function promptNativePushIfNeeded(client) {
   }
 }
 
-/** Registers this device for FCM push and sends the resulting token to the backend. */
+let registerInFlight = null
+
+/**
+ * Registers this device for FCM push and sends the resulting token to the backend.
+ * Safe to call repeatedly: clears stale listeners, dedupes concurrent calls, and
+ * falls back to the cached token if Capacitor does not re-emit "registration".
+ */
 export function enableNativePush(client) {
-  return new Promise((resolve, reject) => {
-    let settled = false
+  if (!isNativePlatform()) {
+    return Promise.reject(new Error('Not a native platform'))
+  }
+  if (registerInFlight) return registerInFlight
 
-    PushNotifications.addListener('registration', async (token) => {
+  registerInFlight = (async () => {
+    try {
       try {
-        await client.post('/push/register-fcm-token', { token: token.value, deviceId: getDeviceId() })
-        localStorage.setItem('fcmToken', token.value)
-        settled = true
-        resolve()
-      } catch (err) {
-        settled = true
-        reject(err)
+        await PushNotifications.removeAllListeners()
+      } catch { /* ignore */ }
+
+      let status = await PushNotifications.checkPermissions()
+      if (status.receive === 'prompt' || status.receive === 'prompt-with-rationale') {
+        status = await PushNotifications.requestPermissions()
       }
-    })
+      if (status.receive !== 'granted') {
+        throw new Error('Notification permission was not granted')
+      }
 
-    PushNotifications.addListener('registrationError', (err) => {
-      settled = true
-      reject(new Error(err.error || 'Push registration failed'))
-    })
-
-    PushNotifications.checkPermissions()
-      .then((status) => (status.receive === 'prompt' ? PushNotifications.requestPermissions() : status))
-      .then((status) => {
-        if (status.receive !== 'granted') {
-          throw new Error('Notification permission was not granted')
+      const tokenValue = await new Promise((resolve, reject) => {
+        let done = false
+        const finish = (fn) => (value) => {
+          if (done) return
+          done = true
+          clearTimeout(timer)
+          fn(value)
         }
-        return PushNotifications.register()
+
+        const timer = setTimeout(() => {
+          const cached = localStorage.getItem('fcmToken')
+          if (cached) finish(resolve)(cached)
+          else finish(reject)(new Error('Push registration timed out'))
+        }, 12_000)
+
+        PushNotifications.addListener('registration', (token) => {
+          finish(resolve)(token?.value)
+        })
+        PushNotifications.addListener('registrationError', (err) => {
+          finish(reject)(new Error(err?.error || 'Push registration failed'))
+        })
+
+        PushNotifications.register().catch((err) => {
+          finish(reject)(err)
+        })
       })
-      .catch((err) => {
-        if (!settled) reject(err)
+
+      if (!tokenValue) throw new Error('No FCM token received')
+
+      await client.post('/push/register-fcm-token', {
+        token: tokenValue,
+        deviceId: getDeviceId(),
       })
-  })
+      localStorage.setItem('fcmToken', tokenValue)
+    } finally {
+      registerInFlight = null
+    }
+  })()
+
+  return registerInFlight
 }
 
 export async function disableNativePush(client) {
@@ -85,7 +118,9 @@ export async function disableNativePush(client) {
     await client.post('/push/unregister-fcm-token', { token })
     localStorage.removeItem('fcmToken')
   }
-  await PushNotifications.removeAllListeners()
+  try {
+    await PushNotifications.removeAllListeners()
+  } catch { /* ignore */ }
 }
 
 async function tryConfirmFromTap(detail) {

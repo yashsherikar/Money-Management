@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import client, { networkErrorMessage } from '../api/client'
-import { notifyTransactionsChanged } from '../utils/confirmDuePaid.js'
+import { notifyTransactionsChanged, clearPaidReminders, RELATED } from '../utils/confirmDuePaid.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
@@ -177,6 +177,7 @@ export default function Recurring() {
     setError('')
     try {
       await client.post(`/recurring-transactions/${id}/confirm`)
+      await clearPaidReminders(RELATED.RECURRING, id)
       notifyTransactionsChanged()
       await loadAll()
     } catch (err) {

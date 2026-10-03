@@ -1,4 +1,6 @@
-/** Local store for P2P / merchant pays waiting for bank SMS confirmation. */
+/** Local store for P2P / merchant pays waiting for bank SMS confirmation (per user). */
+
+import { currentUserId, isLoggedIn, userGetItem, userSetItem } from './userStorage.js'
 
 const KEY = 'mm_pending_p2p_pays'
 const MAX_ITEMS = 40
@@ -11,8 +13,10 @@ function uid() {
 }
 
 export function listPendingP2pPays() {
+  if (!isLoggedIn()) return []
+  const uidNow = currentUserId()
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = userGetItem(KEY)
     if (!raw) return []
     const list = JSON.parse(raw)
     if (!Array.isArray(list)) return []
@@ -20,12 +24,14 @@ export function listPendingP2pPays() {
     let changed = false
     const next = list.map((item) => {
       if (!item || !item.id) return null
+      // Skip other users' leftovers (legacy)
+      if (item.userId && String(item.userId) !== uidNow) return null
       if ((item.status === 'waiting_sms' || item.status === 'pending')
           && item.expiresAt && now > item.expiresAt) {
         changed = true
-        return { ...item, status: 'expired', updatedAt: now }
+        return { ...item, status: 'expired', updatedAt: now, userId: item.userId || uidNow }
       }
-      return item
+      return item.userId ? item : { ...item, userId: uidNow }
     }).filter(Boolean)
     if (changed) saveAll(next)
     return next.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
@@ -35,8 +41,9 @@ export function listPendingP2pPays() {
 }
 
 function saveAll(list) {
+  if (!isLoggedIn()) return
   const trimmed = list.slice(0, MAX_ITEMS)
-  localStorage.setItem(KEY, JSON.stringify(trimmed))
+  userSetItem(KEY, JSON.stringify(trimmed))
   try {
     window.dispatchEvent(new CustomEvent('mm-pending-p2p-changed', { detail: { list: trimmed } }))
   } catch { /* ignore */ }
@@ -46,9 +53,11 @@ function saveAll(list) {
  * Create a waiting-SMS pending after user opens UPI.
  */
 export function addPendingP2pPay({ pa, pn, amount, personal = true }) {
+  if (!isLoggedIn()) return null
   const now = Date.now()
   const item = {
     id: uid(),
+    userId: currentUserId(),
     pa: String(pa || '').toLowerCase().trim(),
     pn: String(pn || '').trim(),
     amount: Number(Number(amount).toFixed(2)),

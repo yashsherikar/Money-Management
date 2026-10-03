@@ -6,6 +6,8 @@ import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import BillScanSheet from '../components/BillScanSheet.jsx'
+import TransactionEditSheet from '../components/TransactionEditSheet.jsx'
+import TransactionDetailSheet from '../components/TransactionDetailSheet.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { waitingP2pPays, countWaitingP2pPays, listPendingP2pPays } from '../utils/pendingP2pPays.js'
 import { syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
@@ -31,7 +33,8 @@ export default function Transactions() {
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [form, setForm] = useState(emptyForm)
-  const [editingId, setEditingId] = useState(null)
+  const [editingTxn, setEditingTxn] = useState(null)
+  const [viewingTxn, setViewingTxn] = useState(null)
   const [error, setError] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -76,7 +79,6 @@ export default function Transactions() {
 
   function resetForm() {
     setForm(emptyForm)
-    setEditingId(null)
     setFormOpen(false)
     setCategoryQuery('')
     setAddingCategory(false)
@@ -94,11 +96,7 @@ export default function Transactions() {
         description: form.description,
         txnDate: form.txnDate,
       }
-      if (editingId) {
-        await client.put(`/transactions/${editingId}`, payload)
-      } else {
-        await client.post('/transactions', payload)
-      }
+      await client.post('/transactions', payload)
       resetForm()
       loadAll()
     } catch (err) {
@@ -107,23 +105,22 @@ export default function Transactions() {
   }
 
   function startEdit(txn) {
-    setEditingId(txn.id)
-    setFormOpen(true)
-    setForm({
-      accountId: String(txn.accountId),
-      categoryId: txn.categoryId ? String(txn.categoryId) : '',
-      type: txn.type,
-      amount: String(txn.amount),
-      description: txn.description || '',
-      txnDate: txn.txnDate,
-    })
-    setCategoryQuery(txn.categoryId ? categories.find((c) => c.id === txn.categoryId)?.name || '' : '')
+    setFormOpen(false)
+    setViewingTxn(null)
+    setEditingTxn(txn)
+  }
+
+  function openTxnDetail(txn) {
+    setFormOpen(false)
+    setEditingTxn(null)
+    setViewingTxn(txn)
   }
 
   async function handleDelete(id) {
-    if (!confirm(t('Delete this transaction?'))) return
+    if (!confirm(t('Delete this transaction? Account balance and dashboard will be updated.'))) return
     await client.delete(`/transactions/${id}`)
-    loadAll()
+    window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
+    await loadAll()
   }
 
   async function handleAddCategory(e) {
@@ -195,6 +192,45 @@ export default function Transactions() {
         categories={categories}
         defaultAccountId={form.accountId}
         onSave={saveBillScan}
+      />
+
+      <TransactionDetailSheet
+        open={!!viewingTxn}
+        txn={viewingTxn}
+        onClose={() => setViewingTxn(null)}
+        onEdit={(txn) => startEdit(txn)}
+        onDelete={async (txn) => {
+          if (!confirm(t('Delete this transaction? Account balance and dashboard will be updated.'))) return
+          await client.delete(`/transactions/${txn.id}`)
+          setViewingTxn(null)
+          window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
+          await loadAll()
+        }}
+        onSplit={(txn) => {
+          setViewingTxn(null)
+          navigate(txn.splitBillId ? '/split-bills' : `/split-bills?txnId=${txn.id}`)
+        }}
+      />
+
+      <TransactionEditSheet
+        open={!!editingTxn}
+        txn={editingTxn}
+        accounts={accounts}
+        categories={categories}
+        onClose={() => setEditingTxn(null)}
+        onSave={{
+          update: async (payload) => {
+            const { id, ...body } = payload
+            await client.put(`/transactions/${id}`, body)
+            window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
+            await loadAll()
+          },
+          addCategory: async (name) => {
+            const { data } = await client.post('/categories', { name, essential: false })
+            setCategories((prev) => [...prev, data])
+            return data
+          },
+        }}
       />
 
       {waitingPays.length > 0 && (
@@ -361,7 +397,7 @@ export default function Transactions() {
 
         <div className="flex gap-2">
           <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
-            {editingId ? t('Update') : t('Add')}
+            {t('Add')}
           </button>
           <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
         </div>
@@ -375,16 +411,14 @@ export default function Transactions() {
           const isAutopay = /^Autopay:/i.test(desc)
           const isSavings = /^Savings/i.test(desc)
           const brand = brandFromTxnText(txn.description, txn.categoryName)
-          const title = brand?.name
-            || txn.description
-            || txn.categoryName
-            || t('Transaction')
+          // Always keep the real description as the title (logo is separate)
+          const title = txn.description || txn.categoryName || t('Transaction')
           const isIncome = txn.type === 'INCOME'
           const meta = [
             txn.txnDate,
             txn.accountName,
-            brand && txn.description && !new RegExp(brand.name, 'i').test(txn.description)
-              ? txn.description
+            brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
+              ? brand.name
               : null,
             isAutopay && t('Autopay · SMS'),
             isSavings && t('Savings · SMS'),
@@ -400,6 +434,7 @@ export default function Transactions() {
               type={txn.type}
               icon={brand ? <MerchantLogo brand={brand} size={40} /> : null}
               iconText={brand ? undefined : `${txn.description || ''} ${txn.categoryName || ''}`}
+              onClick={() => openTxnDetail(txn)}
               actions={(
                 <>
                   {txn.canSplit && (

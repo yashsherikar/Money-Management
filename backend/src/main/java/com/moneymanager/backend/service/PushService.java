@@ -1,5 +1,6 @@
 package com.moneymanager.backend.service;
 
+import com.google.firebase.messaging.AndroidConfig;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
@@ -259,12 +260,16 @@ public class PushService {
                          String relatedType, Long relatedId) {
         if (!firebaseEnabled) return;
         try {
+            // HIGH priority is required for data-only FCM to wake Doze / show promptly.
             Message.Builder message = Message.builder()
                     .setToken(sub.getFcmToken())
                     .putData("title", title)
                     .putData("body", body)
                     .putData("url", url)
-                    .putData("actionType", actionType);
+                    .putData("actionType", actionType)
+                    .setAndroidConfig(AndroidConfig.builder()
+                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .build());
             if (StringUtils.hasText(payUrl)) {
                 message.putData("payUrl", payUrl);
             }
@@ -298,6 +303,9 @@ public class PushService {
                     .putData("title", "")
                     .putData("body", "")
                     .putData("url", "/")
+                    .setAndroidConfig(AndroidConfig.builder()
+                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .build())
                     .build();
             FirebaseMessaging.getInstance().send(message);
         } catch (FirebaseMessagingException e) {
@@ -331,6 +339,9 @@ public class PushService {
                             .putData("body", "If you see this, native push notifications work.")
                             .putData("url", "/")
                             .putData("actionType", ACTION_VIEW_ONLY)
+                            .setAndroidConfig(AndroidConfig.builder()
+                                    .setPriority(AndroidConfig.Priority.HIGH)
+                                    .build())
                             .build();
                     String response = FirebaseMessaging.getInstance().send(message);
                     results.add("Subscription " + sub.getId() + " (native app): sent, id " + response);

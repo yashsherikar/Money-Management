@@ -3,8 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { EyeIcon, EyeOffIcon } from '../components/icons.jsx'
-import client from '../api/client'
-import { promptNativePushIfNeeded } from '../nativePush.js'
+import { bootstrapNotifications } from '../utils/notificationBootstrap.js'
 
 export default function Signup() {
   const { user, signup } = useAuth()
@@ -25,7 +24,7 @@ export default function Signup() {
     setLoading(true)
     try {
       await signup(email.trim(), password, name.trim())
-      promptNativePushIfNeeded(client).catch(() => {})
+      bootstrapNotifications({ refreshPush: true }).catch(() => {})
       navigate('/', { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || t('Signup failed'))

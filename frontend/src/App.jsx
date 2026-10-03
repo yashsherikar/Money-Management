@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { listenForNotificationTaps } from './nativePush.js'
+import { bootstrapNotifications } from './utils/notificationBootstrap.js'
 import { startSmsPayWatcher } from './utils/smsPayWatch.js'
 import { startPendingPayReminderWatcher } from './utils/pendingPayReminders.js'
 import { syncUnloggedConfirmedPays } from './utils/paymentNotify.js'
@@ -47,6 +48,12 @@ export default function App() {
     listenForNotificationTaps(navigate)
   }, [navigate])
 
+  // Permissions, Android channels, FCM token → backend (cold start with saved session)
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return
+    bootstrapNotifications({ refreshPush: true }).catch(() => {})
+  }, [])
+
   useEffect(() => {
     return startSmsPayWatcher()
   }, [])
@@ -81,15 +88,6 @@ export default function App() {
       clearInterval(t)
     }
   }, [])
-
-  useEffect(() => {
-    const onTap = (e) => {
-      const url = e?.detail?.url
-      if (url) navigate(url)
-    }
-    window.addEventListener('mm-notification-tap', onTap)
-    return () => window.removeEventListener('mm-notification-tap', onTap)
-  }, [navigate])
 
   return (
     <BiometricGate>

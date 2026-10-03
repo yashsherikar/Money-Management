@@ -4,6 +4,7 @@ import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { enablePush, disablePush, isPushEnabled, isPushSupported } from '../push.js'
 import { isNativePlatform, isNativePushEnabled, enableNativePush, disableNativePush } from '../nativePush.js'
+import { ensureNotificationPermissions } from '../utils/notificationBootstrap.js'
 import { isBiometricEnabled } from '../biometricLock.js'
 import { isPinSet as isAppLockSet } from '../appLock.js'
 import {
@@ -85,7 +86,11 @@ export default function Settings() {
         await (native ? disableNativePush(client) : disablePush(client))
         setPushOn(false)
       } else {
-        await (native ? enableNativePush(client) : enablePush(client))
+        if (native) {
+          await ensureNotificationPermissions({ refreshPush: true })
+        } else {
+          await enablePush(client)
+        }
         setPushOn(true)
       }
     } catch (err) {
@@ -244,7 +249,7 @@ export default function Settings() {
               <div>
                 <h2 className="font-semibold">{t('Bank SMS')}</h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  {t('Confirms P2P pays, detects Autopay → Recurring, and savings transfers. Name accounts like “HDFC Salary” so the right bank is debited/credited.')}
+                  {t('Only new debit/credit SMS (not old inbox). Ads, scam, and spam are ignored. Name accounts like “HDFC Salary” so the right bank is matched.')}
                 </p>
                 <p className={`text-xs mt-2 font-medium ${smsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {smsOk ? t('SMS permission on') : t('SMS permission off')}
