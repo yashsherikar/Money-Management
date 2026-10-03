@@ -21,10 +21,14 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    const trimmed = email.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError(t('Enter a valid email'))
+      return
+    }
     setLoading(true)
     try {
-      await login(email.trim(), password)
-      // Don't block login on push / local notification setup
+      await login(trimmed, password)
       bootstrapNotifications({ refreshPush: true }).catch(() => {})
       navigate('/', { replace: true })
     } catch (err) {
@@ -35,25 +39,35 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-slate-50 px-4 py-8 relative" style={{ paddingTop: 'max(2rem, env(safe-area-inset-top))', paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
+    <div
+      className="auth-shell min-h-screen min-h-[100dvh] flex flex-col items-center justify-center px-4 py-8 relative"
+      style={{ paddingTop: 'max(2rem, env(safe-area-inset-top))', paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}
+    >
       <button
+        type="button"
         onClick={() => setLang(lang === 'mr' ? 'en' : 'mr')}
-        className="absolute top-4 right-4 text-sm text-slate-600 hover:underline"
+        aria-label={lang === 'mr' ? 'Switch to English' : 'Switch to Marathi'}
+        className="absolute top-4 right-4 z-10 text-sm text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg"
       >
         {lang === 'mr' ? 'English' : 'मराठी'}
       </button>
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-2 mb-6">
-          <img src="/logo-32.png" alt="" className="w-8 h-8" />
-          <h1 className="text-xl font-bold text-brand-700">{t('Log in')}</h1>
-        </div>
-        {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
+
+      <div className="relative z-10 w-full max-w-sm mb-7 text-center animate-fade-up">
+        <img src="/logo-32.png" alt="Money Manager" className="w-14 h-14 rounded-2xl mx-auto mb-4 shadow-glow" />
+        <div className="auth-brand">Money Manager</div>
+        <p className="mt-2 text-sm text-slate-500">{t('Your money, clearly in control')}</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="auth-card w-full max-w-sm p-7 animate-page-in">
+        <h1 className="text-lg font-semibold text-slate-900 mb-5">{t('Log in')}</h1>
+        {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2.5 rounded-xl">{error}</div>}
         <label className="block text-sm font-medium text-slate-700 mb-1">{t('Email')}</label>
         <input
-          type="text"
+          type="email"
           inputMode="email"
           autoCapitalize="none"
           autoCorrect="off"
+          autoComplete="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -63,6 +77,7 @@ export default function Login() {
         <div className="relative mb-6">
           <input
             type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -80,11 +95,11 @@ export default function Login() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 rounded-md disabled:opacity-60"
+          className="w-full bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 rounded-md disabled:opacity-60"
         >
           {loading ? t('Logging in...') : t('Log in')}
         </button>
-        <p className="mt-4 text-sm text-slate-600 text-center">
+        <p className="mt-5 text-sm text-slate-600 text-center">
           {t('No account?')} <Link to="/signup" className="text-brand-600 font-medium">{t('Sign up')}</Link>
         </p>
       </form>

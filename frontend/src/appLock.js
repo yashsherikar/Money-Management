@@ -78,18 +78,29 @@ const SUPPRESS_KEY = 'mm_suppress_lock_until'
 let suppressResumeLockUntil = 0
 
 function readPersistedSuppress() {
-  const until = Number(sessionStorage.getItem(SUPPRESS_KEY) || 0)
+  // localStorage survives camera / GPay when Android kills the WebView;
+  // sessionStorage alone is wiped on process death → biometric pops again.
+  let until = 0
+  try {
+    until = Math.max(until, Number(localStorage.getItem(SUPPRESS_KEY) || 0))
+  } catch { /* ignore */ }
+  try {
+    until = Math.max(until, Number(sessionStorage.getItem(SUPPRESS_KEY) || 0))
+  } catch { /* ignore */ }
   if (until > Date.now()) return until
-  sessionStorage.removeItem(SUPPRESS_KEY)
+  try { localStorage.removeItem(SUPPRESS_KEY) } catch { /* ignore */ }
+  try { sessionStorage.removeItem(SUPPRESS_KEY) } catch { /* ignore */ }
   return 0
 }
 
-/** Call before opening QR scanner / GPay so returning doesn't demand biometric.
- *  Persisted — Android may kill the WebView while GPay is open. */
+/** Call before opening camera / QR / GPay so returning doesn't demand biometric.
+ *  Persisted in localStorage — Android may kill the WebView while camera is open. */
 export function suppressResumeLock(ms = 300_000) {
   const until = Date.now() + ms
   suppressResumeLockUntil = Math.max(suppressResumeLockUntil, until, readPersistedSuppress())
-  sessionStorage.setItem(SUPPRESS_KEY, String(suppressResumeLockUntil))
+  const val = String(suppressResumeLockUntil)
+  try { localStorage.setItem(SUPPRESS_KEY, val) } catch { /* ignore */ }
+  try { sessionStorage.setItem(SUPPRESS_KEY, val) } catch { /* ignore */ }
 }
 
 export function isResumeLockSuppressed() {

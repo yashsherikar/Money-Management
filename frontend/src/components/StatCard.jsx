@@ -10,9 +10,9 @@ export default function StatCard({ label, value, sub, tone = 'default' }) {
     bad: 'bg-red-500',
   }
   return (
-    <div className="relative bg-white rounded-xl border border-slate-200 p-3 sm:p-4 pl-4 sm:pl-5 overflow-hidden min-w-0">
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${accentClasses[tone]}`} />
-      <div className="text-[0.65rem] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">{label}</div>
+    <div className="relative bg-white rounded-xl border border-slate-200 p-3 sm:p-4 pl-4 sm:pl-5 overflow-hidden min-w-0 transition-transform duration-200 hover:-translate-y-0.5">
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${accentClasses[tone]}`} />
+      <div className="text-[0.65rem] sm:text-xs font-semibold text-slate-500 uppercase tracking-[0.12em] truncate">{label}</div>
       <div className={`mt-1.5 stat-value ${toneClasses[tone]}`}>{value}</div>
       {sub && <div className="mt-1 text-[0.7rem] sm:text-xs text-slate-500 leading-snug line-clamp-2">{sub}</div>}
     </div>

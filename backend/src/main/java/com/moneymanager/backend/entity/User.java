@@ -27,6 +27,10 @@ public class User {
     @Column(nullable = false)
     private String name;
 
+    /** Digits-only mobile (optional). Used for split/request lookup. */
+    @Column(length = 20)
+    private String phone;
+
     @Column(name = "upi_id")
     private String upiId;
 

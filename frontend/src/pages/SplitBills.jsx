@@ -4,8 +4,10 @@ import client from '../api/client'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { suppressResumeLock, savePendingUpiConfirm } from '../appLock.js'
-import { copyVpaAndOpenApp, parseUpiQr, formatUpiAmount } from '../utils/upiQr.js'
+import ContactSuggest from '../components/ContactSuggest.jsx'
+import { parseUpiQr, formatUpiAmount } from '../utils/upiQr.js'
+import { startRequestPayWatch } from '../utils/requestPayWatch.js'
+import { upsertSavedContact, syncContactsFromServer, ingestContactsFromHistory } from '../utils/savedContacts.js'
 
 function money(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -15,7 +17,7 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
 }
 
-const emptyParticipant = () => ({ name: '', shareAmount: '', sharePercent: '', email: '' })
+const emptyParticipant = () => ({ name: '', shareAmount: '', sharePercent: '', email: '', phone: '', q: '' })
 
 const emptyForm = {
   title: '',
@@ -72,6 +74,19 @@ export default function SplitBills() {
     setOwedBills(owedRes.data || [])
     const primary = accountsRes.data.find((a) => a.isPrimary) || accountsRes.data[0]
     if (primary) setForm((f) => (f.accountId ? f : { ...f, accountId: String(primary.id) }))
+
+    // Remember split partners for Requests / future splits autofill
+    const fromSplits = []
+    for (const b of billsRes.data || []) {
+      for (const p of b.participants || []) {
+        fromSplits.push({ name: p.name, email: p.email, phone: p.phone })
+      }
+    }
+    for (const b of owedRes.data || []) {
+      fromSplits.push({ name: b.payerName, upiId: b.requesterUpiId })
+    }
+    ingestContactsFromHistory(fromSplits)
+    syncContactsFromServer(client, fromSplits).catch(() => {})
   }
 
   async function payOwedSplit(b) {
@@ -94,18 +109,15 @@ export default function SplitBills() {
         alert(t('Could not open UPI app'))
         return
       }
-      suppressResumeLock(300_000)
-      savePendingUpiConfirm({
+      await startRequestPayWatch({
         kind: 'split_bill',
-        requestId: b.participantId,
         participantId: b.participantId,
+        requestId: b.participantId,
         pa,
-        am,
         amount: am,
-        name: b.payerName || pa,
+        name: b.payerName || '',
         pn: b.payerName || '',
       })
-      await copyVpaAndOpenApp({ pa, amount: am, app: 'gpay' })
     } catch (e) {
       alert(e.message || t('Could not open UPI app'))
     } finally {
@@ -230,6 +242,7 @@ export default function SplitBills() {
           shareAmount: amt,
           sharePercent: pct > 0 ? pct : (total > 0 ? round2((amt / total) * 100) : null),
           email: p.email || null,
+          phone: p.phone || null,
         }
       })
     if (!participants.length) {
@@ -237,6 +250,11 @@ export default function SplitBills() {
       return
     }
     try {
+      participants.forEach((p) => upsertSavedContact({
+        name: p.name,
+        email: p.email,
+        phone: p.phone,
+      }))
       await client.post('/split-bills', {
         title: form.title,
         totalAmount: total,
@@ -402,6 +420,26 @@ export default function SplitBills() {
           <div className="text-[13px] font-bold text-muted">{t('Who owes what')}</div>
           {form.participants.map((p, i) => (
             <div key={i} className="bg-slate-50 rounded-2xl p-3 flex flex-col gap-2">
+              <ContactSuggest
+                value={p.q || p.name}
+                onChange={(v) => updateParticipant(i, 'q', v)}
+                onPick={(c) => {
+                  const participants = form.participants.map((row, idx) => (
+                    idx === i
+                      ? {
+                        ...row,
+                        q: c.name || c.email || c.phone || row.q,
+                        name: c.name || row.name,
+                        email: c.email || '',
+                        phone: c.phone || '',
+                      }
+                      : row
+                  ))
+                  setForm({ ...form, participants })
+                }}
+                placeholder={t('Name, email, or phone')}
+                className="w-full"
+              />
               <input placeholder={t('Name')} value={p.name} onChange={(e) => updateParticipant(i, 'name', e.target.value)} className="w-full" />
               {form.splitMode === 'percent' ? (
                 <div className="flex gap-2 items-center">
@@ -436,13 +474,14 @@ export default function SplitBills() {
                 </div>
               )}
               <input type="email" placeholder={t('Their email (optional, if they use this app)')} value={p.email} onChange={(e) => updateParticipant(i, 'email', e.target.value)} className="w-full" />
+              <input type="tel" placeholder={t('Phone (optional)')} value={p.phone || ''} onChange={(e) => updateParticipant(i, 'phone', e.target.value)} className="w-full" />
               {form.participants.length > 1 && (
                 <button type="button" onClick={() => removeParticipantRow(i)} className="self-start text-sm text-red-600">{t('Remove')}</button>
               )}
             </div>
           ))}
           <button type="button" onClick={addParticipantRow} className="self-start text-sm text-brand-600">{t('+ Add another person')}</button>
-          <p className="text-xs text-slate-500">{t("If their email matches a Money Manager account, this bill shows up on their Requests page too.")}</p>
+          <p className="text-xs text-slate-500">{t('If their email or phone matches a Money Manager account, this bill shows up for them too.')}</p>
         </div>
 
         <Field label={t('Note (optional)')}>

@@ -410,7 +410,8 @@ export default function Transactions() {
           const desc = String(txn.description || '')
           const isAutopay = /^Autopay:/i.test(desc)
           const isSavings = /^Savings/i.test(desc)
-          const brand = brandFromTxnText(txn.description, txn.categoryName)
+          const isTransfer = /^Transfer\s*:/i.test(desc)
+          const brand = isTransfer ? null : brandFromTxnText(txn.description, txn.categoryName)
           // Always keep the real description as the title (logo is separate)
           const title = txn.description || txn.categoryName || t('Transaction')
           const isIncome = txn.type === 'INCOME'
@@ -420,9 +421,10 @@ export default function Transactions() {
             brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
               ? brand.name
               : null,
+            isTransfer && t('Transfer · own accounts'),
             isAutopay && t('Autopay · SMS'),
             isSavings && t('Savings · SMS'),
-            txn.categoryName && txn.description && !isAutopay && !isSavings ? txn.categoryName : null,
+            txn.categoryName && txn.description && !isAutopay && !isSavings && !isTransfer ? txn.categoryName : null,
           ].filter(Boolean).join(' · ')
           return (
             <MoneyRow

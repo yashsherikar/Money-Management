@@ -52,9 +52,9 @@ export default function PaymentNotifyAsk() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pb-20">
       <div className="absolute inset-0 bg-black/40" onClick={dismiss} />
-      <div className="relative bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-xl m-0 sm:m-4">
+      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl">
         <h2 className="font-bold text-lg mb-2">{t('Auto-track UPI payments?')}</h2>
         <p className="text-sm text-slate-600 mb-3 leading-relaxed">
           {t('Allow notification access so we can read GPay/PhonePe payment alerts and log expenses by category. We only use payment notifications — Pay still works if you skip.')}

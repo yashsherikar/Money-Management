@@ -92,16 +92,19 @@ export default function PendingPays() {
       })
       .catch(() => {})
 
-    if (!isSmsPaySupported()) return undefined
-    checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
-    scanInboxForPendingPays().then(async () => {
-      await syncUnloggedConfirmedPays().catch(() => {})
-      refresh()
-    })
     const onChange = () => refresh()
     window.addEventListener('mm-pending-p2p-changed', onChange)
     window.addEventListener('mm-p2p-sms-confirmed', onChange)
     window.addEventListener('mm-transactions-changed', onChange)
+
+    if (isSmsPaySupported()) {
+      checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
+      scanInboxForPendingPays().then(async () => {
+        await syncUnloggedConfirmedPays().catch(() => {})
+        refresh()
+      })
+    }
+
     return () => {
       window.removeEventListener('mm-pending-p2p-changed', onChange)
       window.removeEventListener('mm-p2p-sms-confirmed', onChange)

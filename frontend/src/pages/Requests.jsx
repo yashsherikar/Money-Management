@@ -1,8 +1,15 @@
 ﻿import { useEffect, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { suppressResumeLock, savePendingUpiConfirm } from '../appLock.js'
-import { copyVpaAndOpenApp, parseUpiQr, formatUpiAmount } from '../utils/upiQr.js'
+import ContactSuggest from '../components/ContactSuggest.jsx'
+import { parseUpiQr, formatUpiAmount } from '../utils/upiQr.js'
+import { startRequestPayWatch } from '../utils/requestPayWatch.js'
+import {
+  upsertSavedContact,
+  listSavedContacts,
+  syncContactsFromServer,
+  ingestContactsFromHistory,
+} from '../utils/savedContacts.js'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
@@ -15,7 +22,7 @@ const statusTone = {
   PAID: 'text-emerald-600',
 }
 
-const emptyAsk = { email: '', amount: '', note: '' }
+const emptyAsk = { q: '', email: '', phone: '', name: '', amount: '', note: '' }
 
 export default function Requests() {
   const { t } = useLanguage()
@@ -28,31 +35,88 @@ export default function Requests() {
   const [askOk, setAskOk] = useState(false)
   const [asking, setAsking] = useState(false)
   const [payingId, setPayingId] = useState(null)
+  const [loadError, setLoadError] = useState('')
+  const [recentFriends, setRecentFriends] = useState(() => listSavedContacts().slice(0, 8))
+
+  function pickFriend(c) {
+    setAsk((f) => ({
+      ...f,
+      q: c.name || c.email || c.phone || f.q,
+      name: c.name || f.name,
+      email: c.email || f.email,
+      phone: c.phone || f.phone,
+    }))
+  }
+
+  function applyQueryToAsk(q, prev) {
+    const raw = String(q || '').trim()
+    const next = { ...prev, q }
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+      next.email = raw.toLowerCase()
+      if (!next.name) next.name = raw.split('@')[0]
+    } else if (/^\+?[\d\s-]{10,}$/.test(raw.replace(/\s/g, ''))) {
+      next.phone = raw.replace(/\D/g, '').slice(-10)
+    } else if (raw && !next.name) {
+      next.name = raw
+    }
+    return next
+  }
 
   async function load() {
-    const [inRes, outRes, payInRes, payOutRes] = await Promise.all([
-      client.get('/contribution-requests/incoming'),
-      client.get('/contribution-requests/outgoing'),
-      client.get('/payment-requests/incoming'),
-      client.get('/payment-requests/outgoing'),
-    ])
-    setIncoming(inRes.data)
-    setOutgoing(outRes.data)
-    setPayIncoming(payInRes.data)
-    setPayOutgoing(payOutRes.data)
+    setLoadError('')
+    try {
+      const [inRes, outRes, payInRes, payOutRes] = await Promise.all([
+        client.get('/contribution-requests/incoming'),
+        client.get('/contribution-requests/outgoing'),
+        client.get('/payment-requests/incoming'),
+        client.get('/payment-requests/outgoing'),
+      ])
+      setIncoming(inRes.data || [])
+      setOutgoing(outRes.data || [])
+      setPayIncoming(payInRes.data || [])
+      setPayOutgoing(payOutRes.data || [])
+
+      // History → saved contacts (so Ask form autofills prior friends)
+      const fromHistory = [
+        ...(payOutRes.data || []).map((r) => ({
+          name: r.payerName,
+          email: r.payerEmail,
+          phone: r.payerPhone,
+        })),
+        ...(payInRes.data || []).map((r) => ({
+          name: r.requesterName,
+          email: r.requesterEmail,
+          phone: r.requesterPhone,
+          upiId: r.requesterUpiId,
+        })),
+        ...(outRes.data || []).map((r) => ({ name: r.memberName })),
+        ...(inRes.data || []).map((r) => ({
+          name: r.requesterName,
+          upiId: r.requesterUpiId,
+        })),
+      ]
+      ingestContactsFromHistory(fromHistory)
+      await syncContactsFromServer(client, fromHistory)
+      setRecentFriends(listSavedContacts().slice(0, 8))
+    } catch (err) {
+      setLoadError(err.response?.data?.message || t('Could not load requests'))
+    }
   }
 
   useEffect(() => {
     load()
+    const onContacts = () => setRecentFriends(listSavedContacts().slice(0, 8))
+    window.addEventListener('mm-contacts-changed', onContacts)
+    return () => window.removeEventListener('mm-contacts-changed', onContacts)
   }, [])
 
-  async function accept(id) { await client.patch(`/contribution-requests/${id}/accept`); load() }
-  async function decline(id) { await client.patch(`/contribution-requests/${id}/decline`); load() }
-  async function markPaid(id) { await client.patch(`/contribution-requests/${id}/mark-paid`); load() }
+  async function accept(id) { try { await client.patch(`/contribution-requests/${id}/accept`); load() } catch { /* ignore */ } }
+  async function decline(id) { try { await client.patch(`/contribution-requests/${id}/decline`); load() } catch { /* ignore */ } }
+  async function markPaid(id) { try { await client.patch(`/contribution-requests/${id}/mark-paid`); load() } catch { /* ignore */ } }
 
-  async function acceptPay(id) { await client.patch(`/payment-requests/${id}/accept`); load() }
-  async function declinePay(id) { await client.patch(`/payment-requests/${id}/decline`); load() }
-  async function markPayReceived(id) { await client.patch(`/payment-requests/${id}/mark-paid`); load() }
+  async function acceptPay(id) { try { await client.patch(`/payment-requests/${id}/accept`); load() } catch { /* ignore */ } }
+  async function declinePay(id) { try { await client.patch(`/payment-requests/${id}/decline`); load() } catch { /* ignore */ } }
+  async function markPayReceived(id) { try { await client.patch(`/payment-requests/${id}/mark-paid`); load() } catch { /* ignore */ } }
 
   /**
    * P2P money requests: GPay deep-link often fails. Copy UPI ID + open app,
@@ -80,18 +144,16 @@ export default function Requests() {
         alert(t('Could not open UPI app'))
         return
       }
-      suppressResumeLock(300_000)
-      savePendingUpiConfirm({
+      const who = r.requesterName || r.payerName || ''
+      await startRequestPayWatch({
         kind,
         requestId: r.id,
         participantId: r.participantId || null,
         pa,
-        am,
         amount: am,
-        name: r.requesterName || r.payerName || pa,
-        pn: r.requesterName || '',
+        name: who,
+        pn: who,
       })
-      await copyVpaAndOpenApp({ pa, amount: am, app: 'gpay' })
     } catch (e) {
       alert(e.message || t('Could not open UPI app'))
     } finally {
@@ -103,12 +165,25 @@ export default function Requests() {
     e.preventDefault()
     setAskError('')
     setAskOk(false)
+    const filled = applyQueryToAsk(ask.q, ask)
+    setAsk(filled)
     setAsking(true)
     try {
+      if (!filled.email.trim() && !filled.phone.trim()) {
+        setAskError(t('Enter friend\'s email or phone'))
+        setAsking(false)
+        return
+      }
       await client.post('/payment-requests', {
-        email: ask.email.trim(),
-        amount: Number(ask.amount),
-        note: ask.note.trim() || null,
+        email: filled.email.trim() || null,
+        phone: filled.phone.trim() || null,
+        amount: Number(filled.amount),
+        note: filled.note.trim() || null,
+      })
+      upsertSavedContact({
+        name: filled.name,
+        email: filled.email,
+        phone: filled.phone,
       })
       setAsk(emptyAsk)
       setAskOk(true)
@@ -122,7 +197,15 @@ export default function Requests() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">{t('Requests')}</h1>
+      <h1 className="text-2xl font-bold mb-2">{t('Requests')}</h1>
+      <p className="page-sub">{t('Ask friends or settle money you owe — contacts autofill from past splits & requests.')}</p>
+
+      {loadError && (
+        <div className="mb-4 flex items-center justify-between gap-3 text-sm text-red-600 bg-red-50 p-3 rounded-xl">
+          <span>{loadError}</span>
+          <button type="button" onClick={load} className="shrink-0 px-3 py-1.5 bg-brand-600 text-white rounded-md text-xs font-medium">Retry</button>
+        </div>
+      )}
 
       <section className="mb-8 bg-white border border-slate-200 rounded-xl p-4">
         <h2 className="font-semibold mb-1">{t('Ask for money')}</h2>
@@ -132,14 +215,57 @@ export default function Requests() {
         {askError && <div className="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">{askError}</div>}
         {askOk && <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 p-2 rounded">{t('Request sent.')}</div>}
         <form onSubmit={handleAsk} className="space-y-3 max-w-md">
+          {recentFriends.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-slate-500 mb-1.5">{t('Recent friends')}</div>
+              <div className="flex flex-wrap gap-2">
+                {recentFriends.map((c) => (
+                  <button
+                    key={c.id || c.email || c.phone || c.name}
+                    type="button"
+                    onClick={() => pickFriend(c)}
+                    className="friend-chip text-left px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-brand-50 text-sm"
+                  >
+                    <div className="font-medium text-slate-800 leading-tight">{c.name || c.email || c.phone}</div>
+                    {(c.email || c.phone) && (
+                      <div className="text-[11px] text-slate-500 truncate max-w-[10rem]">
+                        {[c.email, c.phone].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('Friend name / email / phone')}
+            </label>
+            <ContactSuggest
+              value={ask.q}
+              onChange={(v) => setAsk((f) => applyQueryToAsk(v, f))}
+              onPick={pickFriend}
+              placeholder={t('Type name, email, or phone — suggestions fill the rest')}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t("Friend's email")}</label>
             <input
               type="email"
-              required
               value={ask.email}
               onChange={(e) => setAsk((f) => ({ ...f, email: e.target.value }))}
               placeholder="friend@email.com"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Phone')}</label>
+            <input
+              type="tel"
+              value={ask.phone}
+              onChange={(e) => setAsk((f) => ({ ...f, phone: e.target.value }))}
+              placeholder="9876543210"
               className="w-full px-3 py-2 border border-slate-300 rounded-md"
             />
           </div>

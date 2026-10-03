@@ -10,9 +10,17 @@ import java.util.List;
 
 public class ProfileDtos {
 
-    public record ProfileResponse(Long id, String email, String name, String upiId, String photo, boolean pinSet) {}
+    public record ProfileResponse(
+            Long id,
+            String email,
+            String name,
+            String phone,
+            String upiId,
+            String photo,
+            boolean pinSet
+    ) {}
 
-    public record UpdateProfileRequest(String name, String upiId) {}
+    public record UpdateProfileRequest(String name, String phone, String upiId) {}
 
     public record ChangePasswordRequest(
             @NotBlank String currentPassword,
@@ -30,5 +38,11 @@ public class ProfileDtos {
 
     public record AccountBalance(Long accountId, String accountName, AccountType type, BigDecimal balance) {}
 
-    public record TotalBalanceResponse(BigDecimal totalBalance, BigDecimal cashOnHand, BigDecimal udharOwed, BigDecimal lockedMinimumBalance, List<AccountBalance> byAccount) {}
+    public record TotalBalanceResponse(
+            BigDecimal totalBalance,
+            BigDecimal cashOnHand,
+            BigDecimal udharOwed,
+            BigDecimal lockedMinimumBalance,
+            List<AccountBalance> byAccount
+    ) {}
 }

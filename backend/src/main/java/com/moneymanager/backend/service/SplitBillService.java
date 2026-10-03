@@ -170,6 +170,12 @@ public class SplitBillService {
             if (StringUtils.hasText(p.email())) {
                 userRepository.findByIgnoreCaseEmail(p.email().trim()).ifPresent(participant::setUser);
             }
+            if (participant.getUser() == null && StringUtils.hasText(p.phone())) {
+                String phone = ProfileService.normalizePhone(p.phone());
+                if (phone != null) {
+                    userRepository.findByPhone(phone).ifPresent(participant::setUser);
+                }
+            }
             bill.getParticipants().add(participant);
         }
 
@@ -324,7 +330,9 @@ public class SplitBillService {
         List<ParticipantResponse> participants = bill.getParticipants().stream()
                 .map(p -> new ParticipantResponse(
                         p.getId(), p.getName(), p.getShareAmount(), p.getSharePercent(),
-                        p.isPaid(), p.getPaidDate(), p.getUser() != null))
+                        p.isPaid(), p.getPaidDate(), p.getUser() != null,
+                        p.getUser() != null ? p.getUser().getEmail() : null,
+                        p.getUser() != null ? p.getUser().getPhone() : null))
                 .toList();
 
         return new SplitBillResponse(

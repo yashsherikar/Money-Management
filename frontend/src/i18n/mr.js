@@ -522,13 +522,38 @@ export const mr = {
   'Failed to load': 'लोड अयशस्वी',
   'Saving…': 'जतन होत आहे…',
 
-  // Bill scan (Transactions)
+  // Bill scan (Transactions / Pay)
   'Scan bill': 'बिल स्कॅन',
+  'Bill saved to Transactions': 'बिल व्यवहारात जतन झाले',
+  Phone: 'फोन',
+  Contact: 'संपर्क',
+  'Friend name / email / phone': 'मित्राचे नाव / ईमेल / फोन',
+  'Type name, email, or phone — suggestions fill the rest':
+    'नाव, ईमेल किंवा फोन टाइप करा — सुचना बाकी भरेल',
+  'Enter friend\'s email or phone': 'मित्राचा ईमेल किंवा फोन टाका',
+  'Friends can find you by phone for split bills and money requests.':
+    'स्प्लिट बिल आणि पैसे मागण्यासाठी मित्र फोनने तुम्हाला शोधू शकतात.',
+  'Name, email, or phone': 'नाव, ईमेल किंवा फोन',
+  'Phone (optional)': 'फोन (पर्यायी)',
+  'If their email or phone matches a Money Manager account, this bill shows up for them too.':
+    'त्यांचा ईमेल किंवा फोन Money Manager खात्याशी जुळला तर हे बिल त्यांनाही दिसेल.',
   'Photo or upload a bill — we read amount, category, payment mode, then check SMS before save.':
     'बिलाचा फोटो किंवा अपलोड — रक्कम, श्रेणी, पेमेंट पद्धत वाचून जतन करण्यापूर्वी SMS तपासतो.',
   'Take photo': 'फोटो काढा',
   'Upload from gallery': 'गॅलरीतून अपलोड',
   'Reading bill…': 'बिल वाचत आहे…',
+  'Moved to your other bank?': 'तुमच्या दुसऱ्या बँकेत ट्रान्सफर?',
+  'This looks like money moved between your own accounts. Pick from and to — it will save as Transfer (not spend/earn).': 'हे तुमच्या स्वतःच्या खात्यांमधील ट्रान्सफर वाटते. From आणि To निवडा — Transfer म्हणून सेव्ह होईल (खर्च/उत्पन्न नाही).',
+  'From account': 'कोणत्या खात्यातून',
+  'To account': 'कोणत्या खात्यात',
+  'To account (credited)': 'जमा झालेले खाते',
+  'From account (source)': 'कशातून आले',
+  'Save transfer': 'ट्रान्सफर सेव्ह करा',
+  'Not a transfer': 'ट्रान्सफर नाही',
+  'Transfer · own accounts': 'ट्रान्सफर · स्वतःची खाती',
+  'Primary bank only — all accounts on Transactions': 'फक्त प्राथमिक बँक — सर्व खाती Transactions मध्ये',
+  'Recent friends': 'अलीकडील मित्र',
+  'Type name, email, or phone — suggestions fill the rest': 'नाव, ईमेल किंवा फोन टाइप करा — सूचना बाकी भरतील',
   'Opening camera…': 'कॅमेरा उघडत आहे…',
   'Could not open camera': 'कॅमेरा उघडता आला नाही',
   'Could not open gallery': 'गॅलरी उघडता आली नाही',
@@ -550,6 +575,10 @@ export const mr = {
     'SMS चालू. फक्त नवीन डेबिट/क्रेडिट SMS — जाहिरात, स्कॅम आणि जुना inbox दुर्लक्षित.',
   'Only new debit/credit SMS (not old inbox). Ads, scam, and spam are ignored. Name accounts like “HDFC Salary” so the right bank is matched.':
     'फक्त नवीन डेबिट/क्रेडिट SMS (जुना inbox नाही). जाहिरात, स्कॅम, स्पॅम दुर्लक्षित. खाते नाव “HDFC Salary” सारखे ठेवा.',
+  'New debit/credit SMS only (from when you allowed SMS). App also checks recent inbox when you open it. Ads, scam, and spam are ignored.':
+    'फक्त नवीन डेबिट/क्रेडिट SMS (SMS परवानगी दिल्यापासून). अॅप उघडल्यावर अलीकडील inbox तपासते. जाहिरात, स्कॅम, स्पॅम दुर्लक्षित.',
+  'Live debit/credit SMS only — works even if the app was closed. Past inbox is never imported. Ads, scam, and spam are ignored.':
+    'फक्त लाइव्ह डेबिट/क्रेडिट SMS — अॅप बंद असले तरी चालते. जुना inbox कधीही आणत नाही. जाहिरात, स्कॅम, स्पॅम दुर्लक्षित.',
   'Check SMS again': 'पुन्हा SMS तपासा',
   'SMS found — bill amount matches a bank debit.': 'SMS सापडला — बिल रक्कम बँक डेबिटशी जुळते.',
   'merchant match': 'दुकान जुळले',
@@ -573,6 +602,7 @@ export const mr = {
   'You forgot to add this expense': 'तुम्ही हा खर्च जोडायला विसरलात',
   'You were credited': 'तुमच्या खात्यात जमा झाले',
   'You were debited': 'तुमच्या खात्यातून कापले',
+  'Cashback received': 'कॅशबॅक मिळाला',
   'Confirm bank SMS credit': 'बँक SMS क्रेडिट पुष्टी करा',
   'Add where you paid (category + description). Until then Add stays disabled.':
     'कुठे दिले ते लिहा (श्रेणी + वर्णन). तोपर्यंत Add बंद राहील.',

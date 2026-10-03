@@ -23,8 +23,8 @@ const CHANNELS = [
   },
   {
     id: 'subscriptions',
-    name: 'Subscriptions',
-    description: 'Subscription due reminders',
+    name: 'Dues & subscriptions',
+    description: 'Subscription, autopay, emergency fund, and recurring due reminders',
     importance: 4,
   },
   {

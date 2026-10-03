@@ -17,7 +17,16 @@ export default function DueReminders() {
 
   useEffect(() => {
     if (!user) return
-    client.get('/recurring-transactions/due').then((res) => setItems(res.data)).catch(() => {})
+    client.get('/recurring-transactions/due')
+      .then((res) => {
+        // Daily autopay (every 1 day) — bank SMS covers it; don't nag
+        const list = (res.data || []).filter((item) => !(
+          item.recurrenceType === 'INTERVAL_DAYS'
+          && (!item.intervalDays || Number(item.intervalDays) <= 1)
+        ))
+        setItems(list)
+      })
+      .catch(() => {})
   }, [user?.id])
 
   async function confirmPaid(id) {

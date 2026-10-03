@@ -93,8 +93,10 @@ async function mediaResultToDataUrl(media) {
  * Open native camera (Capacitor Camera plugin — HTML capture= often fails in WebView).
  */
 export async function captureBillPhoto({ categories = [] } = {}) {
-  suppressResumeLock(5 * 60_000)
+  // Camera leaves the app — suppress lock so return doesn't ask biometric
+  suppressResumeLock(10 * 60_000)
   await ensureCameraAccess(true)
+  suppressResumeLock(10 * 60_000)
 
   // Modern Camera 8 API
   if (typeof Camera.takePhoto === 'function') {
@@ -133,8 +135,9 @@ export async function captureBillPhoto({ categories = [] } = {}) {
 
 /** Open native gallery / photo picker. */
 export async function pickBillPhoto({ categories = [] } = {}) {
-  suppressResumeLock(5 * 60_000)
+  suppressResumeLock(10 * 60_000)
   await ensureCameraAccess(false)
+  suppressResumeLock(10 * 60_000)
 
   if (typeof Camera.chooseFromGallery === 'function') {
     try {

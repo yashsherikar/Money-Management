@@ -23,6 +23,14 @@ export default function MoneyRow({
     <li
       className={`px-4 py-3.5 sm:px-5 sm:py-4 ${onClick ? 'cursor-pointer active:bg-slate-50/50' : ''}`}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick(e)
+        }
+      } : undefined}
     >
       <div className="flex items-start gap-3 min-w-0">
         {icon != null ? (

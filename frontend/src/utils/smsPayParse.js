@@ -60,10 +60,29 @@ function capture(text, re) {
   return m ? String(m[1]).trim() : ''
 }
 
+function normalizePersonName(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** True if SMS payee name looks like the person we paid (payment-request / split). */
+export function namesLookSame(a, b) {
+  const na = normalizePersonName(a)
+  const nb = normalizePersonName(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  if (na.includes(nb) || nb.includes(na)) return true
+  const fa = na.split(' ')[0]
+  const fb = nb.split(' ')[0]
+  return fa.length >= 3 && fa === fb
+}
+
 /**
  * Match a parsed SMS against a pending P2P pay.
- * Amount must match. VPA match is a strong bonus but optional (many banks omit VPA).
- * Allows late SMS: any time from 2 min before pay up to pending.expiresAt.
+ * Amount + time required. VPA and/or payee name strengthen the match.
  */
 export function smsMatchesPending(parsed, pending) {
   if (!parsed || !pending) return false
@@ -76,7 +95,6 @@ export function smsMatchesPending(parsed, pending) {
 
   const created = Number(pending.createdAt) || 0
   const smsDate = Number(parsed.date) || Date.now()
-  // SMS can arrive late (5–15+ min). Accept from 2 min before create until expiry.
   if (created && smsDate < created - 2 * 60_000) return false
   const expires = Number(pending.expiresAt) || (created + 24 * 60 * 60_000)
   if (smsDate > expires + 5 * 60_000) return false
@@ -85,23 +103,37 @@ export function smsMatchesPending(parsed, pending) {
   const smsPa = String(parsed.pa || '').toLowerCase().trim()
   if (pendingPa && smsPa) {
     if (pendingPa === smsPa) return true
-    // Different VPA in SMS → not this pay
     return false
   }
 
-  // No VPA in SMS: amount + time window is enough for single pending;
-  // if multiple pending share same amount, prefer closest createdAt.
+  const pendingName = pending.pn || pending.name || ''
+  const smsName = parsed.payeeName || ''
+  // For payment requests, require name when SMS has a payee (avoid wrong auto-mark)
+  if (pending.kind === 'payment_request' || pending.kind === 'split_bill') {
+    if (smsName && pendingName && !namesLookSame(smsName, pendingName)) return false
+    if (!smsName && !smsPa) {
+      // amount + time only — OK if this is the only waiting request with that amount
+      return true
+    }
+  }
+
   return true
 }
 
-/** Among matching pendings with same amount, pick best (VPA match, then closest time). */
+function scorePending(parsed, pending) {
+  let score = 0
+  const smsPa = String(parsed.pa || '').toLowerCase()
+  if (smsPa && String(pending.pa || '').toLowerCase() === smsPa) score += 100
+  if (namesLookSame(parsed.payeeName, pending.pn || pending.name)) score += 50
+  const smsDate = Number(parsed.date) || Date.now()
+  score -= Math.min(40, Math.abs((pending.createdAt || 0) - smsDate) / 60_000)
+  return score
+}
+
+/** Among matching pendings, pick best (VPA → name → closest time). */
 export function pickBestPendingMatch(parsed, pendings) {
   const candidates = (pendings || []).filter((p) => smsMatchesPending(parsed, p))
   if (!candidates.length) return null
-  const smsPa = String(parsed.pa || '').toLowerCase()
-  const withVpa = candidates.filter((p) => smsPa && String(p.pa || '').toLowerCase() === smsPa)
-  const pool = withVpa.length ? withVpa : candidates
-  const smsDate = Number(parsed.date) || Date.now()
-  pool.sort((a, b) => Math.abs((a.createdAt || 0) - smsDate) - Math.abs((b.createdAt || 0) - smsDate))
-  return pool[0]
+  candidates.sort((a, b) => scorePending(parsed, b) - scorePending(parsed, a))
+  return candidates[0]
 }

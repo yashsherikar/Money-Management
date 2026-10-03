@@ -55,6 +55,16 @@
         </service>
         <receiver android:name=".NotificationActionReceiver" android:exported="false" />
 
+        <!-- Live bank SMS even when app is killed (no inbox history read). -->
+        <receiver
+            android:name=".SmsReceivedReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
         <!-- UpiPaymentNotificationListener intentionally NOT registered here.
              Play Protect blocks sideloaded APKs that declare Notification Access
              ("sensitive data"). Re-enable the <service> when distributing via

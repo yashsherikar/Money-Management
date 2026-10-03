@@ -36,7 +36,7 @@ export default function Profile() {
   const { t } = useLanguage()
   const fileInputRef = useRef(null)
   const [profile, setProfile] = useState(null)
-  const [form, setForm] = useState({ name: '', upiId: '' })
+  const [form, setForm] = useState({ name: '', phone: '', upiId: '' })
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -52,7 +52,11 @@ export default function Profile() {
     client.get('/profile')
       .then((res) => {
         setProfile(res.data)
-        setForm({ name: res.data.name, upiId: res.data.upiId || '' })
+        setForm({
+          name: res.data.name,
+          phone: res.data.phone || '',
+          upiId: res.data.upiId || '',
+        })
       })
       .catch((err) => setLoadError(networkErrorMessage(err, 'Failed to load profile')))
   }
@@ -161,6 +165,18 @@ export default function Profile() {
           />
           <label className="block text-sm font-medium text-slate-700 mb-1">{t('Email')}</label>
           <input value={profile.email} disabled className="w-full mb-4 px-3 py-2 border border-slate-200 rounded-md bg-slate-50 text-slate-500" />
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('Phone')}</label>
+          <input
+            type="tel"
+            inputMode="tel"
+            placeholder="9876543210"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            className="w-full mb-1 px-3 py-2 border border-slate-300 rounded-md"
+          />
+          <p className="text-xs text-slate-500 mb-4">
+            {t('Friends can find you by phone for split bills and money requests.')}
+          </p>
           <label className="block text-sm font-medium text-slate-700 mb-1">{t('UPI ID')}</label>
           <input
             placeholder="yourname@upi"
