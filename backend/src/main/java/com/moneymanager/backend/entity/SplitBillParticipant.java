@@ -34,6 +34,10 @@ public class SplitBillParticipant {
     @Column(name = "share_amount", nullable = false)
     private BigDecimal shareAmount;
 
+    /** Optional percent of total (e.g. 50.00). Amount is source of truth for money. */
+    @Column(name = "share_percent")
+    private BigDecimal sharePercent;
+
     @Column(nullable = false)
     private boolean paid = false;
 

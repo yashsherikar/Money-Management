@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(UpiLauncherPlugin.class);
         registerPlugin(PaymentNotifyPlugin.class);
         registerPlugin(SmsReaderPlugin.class);
+        registerPlugin(BillOcrPlugin.class);
         super.onCreate(savedInstanceState);
         deliverNotificationTap(getIntent());
     }

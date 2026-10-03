@@ -7,6 +7,7 @@ import MoneyRow from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { countWaitingP2pPays } from '../utils/pendingP2pPays.js'
 import { scanInboxForPendingPays, isSmsPaySupported } from '../utils/smsPayWatch.js'
+import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 
 const COLORS = ['#226DFF', '#00F5D4', '#f59e0b', '#FF5376', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
 
@@ -137,16 +138,20 @@ export default function Dashboard() {
             <div className="text-sm text-slate-500">{t('Nothing flagged. Nice.')}</div>
           ) : (
             <ul className="divide-y divide-slate-100 -mx-4 -mb-4">
-              {summary.unwantedExpenses.map((u) => (
-                <MoneyRow
-                  key={u.transactionId}
-                  title={u.description || u.categoryName}
-                  meta={u.categoryName}
-                  amount={u.amount}
-                  type="EXPENSE"
-                  iconText={`${u.description || ''} ${u.categoryName || ''}`}
-                />
-              ))}
+              {summary.unwantedExpenses.map((u) => {
+                const brand = brandFromTxnText(u.description, u.categoryName)
+                return (
+                  <MoneyRow
+                    key={u.transactionId}
+                    title={brand?.name || u.description || u.categoryName}
+                    meta={u.categoryName}
+                    amount={u.amount}
+                    type="EXPENSE"
+                    icon={brand ? <MerchantLogo brand={brand} size={40} /> : null}
+                    iconText={brand ? undefined : `${u.description || ''} ${u.categoryName || ''}`}
+                  />
+                )
+              })}
             </ul>
           )}
         </div>

@@ -15,16 +15,17 @@ import {
   scanInboxForPendingPays,
   isSmsPaySupported,
 } from '../utils/smsPayWatch.js'
-import { handleDetectedUpiPayment } from '../utils/paymentNotify.js'
-import client from '../api/client'
+import { handleDetectedUpiPayment, syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
 
-function statusLabel(status, t) {
+function statusLabel(status, t, item) {
   switch (status) {
     case 'waiting_sms':
     case 'pending':
       return t('Waiting for bank SMS')
     case 'confirmed':
-      return t('Paid (SMS verified)')
+      if (item?.source === 'sms') return t('Paid · SMS')
+      if (item?.source === 'manual') return t('Paid · Manual')
+      return t('Paid')
     case 'not_paid':
       return t('Not paid')
     case 'expired':
@@ -32,6 +33,11 @@ function statusLabel(status, t) {
     default:
       return status
   }
+}
+
+function kindLabel(item, t) {
+  if (item.personal === false) return t('Merchant')
+  return t('P2P')
 }
 
 function statusClass(status) {
@@ -77,21 +83,32 @@ export default function PendingPays() {
 
   useEffect(() => {
     refresh()
+    // Push any Paid-but-missing Transactions into the ledger
+    syncUnloggedConfirmedPays()
+      .then((r) => {
+        refresh()
+        const n = (r || []).filter((x) => x.logged).length
+        if (n) setHint(t('Saved') + ` ${n} ` + t('paid pay(s) into Transactions.'))
+      })
+      .catch(() => {})
+
     if (!isSmsPaySupported()) return undefined
     checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
-    // Always scan on open — catches late SMS without waiting for interval
-    scanInboxForPendingPays().then((found) => {
+    scanInboxForPendingPays().then(async (found) => {
+      await syncUnloggedConfirmedPays().catch(() => {})
       refresh()
       if (found?.length) {
-        setHint(t('Matched') + ` ${found.length} ` + t('payment(s) from SMS.'))
+        setHint(t('Matched') + ` ${found.length} ` + t('payment(s) from SMS — check Transactions.'))
       }
     })
     const onChange = () => refresh()
     window.addEventListener('mm-pending-p2p-changed', onChange)
     window.addEventListener('mm-p2p-sms-confirmed', onChange)
+    window.addEventListener('mm-transactions-changed', onChange)
     return () => {
       window.removeEventListener('mm-pending-p2p-changed', onChange)
       window.removeEventListener('mm-p2p-sms-confirmed', onChange)
+      window.removeEventListener('mm-transactions-changed', onChange)
     }
   }, [refresh, t])
 
@@ -128,15 +145,21 @@ export default function PendingPays() {
     setBusyId(item.id)
     try {
       markPendingP2pConfirmed(item.id, { source: 'manual' })
-      const [a, c] = await Promise.all([client.get('/accounts'), client.get('/categories')])
       const logResult = await handleDetectedUpiPayment(
-        { amount: item.amount, pa: item.pa, payeeName: item.pn, source: 'manual' },
-        { accounts: a.data, categories: c.data },
+        {
+          amount: item.amount,
+          pa: item.pa,
+          payeeName: item.pn,
+          source: 'manual',
+          personal: item.personal,
+          kind: item.personal === false ? 'merchant' : 'p2p',
+          forceLog: true,
+        },
       )
       updatePendingP2pPay(item.id, {
         transactionLogged: !!logResult?.logged,
         transactionId: logResult?.transactionId || null,
-        logError: logResult?.logged ? null : (logResult?.needsAccount ? 'needs_account' : null),
+        logError: logResult?.logged ? null : (logResult?.error || 'log_failed'),
       })
       window.dispatchEvent(new CustomEvent('mm-p2p-sms-confirmed', {
         detail: { pending: item, logResult },
@@ -144,13 +167,43 @@ export default function PendingPays() {
       if (logResult?.logged) {
         setHint(t('Saved in Transactions') + (logResult.categoryName ? ` (${logResult.categoryName})` : ''))
       } else {
-        setHint(t('Marked paid — finish category / account to save in Transactions'))
+        setHint(t('Marked paid but Transactions save failed') + (logResult?.error ? `: ${logResult.error}` : ''))
       }
       refresh()
     } catch (err) {
       updatePendingP2pPay(item.id, { transactionLogged: false, logError: err?.message || 'log_failed' })
       setHint(err?.message || t('Could not save transaction'))
       refresh()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function saveToTransactions(item) {
+    setBusyId(item.id)
+    try {
+      const logResult = await handleDetectedUpiPayment({
+        amount: item.amount,
+        pa: item.pa,
+        payeeName: item.pn,
+        source: item.source || 'manual',
+        personal: item.personal,
+        kind: item.personal === false ? 'merchant' : 'p2p',
+        forceLog: true,
+      })
+      updatePendingP2pPay(item.id, {
+        transactionLogged: !!logResult?.logged,
+        transactionId: logResult?.transactionId || null,
+        logError: logResult?.logged ? null : (logResult?.error || 'log_failed'),
+      })
+      if (logResult?.logged) {
+        setHint(t('Saved in Transactions') + (logResult.categoryName ? ` (${logResult.categoryName})` : ''))
+      } else {
+        setHint(t('Could not save') + (logResult?.error ? `: ${logResult.error}` : ''))
+      }
+      refresh()
+    } catch (err) {
+      setHint(err?.message || t('Could not save transaction'))
     } finally {
       setBusyId(null)
     }
@@ -230,9 +283,10 @@ export default function PendingPays() {
                     <div className="text-xs text-slate-500 mt-1">{ago(item.createdAt)} · {t('SMS can arrive late')}</div>
                   </div>
                   <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-1 rounded-full ${statusClass(item.status)}`}>
-                    {statusLabel(item.status, t)}
+                    {statusLabel(item.status, t, item)}
                   </span>
                 </div>
+                <div className="text-[10px] text-slate-500 mt-1 uppercase tracking-wide">{kindLabel(item, t)}</div>
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button
                     type="button"
@@ -259,36 +313,57 @@ export default function PendingPays() {
       {done.length > 0 && (
         <section>
           <h2 className="font-semibold mb-2 text-sm text-slate-500 uppercase tracking-wide">
-            {t('Recent')} ({done.length})
+            {t('Pay history')} ({done.length})
           </h2>
+          <p className="text-xs text-slate-500 mb-2">
+            {t('P2P, request pays, and QR/merchant pays marked Paid appear here. Paid ones should also show in Transactions.')}
+          </p>
           <div className="space-y-2">
-            {done.slice(0, 20).map((item) => (
-              <div key={item.id} className="app-card flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-medium truncate">{item.pn || item.pa}</div>
-                  <div className="text-sm">{money(item.amount)} · {ago(item.updatedAt || item.createdAt)}</div>
-                  {item.status === 'confirmed' && item.transactionLogged && (
-                    <div className="text-[10px] text-teal mt-0.5">
-                      {t('Saved in Transactions')}
-                      {item.source === 'sms' ? ` · ${t('SMS verified')}` : ''}
+            {done.slice(0, 40).map((item) => (
+              <div key={item.id} className="app-card">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{item.pn || item.pa}</div>
+                    <div className="text-xs text-slate-500 font-mono truncate">{item.pa}</div>
+                    <div className="text-sm mt-0.5">
+                      {money(item.amount)} · {ago(item.updatedAt || item.createdAt)}
+                      {' · '}
+                      <span className="uppercase tracking-wide text-[10px]">{kindLabel(item, t)}</span>
                     </div>
-                  )}
-                  {item.status === 'confirmed' && !item.transactionLogged && (
-                    <div className="text-[10px] text-amber-500 mt-0.5">
-                      {t('Paid — not in Transactions yet (check account / category)')}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${statusClass(item.status)}`}>
-                    {statusLabel(item.status, t)}
+                    {item.status === 'confirmed' && item.transactionLogged && (
+                      <div className="text-[10px] text-teal mt-0.5">
+                        {t('In Transactions')}
+                        {item.source === 'sms' ? ` · ${t('SMS')}` : item.source === 'manual' ? ` · ${t('Manual')}` : ''}
+                      </div>
+                    )}
+                    {item.status === 'confirmed' && !item.transactionLogged && (
+                      <div className="text-[10px] text-amber-500 mt-0.5">
+                        {t('Paid — missing from Transactions')}
+                        {item.logError ? ` (${item.logError})` : ''}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-1 rounded-full ${statusClass(item.status)}`}>
+                    {statusLabel(item.status, t, item)}
                   </span>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {item.status === 'confirmed' && !item.transactionLogged && (
+                    <button
+                      type="button"
+                      disabled={busyId === item.id}
+                      onClick={() => saveToTransactions(item)}
+                      className="flex-1 min-w-[8rem] bg-brand-600 text-white rounded-md py-2 text-sm font-medium disabled:opacity-60"
+                    >
+                      {busyId === item.id ? t('Saving…') : t('Save to Transactions')}
+                    </button>
+                  )}
                   {item.transactionLogged && (
-                    <Link to="/transactions" className="text-xs text-brand-400 font-medium">
-                      {t('View')} →
+                    <Link to="/transactions" className="text-xs text-brand-600 font-medium self-center px-1">
+                      {t('View Transactions')} →
                     </Link>
                   )}
-                  <button type="button" onClick={() => removeItem(item)} className="text-xs text-slate-500">
+                  <button type="button" onClick={() => removeItem(item)} className="text-xs text-slate-500 self-center ml-auto">
                     {t('Remove')}
                   </button>
                 </div>

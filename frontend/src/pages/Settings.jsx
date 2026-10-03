@@ -242,9 +242,9 @@ export default function Settings() {
           <div className="bg-white rounded-xl p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="font-semibold">{t('Bank SMS (P2P confirm)')}</h2>
+                <h2 className="font-semibold">{t('Bank SMS')}</h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  {t('Read bank debit SMS to mark P2P pays as Paid. Works even if SMS arrives 5–15 minutes late.')}
+                  {t('Confirms P2P pays, detects Autopay → Recurring, and savings transfers. Name accounts like “HDFC Salary” so the right bank is debited/credited.')}
                 </p>
                 <p className={`text-xs mt-2 font-medium ${smsOk ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {smsOk ? t('SMS permission on') : t('SMS permission off')}

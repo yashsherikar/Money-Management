@@ -10,6 +10,7 @@ export default function MoneyRow({
   amount,
   income = false,
   iconText = '',
+  icon = null,
   type = 'EXPENSE',
   hideAmount = false,
   trailing = null,
@@ -17,14 +18,16 @@ export default function MoneyRow({
   onClick,
 }) {
   const isIncome = income || type === 'INCOME'
-  const showIcon = iconText != null
+  const showIcon = icon != null || iconText != null
   return (
     <li
       className={`px-4 py-3.5 sm:px-5 sm:py-4 ${onClick ? 'cursor-pointer active:bg-slate-50/50' : ''}`}
       onClick={onClick}
     >
       <div className="flex items-start gap-3 min-w-0">
-        {showIcon && (
+        {icon != null ? (
+          <span className="shrink-0" aria-hidden="true">{icon}</span>
+        ) : showIcon ? (
           <span
             className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
               isIncome ? 'bg-emerald-50' : 'bg-red-50'
@@ -33,7 +36,7 @@ export default function MoneyRow({
           >
             {categoryIcon(iconText || title || '', isIncome ? 'INCOME' : type)}
           </span>
-        )}
+        ) : null}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">

@@ -15,6 +15,8 @@ public class SplitBillDtos {
     public record ParticipantRequest(
             @NotBlank String name,
             @NotNull @DecimalMin("0.01") BigDecimal shareAmount,
+            /** Optional 0.01–99.99 of the bill total. */
+            BigDecimal sharePercent,
             String email
     ) {}
 
@@ -24,6 +26,9 @@ public class SplitBillDtos {
             Long accountId,
             @NotNull LocalDate billDate,
             String note,
+            /** When set, splits an existing expense (must be within 2 days). No double debit. */
+            Long sourceTransactionId,
+            Long categoryId,
             @NotEmpty @Valid List<ParticipantRequest> participants
     ) {}
 
@@ -31,6 +36,7 @@ public class SplitBillDtos {
             Long id,
             String name,
             BigDecimal shareAmount,
+            BigDecimal sharePercent,
             boolean paid,
             LocalDate paidDate,
             boolean linked
@@ -56,8 +62,11 @@ public class SplitBillDtos {
             LocalDate billDate,
             String note,
             BigDecimal yourShare,
+            BigDecimal yourSharePercent,
             BigDecimal collected,
             BigDecimal pending,
+            Long sourceTransactionId,
+            Long expenseTransactionId,
             List<ParticipantResponse> participants
     ) {}
 }

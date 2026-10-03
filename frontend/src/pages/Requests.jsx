@@ -23,7 +23,6 @@ export default function Requests() {
   const [outgoing, setOutgoing] = useState([])
   const [payIncoming, setPayIncoming] = useState([])
   const [payOutgoing, setPayOutgoing] = useState([])
-  const [owedBills, setOwedBills] = useState([])
   const [ask, setAsk] = useState(emptyAsk)
   const [askError, setAskError] = useState('')
   const [askOk, setAskOk] = useState(false)
@@ -31,16 +30,14 @@ export default function Requests() {
   const [payingId, setPayingId] = useState(null)
 
   async function load() {
-    const [inRes, outRes, owedRes, payInRes, payOutRes] = await Promise.all([
+    const [inRes, outRes, payInRes, payOutRes] = await Promise.all([
       client.get('/contribution-requests/incoming'),
       client.get('/contribution-requests/outgoing'),
-      client.get('/split-bills/owed-by-me'),
       client.get('/payment-requests/incoming'),
       client.get('/payment-requests/outgoing'),
     ])
     setIncoming(inRes.data)
     setOutgoing(outRes.data)
-    setOwedBills(owedRes.data)
     setPayIncoming(payInRes.data)
     setPayOutgoing(payOutRes.data)
   }
@@ -234,43 +231,6 @@ export default function Requests() {
               <button onClick={() => markPayReceived(r.id)} className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">
                 {t('Mark as received')}
               </button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <h2 className="font-semibold mb-3">{t('Split bills you owe')}</h2>
-      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 mb-8">
-        {owedBills.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No requests.')}</div>}
-        {owedBills.map((b) => (
-          <div key={b.participantId} className="p-4 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <div className="font-medium">
-                {b.payerName} {t('wants')} {money(b.shareAmount)} {t('for')} "{b.title}"
-              </div>
-              {b.paid && <div className="text-xs font-medium text-emerald-600">{t('PAID')}</div>}
-            </div>
-            {!b.paid && (
-              (b.upiPayLink || b.requesterUpiId) ? (
-                <button
-                  type="button"
-                  disabled={payingId === b.participantId}
-                  onClick={() => payRequestP2p({
-                    id: b.participantId,
-                    amount: b.shareAmount,
-                    shareAmount: b.shareAmount,
-                    upiPayLink: b.upiPayLink,
-                    requesterUpiId: b.requesterUpiId,
-                    requesterName: b.payerName,
-                    participantId: b.participantId,
-                  }, { kind: 'split_bill' })}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-60"
-                >
-                  {payingId === b.participantId ? t('Opening…') : t('Pay via UPI')}
-                </button>
-              ) : (
-                <span className="text-xs text-slate-500">{b.payerName} {t("hasn't added a UPI ID yet")}</span>
-              )
             )}
           </div>
         ))}

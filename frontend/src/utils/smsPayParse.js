@@ -2,13 +2,16 @@
  * Parse bank / UPI debit SMS for payment confirmation.
  * Covers common Indian bank formats (amount + debit/spent/paid/UPI).
  */
+import { shouldIgnoreMoneySms } from './smsScamFilter.js'
+
 export function parseBankPaymentSms({ body = '', address = '', date = 0 } = {}) {
   const text = String(body || '').replace(/\s+/g, ' ').trim()
   if (!text) return null
 
   const lower = text.toLowerCase()
-  // Skip OTP / credit-only / cashback
+  // Skip OTP / scam / credit-only / cashback
   if (/\botp\b|one[- ]time|verification code|do not share/i.test(lower)) return null
+  if (shouldIgnoreMoneySms({ body: text, address })) return null
   if (/\bcredited\b|\breceived\b|\bdeposited\b|\bcashback\b/i.test(lower)
       && !/\bdebited\b|\bspent\b|\bpaid\b|\bsent\b|\bwithdrawn\b/i.test(lower)) {
     return null

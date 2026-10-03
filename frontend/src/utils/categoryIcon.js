@@ -13,11 +13,13 @@ const ICONS = [
   { keywords: ['cake', 'bakery', 'pastry'], icon: '🎂' },
   { keywords: ['pani puri', 'chaat', 'street food', 'vada pav'], icon: '🌮' },
   { keywords: ['juice', 'smoothie'], icon: '🥤' },
+  { keywords: ['blinkit', 'zepto', 'instamart', 'jiomart'], icon: '⚡' },
   { keywords: ['grocery', 'groceries', 'vegetable', 'kirana', 'supermarket', 'bigbasket', 'dmart'], icon: '🛒' },
   { keywords: ['dining', 'restaurant', 'food', 'zomato', 'swiggy', 'lunch', 'dinner', 'breakfast', 'meal', 'hotel food'], icon: '🍽️' },
 
   // Transport
   { keywords: ['petrol', 'diesel', 'fuel', 'gas station'], icon: '⛽' },
+  { keywords: ['rapido'], icon: '🏍️' },
   { keywords: ['uber', 'ola', 'taxi', 'cab'], icon: '🚕' },
   { keywords: ['auto', 'rickshaw'], icon: '🛺' },
   { keywords: ['bus'], icon: '🚌' },
@@ -46,11 +48,12 @@ const ICONS = [
   { keywords: ['electronics', 'gadget', 'laptop', 'mobile phone purchase'], icon: '🔌' },
   { keywords: ['jewelry', 'jewellery', 'gold'], icon: '💍' },
   { keywords: ['furniture', 'decor', 'sofa'], icon: '🛋️' },
-  { keywords: ['amazon', 'flipkart', 'myntra', 'shopping'], icon: '🛍️' },
+  { keywords: ['amazon', 'flipkart', 'myntra', 'ajio', 'meesho', 'shopping'], icon: '🛍️' },
 
   // Entertainment
   { keywords: ['movie', 'cinema', 'pvr', 'inox'], icon: '🎬' },
-  { keywords: ['netflix', 'prime video', 'hotstar', 'streaming'], icon: '📺' },
+  { keywords: ['netflix', 'prime video', 'hotstar', 'tata play', 'tataplay', 'zee5', 'streaming'], icon: '📺' },
+  { keywords: ['youtube'], icon: '▶️' },
   { keywords: ['game', 'gaming', 'playstation', 'xbox', 'steam'], icon: '🎮' },
   { keywords: ['music', 'spotify', 'concert'], icon: '🎵' },
   { keywords: ['party', 'club', 'pub', 'bar'], icon: '🎉' },
