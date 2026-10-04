@@ -609,6 +609,18 @@ export const mr = {
     'बॅकग्राउंड मर्यादित — Battery Saver अॅप बंद असताना SMS थांबवू शकते',
   'Turn off Battery Saver for Money Manager (set Battery → Unrestricted). Otherwise Android may not deliver bank SMS when the app is killed.':
     'Money Manager साठी Battery Saver बंद करा (Battery → Unrestricted). नाहीतर अॅप बंद असताना बँक SMS येणार नाही.',
+  'Marked as paid — reminder cleared': 'भरले म्हणून नोंदले — रिमाइंडर काढला',
+  'Payment ID': 'पेमेंट ID',
+  'UPI ID stays here — not in Description.': 'UPI ID येथे राहील — Description मध्ये नाही.',
+  'UPI ID — stored as Payment ID, not Description.': 'UPI ID = Payment ID; Description मध्ये नाही.',
+  'Shop / what you paid for — not the UPI ID.': 'दुकान / कशासाठी दिले — UPI ID नाही.',
+  'Search categories…': 'श्रेणी शोधा…',
+  'No categories match': 'जुळणारी श्रेणी नाही',
+  'Select category…': 'श्रेणी निवडा…',
+  'Merchant QR': 'व्यापारी QR',
+  'Category filled — edit if needed.': 'श्रेणी भरली — गरज असल्यास बदला.',
+  'Merchant QR scanned. Name & type filled — confirm category + amount, then pay.':
+    'व्यापारी QR स्कॅन — नाव आणि प्रकार भरले. श्रेणी + रक्कम तपासा, मग पे करा.',
   'Allow background': 'बॅकग्राउंड परवानगी द्या',
   'Allow background for bank SMS?': 'बँक SMS साठी बॅकग्राउंड परवानगी द्या?',
   'So Money Manager can read new debit/credit SMS even when the app is closed or killed, Android must set Battery to Unrestricted. Without this, Battery Saver often blocks SMS.':

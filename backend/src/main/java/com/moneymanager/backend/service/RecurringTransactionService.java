@@ -71,16 +71,114 @@ public class RecurringTransactionService {
         return toResponse(recurringTransactionRepository.save(rt));
     }
 
-    /** Active recurring transactions whose day/cycle has arrived and haven't been confirmed yet. */
-    @Transactional(readOnly = true)
+    /**
+     * Active recurring transactions whose day/cycle has arrived and haven't been confirmed yet.
+     * Heals stuck dues when the user already logged the payment via QR / SMS / manual expense.
+     */
+    @Transactional
     public List<RecurringResponse> due(User user) {
         LocalDate today = LocalDate.now();
+        healPaidFromExistingTransactions(user, today);
         return recurringTransactionRepository.findByUserIdOrderByDayOfMonthAsc(user.getId()).stream()
                 .filter(RecurringTransaction::isActive)
                 .filter(rt -> !isDailyInterval(rt)) // daily autopay — no "did you pay?" nag
                 .filter(rt -> isDue(rt, today))
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * If an expense already exists for this cycle (QR pay, SMS, or prior confirm),
+     * mark the recurring as paid so "Did you pay these?" does not keep returning.
+     */
+    private void healPaidFromExistingTransactions(User user, LocalDate today) {
+        List<RecurringTransaction> active = recurringTransactionRepository
+                .findByUserIdOrderByDayOfMonthAsc(user.getId()).stream()
+                .filter(RecurringTransaction::isActive)
+                .filter(rt -> !isDailyInterval(rt))
+                .filter(rt -> isDue(rt, today))
+                .toList();
+        if (active.isEmpty()) return;
+
+        String currentMonth = YearMonth.from(today).toString();
+        for (RecurringTransaction rt : active) {
+            if (hasMatchingExpenseThisCycle(user, rt, today)) {
+                markCyclePaid(rt, today, currentMonth);
+                pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, rt.getId());
+            }
+        }
+    }
+
+    private void markCyclePaid(RecurringTransaction rt, LocalDate today, String currentMonth) {
+        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            rt.setLastLoggedDate(today);
+        } else {
+            rt.setLastLoggedMonth(currentMonth);
+        }
+        recurringTransactionRepository.save(rt);
+    }
+
+    /**
+     * Match an existing expense to this subscription: same amount this month, and either
+     * same description, from_recurring, UPI (payment_id set) when amount is unique among open dues,
+     * or description shares a meaningful token (e.g. ICICI).
+     */
+    private boolean hasMatchingExpenseThisCycle(User user, RecurringTransaction rt, LocalDate today) {
+        LocalDate from;
+        LocalDate to = today;
+        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
+            int days = rt.getIntervalDays() != null ? Math.max(1, rt.getIntervalDays()) : 30;
+            from = today.minusDays(days + 2L);
+        } else {
+            from = YearMonth.from(today).atDay(1);
+        }
+        List<Transaction> hits = transactionRepository.findExpensesByAmountInRange(
+                user.getId(), rt.getAmount(), from, to);
+        if (hits.isEmpty()) return false;
+
+        String rtDesc = rt.getDescription() == null ? "" : rt.getDescription().trim();
+        String rtLower = rtDesc.toLowerCase();
+        String token = meaningfulToken(rtDesc);
+
+        for (Transaction t : hits) {
+            String d = t.getDescription() == null ? "" : t.getDescription().trim();
+            String dLower = d.toLowerCase();
+            if (t.isFromRecurring() && dLower.equals(rtLower)) return true;
+            if (!rtLower.isEmpty() && dLower.equals(rtLower)) return true;
+            if (token != null && dLower.contains(token)) return true;
+        }
+
+        // Unique amount among still-due items + UPI-logged expense (QR / SMS pay)
+        long sameAmountDues = recurringTransactionRepository
+                .findByUserIdOrderByDayOfMonthAsc(user.getId()).stream()
+                .filter(RecurringTransaction::isActive)
+                .filter(r -> !isDailyInterval(r))
+                .filter(r -> isDue(r, today))
+                .filter(r -> r.getAmount().compareTo(rt.getAmount()) == 0)
+                .count();
+        if (sameAmountDues == 1) {
+            return hits.stream().anyMatch(t ->
+                    t.getPaymentId() != null && !t.getPaymentId().isBlank()
+                            || t.isFromRecurring());
+        }
+        return false;
+    }
+
+    /** First useful word from "Subscription: ICICI Bank" → icici (skip generic words). */
+    private static String meaningfulToken(String description) {
+        if (description == null || description.isBlank()) return null;
+        String cleaned = description.toLowerCase().replaceAll("[^a-z0-9\\s]", " ");
+        for (String part : cleaned.split("\\s+")) {
+            if (part.length() < 3) continue;
+            if (part.equals("subscription") || part.equals("subscriptions")
+                    || part.equals("payment") || part.equals("monthly")
+                    || part.equals("bank") || part.equals("recurring")
+                    || part.equals("autopay") || part.equals("emi") || part.equals("due")) {
+                continue;
+            }
+            return part;
+        }
+        return null;
     }
 
     /** Every 1 day (or missing) — bank SMS already covers these; reminders are noise. */
@@ -124,12 +222,27 @@ public class RecurringTransactionService {
         RecurringTransaction rt = get(user, id);
         LocalDate today = LocalDate.now();
         String currentMonth = YearMonth.from(today).toString();
+
+        // Idempotent: already confirmed this cycle → success so UI clears on reopen
+        if (!isDue(rt, today) && !canMarkPaid(rt, today)) {
+            pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, rt.getId());
+            return toResponse(rt);
+        }
         if (rt.getRecurrenceType() == RecurrenceType.MONTHLY && currentMonth.equals(rt.getLastLoggedMonth())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already confirmed for this month");
+            pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, rt.getId());
+            return toResponse(rt);
         }
         // Interval: allow confirm once due (or overdue). Monthly may be confirmed early.
         if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS && today.isBefore(nextDueDate(rt))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not due yet");
+        }
+
+        // QR / SMS already logged this amount → mark paid without double expense
+        if (hasMatchingExpenseThisCycle(user, rt, today)) {
+            markCyclePaid(rt, today, currentMonth);
+            RecurringTransaction saved = recurringTransactionRepository.save(rt);
+            pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, saved.getId());
+            return toResponse(saved);
         }
 
         Account account = rt.getAccount();
@@ -148,11 +261,7 @@ public class RecurringTransactionService {
         account.setBalance(account.getBalance().add(delta));
         accountRepository.save(account);
 
-        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS) {
-            rt.setLastLoggedDate(today);
-        } else {
-            rt.setLastLoggedMonth(currentMonth);
-        }
+        markCyclePaid(rt, today, currentMonth);
         RecurringTransaction saved = recurringTransactionRepository.save(rt);
         pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, saved.getId());
         return toResponse(saved);

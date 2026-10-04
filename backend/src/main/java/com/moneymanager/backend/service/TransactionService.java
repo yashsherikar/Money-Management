@@ -72,6 +72,7 @@ public class TransactionService {
         txn.setType(request.type());
         txn.setAmount(request.amount());
         txn.setDescription(request.description());
+        txn.setPaymentId(trimPaymentId(request.paymentId()));
         txn.setTxnDate(request.txnDate());
         transactionRepository.save(txn);
 
@@ -96,6 +97,10 @@ public class TransactionService {
         txn.setType(request.type());
         txn.setAmount(request.amount());
         txn.setDescription(request.description());
+        // Preserve existing Payment ID when client omits the field (null)
+        if (request.paymentId() != null) {
+            txn.setPaymentId(trimPaymentId(request.paymentId()));
+        }
         txn.setTxnDate(request.txnDate());
         transactionRepository.save(txn);
 
@@ -144,10 +149,18 @@ public class TransactionService {
                 t.getType(),
                 t.getAmount(),
                 t.getDescription(),
+                t.getPaymentId(),
                 t.getTxnDate(),
                 t.getCreatedAt(),
                 canSplit,
                 splitBillId
         );
+    }
+
+    private static String trimPaymentId(String paymentId) {
+        if (paymentId == null) return null;
+        String s = paymentId.trim();
+        if (s.isEmpty()) return null;
+        return s.length() > 120 ? s.substring(0, 120) : s;
     }
 }

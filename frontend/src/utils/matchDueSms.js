@@ -1,19 +1,24 @@
 /**
- * Match a bank debit SMS amount to recurring / EMI / emergency-fund plans
+ * Match a bank debit SMS / QR pay amount to recurring / EMI / emergency-fund plans
  * so “forgot expense” can confirm the right due item instead of a generic category.
  */
 import client from '../api/client.js'
-import { RELATED } from './confirmDuePaid.js'
+import { RELATED, confirmDuePaid } from './confirmDuePaid.js'
 
 function amtClose(a, b) {
   return Math.abs(Number(a) - Number(b)) <= 0.011
 }
 
+const WEAK_NAME_TOKENS = new Set([
+  'subscription', 'subscriptions', 'payment', 'monthly', 'bank',
+  'recurring', 'autopay', 'emi', 'due', 'the', 'and', 'for',
+])
+
 function nameOverlap(merchant, raw, label) {
   const hay = `${merchant || ''} ${raw || ''}`.toLowerCase()
   const needle = String(label || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim()
   if (!needle || needle.length < 3) return false
-  const token = needle.split(/\s+/).find((t) => t.length >= 3)
+  const token = needle.split(/\s+/).find((t) => t.length >= 3 && !WEAK_NAME_TOKENS.has(t))
   return !!(token && hay.includes(token))
 }
 
@@ -105,11 +110,42 @@ export async function findDueMatches({ amount, merchant = '', raw = '' } = {}) {
   return matches.sort((a, b) => b.score - a.score)
 }
 
-/** Unique strong match → safe to auto-confirm. */
-export function pickConfidentDueMatch(matches) {
+/**
+ * Unique strong match → safe to auto-confirm.
+ * Amount-only (score &lt; 120) is NOT enough by default — a QR shop pay of ₹199 must not
+ * confirm Netflix. Pass allowUniqueAmount for QR pays when only one due has that amount.
+ */
+export function pickConfidentDueMatch(matches, { allowUniqueAmount = false } = {}) {
   if (!matches?.length) return null
-  if (matches.length === 1) return matches[0]
-  // Two items same amount — only auto if top score clearly wins
-  if (matches[0].score >= matches[1].score + 20) return matches[0]
+  const top = matches[0]
+  // Need name overlap (+20) on top of amount (≥100) — i.e. score ≥ 120
+  if (top.score >= 120) {
+    if (matches.length === 1) return top
+    if (top.score >= matches[1].score + 20) return top
+    return null
+  }
+  // QR: exact unique due amount (₹50 subscription vs only one ₹50 due)
+  if (allowUniqueAmount && matches.length === 1 && top.score >= 100) return top
   return null
+}
+
+/**
+ * After a QR / UPI expense is logged, confirm a matching subscription if confident.
+ * @returns {Promise<object|null>} the confirmed match, or null
+ */
+export async function tryConfirmMatchingDues({
+  amount,
+  merchant = '',
+  raw = '',
+  allowUniqueAmount = true,
+} = {}) {
+  try {
+    const matches = await findDueMatches({ amount, merchant, raw })
+    const confident = pickConfidentDueMatch(matches, { allowUniqueAmount })
+    if (!confident) return null
+    await confirmDuePaid(confident.relatedType, confident.relatedId)
+    return confident
+  } catch {
+    return null
+  }
 }

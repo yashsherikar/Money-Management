@@ -5,6 +5,10 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { isNativePlatform } from '../nativePush.js'
 import { suppressResumeLock, savePendingUpiConfirm, readPendingUpiConfirm, clearPendingUpiConfirm } from '../appLock.js'
 import QrScannerOverlay from '../components/QrScannerOverlay.jsx'
+import ModalPortal from '../utils/ModalPortal.jsx'
+import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import CategoryPicker from '../components/CategoryPicker.jsx'
+import { detectMerchantBrand } from '../utils/subscriptionBrands.jsx'
 import { scanUpiQrNative, cancelUpiQrScan } from '../utils/scanUpiQr.js'
 import {
   parseUpiQr,
@@ -67,6 +71,7 @@ export default function ScanPay() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const awaitingReturnRef = useRef(false)
   const categoriesRef = useRef([])
+  useBodyScrollLock(!!payPreview || !!confirmOpen)
 
   useEffect(() => {
     categoriesRef.current = categories
@@ -174,15 +179,30 @@ export default function ScanPay() {
       sharedCategoryName,
     })
 
-    // Private UPI: show username tag (pn), not "merchant"
+    const brand = detectMerchantBrand(parsed.pn, parsed.pa, parsed.raw, parsed.tn)
+    const merchantName = brand?.name || parsed.pn || ''
+    // Description = name/note only — Payment ID is form.pa (UPI VPA)
     const description = hintPersonal
-      ? (parsed.pn || parsed.pa)
-      : (parsed.pn || parsed.tn || parsed.pa)
+      ? (parsed.tn || merchantName || '')
+      : (parsed.tn || merchantName || '')
+
+    let nextCat = categoryId
+    if (!nextCat && brand && !hintPersonal) {
+      const grocery = /zepto|blinkit|instamart|bigbasket|dmart|grocery/i.test(`${brand.id} ${brand.name}`)
+      const food = /dining|restaurant|food|cafe|burger|pizza|kfc|mcdonald|swiggy|zomato|zepto/i.test(
+        `${brand.id} ${brand.name}`,
+      )
+      const want = grocery ? 'Groceries' : food ? 'Dining Out' : null
+      if (want) {
+        const hit = cats.find((c) => String(c.name).toLowerCase() === want.toLowerCase())
+        if (hit) nextCat = String(hit.id)
+      }
+    }
 
     setForm((f) => ({
       ...f,
       pa: parsed.pa,
-      pn: parsed.pn,
+      pn: merchantName || parsed.pn,
       mc: parsed.mc,
       am: parsed.am || '',
       mam: parsed.mam || '',
@@ -191,7 +211,7 @@ export default function ScanPay() {
       personal: hintPersonal,
       raw: parsed.raw || '',
       sharedCategoryName,
-      categoryId,
+      categoryId: nextCat,
       description,
     }))
   }
@@ -426,9 +446,17 @@ export default function ScanPay() {
 
   async function handleAddCategory(e) {
     e.preventDefault()
-    if (!newCategoryName.trim()) return
-    const { data } = await client.post('/categories', { name: newCategoryName.trim(), essential: false })
-    setCategories((prev) => [...prev, data])
+    const nameTrim = newCategoryName.trim()
+    if (!nameTrim) return
+    const existing = categories.find((c) => String(c.name).toLowerCase() === nameTrim.toLowerCase())
+    if (existing) {
+      setForm((f) => ({ ...f, categoryId: String(existing.id) }))
+      setNewCategoryName('')
+      setAddingCategory(false)
+      return
+    }
+    const { data } = await client.post('/categories', { name: nameTrim, essential: false })
+    setCategories((prev) => (prev.some((c) => c.id === data.id) ? prev : [...prev, data]))
     setForm((f) => ({ ...f, categoryId: String(data.id) }))
     setNewCategoryName('')
     setAddingCategory(false)
@@ -622,6 +650,17 @@ export default function ScanPay() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Payment ID')}</label>
+            <input
+              type="text"
+              value={form.pa}
+              readOnly
+              className="w-full px-3 py-2 border border-slate-300 rounded-md font-mono text-sm bg-slate-50"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">{t('UPI ID — stored as Payment ID, not Description.')}</p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t('Category')}</label>
             {addingCategory ? (
               <div className="flex gap-2">
@@ -637,24 +676,21 @@ export default function ScanPay() {
                 <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
               </div>
             ) : (
-              <select
-                value={form.categoryId}
-                onChange={(e) => {
-                  const picked = categories.find((c) => String(c.id) === e.target.value)
-                  if (picked?.name === 'Other') {
-                    setAddingCategory(true)
-                    setForm((f) => ({ ...f, categoryId: '' }))
-                  } else {
-                    setForm((f) => ({ ...f, categoryId: e.target.value }))
-                  }
-                }}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md"
-              >
-                <option value="">{t('Select…')}</option>
-                {expenseCategories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name === 'Other' ? t('Other (add new)') : c.name}</option>
-                ))}
-              </select>
+              <>
+                <CategoryPicker
+                  categories={expenseCategories}
+                  value={form.categoryId}
+                  onChange={(id) => setForm((f) => ({ ...f, categoryId: id }))}
+                  placeholder={t('Select…')}
+                />
+                <button
+                  type="button"
+                  className="mt-1.5 text-xs text-brand-600 font-medium"
+                  onClick={() => setAddingCategory(true)}
+                >
+                  {t('+ New category')}
+                </button>
+              </>
             )}
             {form.personal && (
               <p className="text-xs text-slate-500 mt-1">
@@ -664,7 +700,7 @@ export default function ScanPay() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Description / Note')}</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('Description')}</label>
             <input
               type="text"
               value={form.description}
@@ -672,6 +708,7 @@ export default function ScanPay() {
               placeholder={t('e.g. Lunch, rent share, groceries…')}
               className="w-full px-3 py-2 border border-slate-300 rounded-md"
             />
+            <p className="text-[11px] text-slate-500 mt-1">{t('Shop / what you paid for — not the UPI ID.')}</p>
           </div>
 
           <button
@@ -699,9 +736,11 @@ export default function ScanPay() {
       )}
 
       {payPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-20">
-          <div className="absolute inset-0 bg-black/50" onClick={() => !paying && !qrBusy && setPayPreview(null)} />
-          <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
+        <ModalPortal>
+        <div className="app-modal" role="dialog" aria-modal="true">
+          <div className="app-modal-backdrop" onClick={() => !paying && !qrBusy && setPayPreview(null)} />
+          <div className="app-modal-panel">
+          <div className="app-modal-body">
             <h2 className="font-bold text-lg mb-1">{t('Confirm payment')}</h2>
             <p className="text-sm text-slate-500 mb-4">
               {payPreview.personal
@@ -819,13 +858,17 @@ export default function ScanPay() {
               </button>
             </div>
           </div>
+          </div>
         </div>
+        </ModalPortal>
       )}
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-20">
-          <div className="absolute inset-0 bg-black/40" onClick={skipLog} />
-          <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl">
+        <ModalPortal>
+        <div className="app-modal" role="dialog" aria-modal="true">
+          <div className="app-modal-backdrop" onClick={skipLog} />
+          <div className="app-modal-panel">
+            <div className="app-modal-body">
             <h2 className="font-bold text-lg mb-2">{t('Did you pay?')}</h2>
             <p className="text-sm text-slate-600 mb-4">
               {t('Log')} ₹{Number(form.am || 0).toLocaleString('en-IN')} {t('to')} {form.description || form.pn || form.pa}?
@@ -843,8 +886,10 @@ export default function ScanPay() {
                 {t('Not yet')}
               </button>
             </div>
+            </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   )

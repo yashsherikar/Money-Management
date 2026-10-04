@@ -147,6 +147,27 @@ function matchesConfirmedPayNow(parsed) {
   })
 }
 
+/**
+ * Recent merchant QR / Pay screen pay waiting for SMS.
+ * Prevents that debit from becoming "Subscription: …" or confirming an unrelated due.
+ */
+function matchesRecentQrOrPayPending(parsed) {
+  if (!parsed || parsed.direction !== 'DEBIT') return false
+  const amt = Number(parsed.amount)
+  const smsDate = Number(parsed.date) || Date.now()
+  return listPendingP2pPays().some((p) => {
+    if (p.status !== 'waiting_sms' && p.status !== 'confirmed') return false
+    if (Math.abs(Number(p.amount) - amt) > 0.011) return false
+    const created = Number(p.createdAt) || 0
+    if (smsDate < created - 2 * 60_000) return false
+    if (smsDate > created + 3 * 60 * 60_000) return false
+    if (pendingIdentityMatches(parsed, p)) return true
+    // Merchant QR: bank SMS often has no VPA — amount + time is enough
+    if (p.personal === false) return true
+    return false
+  })
+}
+
 function txnDateFromSms(parsed) {
   return localDateYmd(parsed?.date || Date.now())
 }
@@ -361,10 +382,16 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
       } catch { /* fall through to normal path */ }
     }
 
-    if (brand && parsed.direction === 'DEBIT'
+    const fromQrPay = matchesRecentQrOrPayPending(parsed)
+
+    // QR / Pay-screen debit must not become a Subscription autopay
+    if (!fromQrPay && brand && parsed.direction === 'DEBIT'
         && parsed.kind !== 'transfer' && parsed.kind !== 'self_transfer') {
       parsed.kind = 'autopay'
       if (!parsed.merchant) parsed.merchant = brand.name
+    }
+    if (fromQrPay && parsed.kind === 'autopay') {
+      parsed.kind = 'payment'
     }
 
     if (brand && parsed.kind === 'autopay') {
@@ -384,8 +411,9 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
     const txnDate = txnDateFromSms(parsed)
 
     // Debit SMS amount matches recurring / EMI / emergency fund → confirm that, not generic category
+    // Skip when this SMS is for a QR/Pay you just made (amount-only match was wrongly confirming Netflix etc.)
     let matchedDues = null
-    if (parsed.direction === 'DEBIT' && parsed.kind !== 'cashback') {
+    if (!fromQrPay && parsed.direction === 'DEBIT' && parsed.kind !== 'cashback') {
       try {
         matchedDues = await findDueMatches({
           amount: parsed.amount,
@@ -493,7 +521,20 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
         account,
       })
 
-      if (parsed.kind === 'autopay' && parsed.direction === 'DEBIT') {
+      // QR/SMS debit may match subscription / EMI / EF even when earlier due-match was skipped
+      if (parsed.direction === 'DEBIT' && parsed.kind !== 'cashback') {
+        try {
+          const { tryConfirmMatchingDues } = await import('./matchDueSms.js')
+          await tryConfirmMatchingDues({
+            amount: parsed.amount,
+            merchant: parsed.merchant,
+            raw: parsed.raw || body,
+            allowUniqueAmount: !!fromQrPay,
+          })
+        } catch { /* ignore */ }
+      }
+
+      if (!fromQrPay && parsed.kind === 'autopay' && parsed.direction === 'DEBIT') {
         const rec = await upsertAutopaySubscription({
           account,
           amount: parsed.amount,

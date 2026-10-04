@@ -745,29 +745,29 @@ button.rounded-md {
   transition: width 0.45s var(--ease-out);
 }
 
-/* Centered app modals — keep content inside the card; scroll inside, not the page */
+/* Centered app modals — always viewport-fixed; long forms scroll inside the card */
 .app-modal {
   position: fixed;
   inset: 0;
-  z-index: 64;
+  z-index: 80;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px) + 4.5rem);
-  overscroll-behavior: contain;
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) 1rem max(1rem, env(safe-area-inset-bottom, 0px) + 4.75rem);
+  overscroll-behavior: none;
+  touch-action: none;
 }
 .app-modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(2px);
 }
 .app-modal-panel {
   position: relative;
   width: 100%;
   max-width: 28rem;
-  max-height: min(86dvh, 86vh);
+  max-height: min(78dvh, 78vh);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -776,6 +776,7 @@ button.rounded-md {
   background: linear-gradient(165deg, var(--card-hi) 0%, var(--card) 100%);
   border: 1px solid var(--border);
   box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.65);
+  touch-action: pan-y;
 }
 .app-modal-body {
   flex: 1 1 auto;
@@ -786,6 +787,7 @@ button.rounded-md {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding: 1.25rem;
+  touch-action: pan-y;
 }
 .app-modal-row {
   display: grid;
@@ -815,15 +817,34 @@ button.rounded-md {
 /* Recharts renders text via SVG fill, not Tailwind classes — needs an explicit dark-theme color. */
 .recharts-text,
 .recharts-legend-item-text {
-  fill: #8A99AD !important;
+  fill: #C2CAD8 !important;
 }
 
-/* Page transition — applied to a div inside <main>, never to an ancestor of the
-   fixed bottom nav (which is a sibling of main, not a descendant), so this is
-   safe to give a transform without breaking position:fixed. */
+/* Default tooltip items stay black unless overridden — invisible on dark card. */
+.recharts-default-tooltip {
+  background: #1C2436 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  color: #F3F6FA !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4) !important;
+}
+.recharts-tooltip-label {
+  color: #C2CAD8 !important;
+}
+.recharts-tooltip-item {
+  color: #F3F6FA !important;
+}
+.recharts-tooltip-item-name,
+.recharts-tooltip-item-value,
+.recharts-tooltip-item-separator {
+  color: inherit !important;
+}
+
+/* Page transition — opacity only. A leftover transform makes position:fixed
+   popups (edit/SMS/asks) stick to the scrolled page so users must scroll up. */
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .animate-page-in {
   animation: page-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;

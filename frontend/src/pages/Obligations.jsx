@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import client, { networkErrorMessage } from '../api/client'
 import StatCard from '../components/StatCard.jsx'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
@@ -6,6 +7,7 @@ import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { confirmDuePaid, RELATED } from '../utils/confirmDuePaid.js'
 
 function money(n) {
   return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
@@ -20,11 +22,13 @@ const efEmpty = { sourceAccountId: '', targetAccountId: '', amount: '', dayOfMon
 
 export default function Obligations() {
   const { t } = useLanguage()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState('EMI')
   const [summary, setSummary] = useState(null)
   const [accounts, setAccounts] = useState([])
   const [emergencyPlans, setEmergencyPlans] = useState([])
   const [loadError, setLoadError] = useState('')
+  const [confirmingId, setConfirmingId] = useState(null)
 
   const [emiForm, setEmiForm] = useState(emiEmpty)
   const [fdForm, setFdForm] = useState(fdEmpty)
@@ -61,6 +65,32 @@ export default function Obligations() {
   useEffect(() => {
     load()
   }, [])
+
+  // Deep-link from local/push: /obligations?confirmEf= / ?confirmEmi=
+  useEffect(() => {
+    const efId = searchParams.get('confirmEf')
+    const emiId = searchParams.get('confirmEmi')
+    if (!efId && !emiId) return
+    let cancelled = false
+    ;(async () => {
+      setError('')
+      try {
+        if (efId) {
+          setTab('Emergency Fund')
+          await confirmDuePaid(RELATED.EMERGENCY_FUND, efId)
+        } else if (emiId) {
+          setTab('EMI')
+          await confirmDuePaid(RELATED.EMI, emiId)
+        }
+        if (!cancelled) await load()
+      } catch (err) {
+        if (!cancelled) setError(err.response?.data?.message || t('Could not mark as paid'))
+      } finally {
+        if (!cancelled) setSearchParams({}, { replace: true })
+      }
+    })()
+    return () => { cancelled = true }
+  }, [searchParams, setSearchParams, t])
 
   async function submitEmi(e) {
     e.preventDefault()
@@ -205,7 +235,30 @@ export default function Obligations() {
   }
 
   async function toggleEfActive(p) { await client.patch(`/emergency-fund/${p.id}/active?active=${!p.active}`); load() }
-  async function confirmEf(id) { await client.post(`/emergency-fund/${id}/confirm`); load() }
+  async function confirmEf(id) {
+    setConfirmingId(`ef-${id}`)
+    setError('')
+    try {
+      await confirmDuePaid(RELATED.EMERGENCY_FUND, id)
+      await load()
+    } catch (err) {
+      setError(err.response?.data?.message || t('Could not mark as paid'))
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+  async function confirmEmi(id) {
+    setConfirmingId(`emi-${id}`)
+    setError('')
+    try {
+      await confirmDuePaid(RELATED.EMI, id)
+      await load()
+    } catch (err) {
+      setError(err.response?.data?.message || t('Could not mark as paid'))
+    } finally {
+      setConfirmingId(null)
+    }
+  }
   async function deleteEf(id) { await client.delete(`/emergency-fund/${id}`); load() }
 
   const emergencyFundAccounts = accounts.filter((a) => a.type === 'EMERGENCY_FUND')
@@ -291,20 +344,38 @@ export default function Obligations() {
           </CollapsibleSection>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
             {summary.emis.length === 0 && <div className="p-4 text-sm text-slate-500">{t('No EMIs tracked.')}</div>}
-            {summary.emis.map((e) => (
-              <div key={e.id} className="p-4 flex justify-between items-center">
-                <div>
+            {summary.emis.map((e) => {
+              const today = new Date()
+              const ym = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+              const paidThisMonth = e.lastLoggedMonth === ym || e.canMarkPaid === false
+              const dueReached = e.due === true || (
+                e.active && today.getDate() >= Number(e.dueDay || 1) && !paidThisMonth
+              )
+              return (
+              <div key={e.id} className="p-4 flex justify-between items-center gap-2 flex-wrap">
+                <div className="min-w-0">
                   <div className="font-medium">{e.loanName}</div>
                   <div className="text-xs text-slate-500">{e.tenureMonths} {t('months')} · {t('due day')} {e.dueDay} · {t(e.active ? 'active' : 'inactive')}</div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <div className="font-semibold">{money(e.emiAmount)}/{t('mo')}</div>
+                  {e.active && dueReached && (
+                    <button
+                      type="button"
+                      disabled={confirmingId === `emi-${e.id}`}
+                      onClick={() => confirmEmi(e.id)}
+                      className="text-sm text-emerald-600 font-semibold disabled:opacity-60"
+                    >
+                      {confirmingId === `emi-${e.id}` ? t('Saving…') : t('Mark paid')}
+                    </button>
+                  )}
                   <button onClick={() => toggleEmiActive(e)} className="text-sm text-brand-600">{e.active ? t('Pause') : t('Resume')}</button>
                   <button onClick={() => startEditEmi(e)} aria-label={t('Edit')} title={t('Edit')} className="p-1.5 rounded-md text-slate-500 hover:text-brand-600 hover:bg-slate-100"><EditIcon /></button>
                   <button onClick={() => deleteEmi(e.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -455,7 +526,14 @@ export default function Obligations() {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="font-semibold text-brand-700">{money(p.amount)}</div>
-                  <button onClick={() => confirmEf(p.id)} className="text-sm text-emerald-600">{t('Confirm this month')}</button>
+                  <button
+                    type="button"
+                    disabled={confirmingId === `ef-${p.id}`}
+                    onClick={() => confirmEf(p.id)}
+                    className="text-sm text-emerald-600 font-semibold disabled:opacity-60"
+                  >
+                    {confirmingId === `ef-${p.id}` ? t('Saving…') : t('Confirm this month')}
+                  </button>
                   <button onClick={() => toggleEfActive(p)} className="text-sm text-brand-600">{p.active ? t('Pause') : t('Resume')}</button>
                   <button onClick={() => deleteEf(p.id)} aria-label={t('Delete')} title={t('Delete')} className="p-1.5 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50"><DeleteIcon /></button>
                 </div>

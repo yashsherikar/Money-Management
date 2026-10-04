@@ -100,6 +100,7 @@ export async function scheduleEmergencyFundReminders(plan) {
       url: `/obligations?confirmEf=${plan.id}`,
       kind: 'emergency_fund',
       relatedId: String(plan.id),
+      relatedType: 'EMERGENCY_FUND',
     })
   }
 }

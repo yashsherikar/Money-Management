@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import client, { networkErrorMessage } from '../api/client'
-import { notifyTransactionsChanged, clearPaidReminders, RELATED } from '../utils/confirmDuePaid.js'
+import { confirmDuePaid, clearPaidReminders, RELATED } from '../utils/confirmDuePaid.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
@@ -84,13 +84,18 @@ export default function Recurring() {
     ;(async () => {
       setError('')
       try {
-        await client.post(`/recurring-transactions/${confirmId}/confirm`)
+        await confirmDuePaid(RELATED.RECURRING, confirmId)
         if (!cancelled) {
-          notifyTransactionsChanged()
           await loadAll()
         }
       } catch (err) {
-        if (!cancelled) setError(err.response?.data?.message || t('Could not mark as paid'))
+        const msg = String(err?.response?.data?.message || err?.message || '')
+        if (/already confirmed/i.test(msg)) {
+          await clearPaidReminders(RELATED.RECURRING, confirmId).catch(() => {})
+          if (!cancelled) await loadAll()
+        } else if (!cancelled) {
+          setError(err.response?.data?.message || t('Could not mark as paid'))
+        }
       } finally {
         if (!cancelled) setSearchParams({}, { replace: true })
       }
@@ -176,9 +181,7 @@ export default function Recurring() {
     setConfirmingId(id)
     setError('')
     try {
-      await client.post(`/recurring-transactions/${id}/confirm`)
-      await clearPaidReminders(RELATED.RECURRING, id)
-      notifyTransactionsChanged()
+      await confirmDuePaid(RELATED.RECURRING, id)
       await loadAll()
     } catch (err) {
       setError(err.response?.data?.message || t('Could not mark as paid'))

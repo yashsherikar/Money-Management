@@ -5,6 +5,16 @@ import { currentUserId, isLoggedIn, userGetItem, userSetItem } from './userStora
 const KEY = 'mm_local_app_notifications'
 const MAX = 50
 
+/** Kinds that must not spam a new unread row for the same relatedId on every app sync. */
+const DEDUPE_KINDS = new Set([
+  'pending_pay',
+  'subscription',
+  'recurring',
+  'due',
+  'emergency_fund',
+  'emi',
+])
+
 export function listLocalAppNotifications() {
   if (!isLoggedIn()) return []
   const uid = currentUserId()
@@ -30,10 +40,33 @@ export function countUnreadLocalNotifications() {
   return listLocalAppNotifications().filter((n) => !n.viewed).length
 }
 
-export function addLocalAppNotification({ title, body, url = '/pending-pays', kind = 'pending_pay', relatedId = null }) {
+export function addLocalAppNotification({
+  title,
+  body,
+  url = '/pending-pays',
+  kind = 'pending_pay',
+  relatedId = null,
+  relatedType = null,
+} = {}) {
   if (!isLoggedIn()) return null
+
+  // Already have an unread for this related item — don't stack on every focus/sync
+  if (relatedId != null && DEDUPE_KINDS.has(kind)) {
+    const existing = listLocalAppNotifications().find(
+      (n) => n.kind === kind && String(n.relatedId) === String(relatedId) && !n.viewed,
+    )
+    if (existing) return existing
+  }
+
   const list = listLocalAppNotifications().filter(
-    (n) => !(kind === 'pending_pay' && relatedId && n.relatedId === relatedId && n.kind === kind && !n.viewed),
+    (n) => !(
+      relatedId != null
+      && DEDUPE_KINDS.has(kind)
+      && n.relatedId != null
+      && String(n.relatedId) === String(relatedId)
+      && n.kind === kind
+      && !n.viewed
+    ),
   )
   const item = {
     id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -43,6 +76,7 @@ export function addLocalAppNotification({ title, body, url = '/pending-pays', ki
     url,
     kind,
     relatedId,
+    relatedType,
     viewed: false,
     createdAt: new Date().toISOString(),
     local: true,

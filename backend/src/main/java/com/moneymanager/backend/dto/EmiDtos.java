@@ -28,6 +28,11 @@ public class EmiDtos {
             BigDecimal emiAmount,
             LocalDate startDate,
             Integer dueDay,
-            boolean active
+            boolean active,
+            String lastLoggedMonth,
+            /** Due day reached and not confirmed this month. */
+            boolean due,
+            /** Active and not yet confirmed this month (may pay early). */
+            boolean canMarkPaid
     ) {}
 }

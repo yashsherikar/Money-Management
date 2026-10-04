@@ -35,7 +35,19 @@ async function confirmFromNotificationItem(item) {
     return true
   }
   const confirmId = parseConfirmIdFromUrl(item.url)
-  if (confirmId && item.url?.startsWith('/recurring')) {
+  if (!confirmId) return false
+  const url = String(item.url || '')
+  if (url.includes('confirmEf=') || url.includes('/obligations')) {
+    if (url.includes('confirmEmi=')) {
+      await confirmDuePaid(RELATED.EMI, confirmId)
+      return true
+    }
+    if (url.includes('confirmEf=')) {
+      await confirmDuePaid(RELATED.EMERGENCY_FUND, confirmId)
+      return true
+    }
+  }
+  if (url.startsWith('/recurring') || url.includes('confirm=')) {
     await confirmDuePaid(RELATED.RECURRING, confirmId)
     return true
   }
@@ -68,17 +80,34 @@ export default function Notifications() {
       server = data.notifications || []
     } catch { /* offline */ }
 
-    const local = listLocalAppNotifications().map((n) => ({
-      ...n,
-      actionType: n.kind === 'pending_pay' ? 'PENDING_PAY'
-        : (n.kind === 'subscription' || n.kind === 'due' || n.kind === 'recurring') ? 'PAID_VIEW'
-          : null,
-      payUrl: null,
-      relatedType: n.relatedType || (n.kind === 'subscription' || n.kind === 'due' || n.kind === 'recurring'
-        ? RELATED.RECURRING
-        : null),
-      relatedId: n.relatedId != null ? Number(n.relatedId) || n.relatedId : null,
-    }))
+    const local = listLocalAppNotifications().map((n) => {
+      let relatedType = n.relatedType || null
+      if (!relatedType) {
+        if (n.kind === 'subscription' || n.kind === 'due' || n.kind === 'recurring') {
+          relatedType = RELATED.RECURRING
+        } else if (n.kind === 'emergency_fund') {
+          relatedType = RELATED.EMERGENCY_FUND
+        } else if (n.kind === 'emi') {
+          relatedType = RELATED.EMI
+        }
+      }
+      // Deep-link fallback: /obligations?confirmEf= / ?confirmEmi=
+      if (!relatedType && n.url) {
+        if (String(n.url).includes('confirmEf=')) relatedType = RELATED.EMERGENCY_FUND
+        else if (String(n.url).includes('confirmEmi=')) relatedType = RELATED.EMI
+        else if (String(n.url).includes('/recurring')) relatedType = RELATED.RECURRING
+      }
+      return {
+        ...n,
+        actionType: n.kind === 'pending_pay' ? 'PENDING_PAY'
+          : (n.kind === 'subscription' || n.kind === 'due' || n.kind === 'recurring'
+            || n.kind === 'emergency_fund' || n.kind === 'emi') ? 'PAID_VIEW'
+            : null,
+        payUrl: null,
+        relatedType,
+        relatedId: n.relatedId != null ? Number(n.relatedId) || n.relatedId : null,
+      }
+    })
 
     const merged = [...local, ...server].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -159,7 +188,7 @@ export default function Notifications() {
     }
   }
 
-  /** User already paid — remove Pay now without opening UPI again. */
+  /** User already paid — confirm due on server + remove Pay now (no UPI reopen). */
   async function handleAlreadyPaid(item) {
     setBusyId(item.id)
     setToast('')
@@ -168,12 +197,24 @@ export default function Notifications() {
       if (item.relatedType === 'PAYMENT_REQUEST' && item.relatedId) {
         await client.patch(`/payment-requests/${item.relatedId}/confirm-sent`).catch(() => {})
       }
-      await clearNotificationPayAction(item.id)
-      if (item.relatedType && item.relatedId != null) {
+      // Subscription / recurring / EMI / EF: must confirm on server or "Did you pay?" keeps returning
+      const dueTypes = [RELATED.RECURRING, RELATED.EMI, RELATED.EMERGENCY_FUND]
+      if (item.relatedType && item.relatedId != null && dueTypes.includes(item.relatedType)) {
+        try {
+          await confirmDuePaid(item.relatedType, item.relatedId)
+        } catch (err) {
+          const msg = String(err?.response?.data?.message || err?.message || '')
+          // Already confirmed this cycle — still clear reminders/UI
+          if (!/already confirmed|not due/i.test(msg)) throw err
+          await clearPaidReminders(item.relatedType, item.relatedId)
+        }
+      } else if (item.relatedType && item.relatedId != null) {
         await clearPaidReminders(item.relatedType, item.relatedId)
       }
+      await clearNotificationPayAction(item.id)
       markClearedLocally(item)
-      setToast(t('Marked as paid — Pay now removed'))
+      setToast(t('Marked as paid — reminder cleared'))
+      notifyTransactionsChanged()
       await load()
     } catch (err) {
       setToast(err.response?.data?.message || err.message || t('Could not mark as paid'))
@@ -187,7 +228,18 @@ export default function Notifications() {
     setToast('')
     try {
       await markViewed(item)
-      const logged = await confirmFromNotificationItem(item)
+      let logged = false
+      try {
+        logged = await confirmFromNotificationItem(item)
+      } catch (err) {
+        const msg = String(err?.response?.data?.message || err?.message || '')
+        if (/already confirmed/i.test(msg) && item.relatedType && item.relatedId != null) {
+          await clearPaidReminders(item.relatedType, item.relatedId)
+          logged = true
+        } else {
+          throw err
+        }
+      }
       await clearNotificationPayAction(item.id)
       markClearedLocally(item)
       if (logged) {

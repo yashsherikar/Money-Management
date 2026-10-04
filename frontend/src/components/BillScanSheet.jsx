@@ -12,6 +12,7 @@ import { requestSmsPermission, isSmsPaySupported } from '../utils/smsPayWatch.js
 import { suppressResumeLock } from '../appLock.js'
 import Field from './Field.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import ModalPortal from '../utils/ModalPortal.jsx'
 
 /**
  * Native camera / gallery bill upload → OCR fields → SMS paid check → save callback.
@@ -27,6 +28,7 @@ export default function BillScanSheet({
   useBodyScrollLock(!!open)
   const { t } = useLanguage()
   const [busy, setBusy] = useState(false)
+  const [busyLabel, setBusyLabel] = useState('')
   const [error, setError] = useState('')
   const [preview, setPreview] = useState('')
   const [amount, setAmount] = useState('')
@@ -42,6 +44,7 @@ export default function BillScanSheet({
   useEffect(() => {
     if (!open) return
     setBusy(false)
+    setBusyLabel('')
     setError('')
     setPreview('')
     setAmount('')
@@ -90,14 +93,22 @@ export default function BillScanSheet({
 
   async function takePhoto() {
     setBusy(true)
+    setBusyLabel(t('Opening camera…'))
     setError('')
     setSmsStatus(null)
     try {
       if (Capacitor.isNativePlatform()) {
         // Before camera: avoid app-lock biometric when returning from the photo screen
         suppressResumeLock(10 * 60_000)
-        const result = await captureBillPhoto({ categories })
+        const result = await captureBillPhoto({
+          categories,
+          onPhase: (phase) => {
+            if (phase === 'camera') setBusyLabel(t('Opening camera…'))
+            else if (phase === 'ocr') setBusyLabel(t('Reading bill…'))
+          },
+        })
         suppressResumeLock(10 * 60_000)
+        setBusyLabel(t('Checking SMS…'))
         await applyScanResult(result)
       } else {
         // Web fallback: file input with capture
@@ -107,14 +118,16 @@ export default function BillScanSheet({
         input.capture = 'environment'
         input.onchange = async () => {
           const file = input.files?.[0]
-          if (!file) { setBusy(false); return }
+          if (!file) { setBusy(false); setBusyLabel(''); return }
           try {
+            setBusyLabel(t('Reading bill…'))
             await applyScanResult(await scanBillFromFile(file, { categories }))
           } catch (err) {
             setError(err?.message || t('Could not read bill'))
             setStep('pick')
           } finally {
             setBusy(false)
+            setBusyLabel('')
           }
         }
         input.click()
@@ -127,18 +140,27 @@ export default function BillScanSheet({
       setStep('pick')
     } finally {
       setBusy(false)
+      setBusyLabel('')
     }
   }
 
   async function uploadGallery() {
     setBusy(true)
+    setBusyLabel(t('Opening gallery…'))
     setError('')
     setSmsStatus(null)
     try {
       if (Capacitor.isNativePlatform()) {
         suppressResumeLock(10 * 60_000)
-        const result = await pickBillPhoto({ categories })
+        const result = await pickBillPhoto({
+          categories,
+          onPhase: (phase) => {
+            if (phase === 'gallery') setBusyLabel(t('Opening gallery…'))
+            else if (phase === 'ocr') setBusyLabel(t('Reading bill…'))
+          },
+        })
         suppressResumeLock(10 * 60_000)
+        setBusyLabel(t('Checking SMS…'))
         await applyScanResult(result)
       } else {
         const input = document.createElement('input')
@@ -146,14 +168,16 @@ export default function BillScanSheet({
         input.accept = 'image/*'
         input.onchange = async () => {
           const file = input.files?.[0]
-          if (!file) { setBusy(false); return }
+          if (!file) { setBusy(false); setBusyLabel(''); return }
           try {
+            setBusyLabel(t('Reading bill…'))
             await applyScanResult(await scanBillFromFile(file, { categories }))
           } catch (err) {
             setError(err?.message || t('Could not read bill'))
             setStep('pick')
           } finally {
             setBusy(false)
+            setBusyLabel('')
           }
         }
         input.click()
@@ -166,6 +190,7 @@ export default function BillScanSheet({
       setStep('pick')
     } finally {
       setBusy(false)
+      setBusyLabel('')
     }
   }
 
@@ -249,7 +274,8 @@ export default function BillScanSheet({
   }
 
   return (
-    <div className="app-modal z-[67]" role="dialog" aria-modal="true">
+    <ModalPortal>
+    <div className="app-modal" role="dialog" aria-modal="true">
       <div className="app-modal-backdrop" onClick={() => !busy && onClose?.()} />
       <div className="app-modal-panel">
         <div className="app-modal-body">
@@ -266,7 +292,7 @@ export default function BillScanSheet({
               onClick={takePhoto}
               className="w-full bg-brand-600 text-white rounded-md py-3 font-semibold disabled:opacity-60"
             >
-              {busy ? t('Opening camera…') : t('Take photo')}
+              {busy ? (busyLabel || t('Reading bill…')) : t('Take photo')}
             </button>
             <button
               type="button"
@@ -274,8 +300,16 @@ export default function BillScanSheet({
               onClick={uploadGallery}
               className="w-full border border-slate-300 rounded-md py-3 font-medium disabled:opacity-60"
             >
-              {busy ? t('Reading bill…') : t('Upload from gallery')}
+              {busy ? (busyLabel || t('Reading bill…')) : t('Upload from gallery')}
             </button>
+            {busy && (
+              <div className="mt-1" role="status" aria-live="polite">
+                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-full w-1/3 bg-brand-500 animate-[loading-bar_1s_ease-in-out_infinite]" />
+                </div>
+                <p className="text-xs text-slate-500 text-center mt-2">{busyLabel || t('Reading bill…')}</p>
+              </div>
+            )}
             {!isBillOcrSupported() && (
               <p className="text-xs text-amber-600 text-center">
                 {t('Bill scan needs the Android app')}
@@ -358,5 +392,6 @@ export default function BillScanSheet({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

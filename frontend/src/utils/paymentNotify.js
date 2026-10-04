@@ -142,25 +142,19 @@ function resolveOtherCategory(categories) {
 }
 
 /**
- * Store a list-friendly description: payee/merchant name first.
- * Extra bits (source + VPA) after " · " so the Transactions row can show
- * "SHOTDINE" as the headline and the rest in the subtitle.
+ * Human description only — never put UPI VPA here (that goes in paymentId).
  */
-function buildDescription({ pn, pa, source, kind }) {
+function buildDescription({ pn, note, source, kind }) {
   const name = String(pn || '').trim()
-  const vpa = String(pa || '').trim()
-  const headline = name || vpa || 'UPI payment'
-  const bits = [headline]
-  let tag = 'UPI'
-  if (source === 'sms') tag = 'UPI SMS'
-  else if (source === 'manual') tag = 'UPI'
-  else if (kind === 'merchant') tag = 'UPI Merchant'
-  else if (kind === 'request') tag = 'UPI Request'
-  bits.push(tag)
-  if (name && vpa && name.toLowerCase() !== vpa.toLowerCase()) {
-    bits.push(vpa)
+  const extra = String(note || '').trim()
+  if (extra && name && extra.toLowerCase() !== name.toLowerCase()) {
+    return `${name} · ${extra}`.slice(0, 220)
   }
-  return bits.join(' · ')
+  if (extra) return extra.slice(0, 220)
+  if (name) return name.slice(0, 220)
+  if (kind === 'merchant') return 'Merchant payment'
+  if (source === 'sms') return 'UPI payment'
+  return 'UPI payment'
 }
 
 async function loadAccountsAndCategories() {
@@ -248,13 +242,14 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
   }
 
   const note = String(parsed.description || '').trim()
-  const description = note
-    ? [
-      note,
-      pn && !note.toLowerCase().includes(String(pn).toLowerCase()) ? pn : null,
-      source === 'sms' ? 'UPI SMS' : (kind === 'merchant' ? 'UPI Merchant' : null),
-    ].filter(Boolean).join(' · ').slice(0, 220)
-    : buildDescription({ pn, pa, source, kind })
+  // Description = human text only; Payment ID (UPI VPA) is a separate column
+  const description = buildDescription({
+    pn,
+    note: note && note.toLowerCase() !== String(pn || '').toLowerCase() ? note : '',
+    source,
+    kind,
+  })
+  const paymentId = pa || null
   try {
     const res = await client.post('/transactions', {
       accountId: Number(primary.id),
@@ -262,11 +257,24 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
       type: 'EXPENSE',
       amount,
       description,
+      paymentId,
       txnDate: localDateYmd(),
     })
     const transactionId = res?.data?.id ?? res?.data?.transactionId ?? null
     recentKeys.add(dedupeKey)
     setTimeout(() => recentKeys.delete(dedupeKey), 190_000)
+
+    // Link QR/UPI pay → subscription / recurring due (unique amount or name match)
+    let dueConfirmed = null
+    try {
+      const { tryConfirmMatchingDues } = await import('./matchDueSms.js')
+      dueConfirmed = await tryConfirmMatchingDues({
+        amount,
+        merchant: pn,
+        raw: `${pn || ''} ${pa || ''} ${description || ''}`,
+        allowUniqueAmount: true,
+      })
+    } catch { /* ignore */ }
 
     window.dispatchEvent(new Event('mm-transactions-changed'))
 
@@ -290,6 +298,7 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
         categoryName: category?.name || 'Other',
         needsCategory: true,
         refineOnly: true,
+        dueConfirmed,
       }
     }
 
@@ -298,6 +307,7 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
       transactionId,
       categoryName: category?.name || known?.categoryName || 'Uncategorized',
       needsCategory: false,
+      dueConfirmed,
     }
   } catch (err) {
     const msg = err?.response?.data?.message || err?.message || 'save_failed'
@@ -313,24 +323,20 @@ export async function updateLoggedUpiCategory({
   if (!cat) throw new Error('Category missing')
   const date = txnDate || localDateYmd()
 
+  const desc = description || buildDescription({ pn, note: description, source: 'upi' })
+  const body = {
+    accountId: Number(accountId),
+    categoryId: Number(categoryId),
+    type: 'EXPENSE',
+    amount: Number(amount),
+    description: desc,
+    paymentId: pa || null,
+    txnDate: date,
+  }
   if (transactionId) {
-    await client.put(`/transactions/${transactionId}`, {
-      accountId: Number(accountId),
-      categoryId: Number(categoryId),
-      type: 'EXPENSE',
-      amount: Number(amount),
-      description: description || buildDescription({ pn, pa, source: 'upi' }),
-      txnDate: date,
-    })
+    await client.put(`/transactions/${transactionId}`, body)
   } else {
-    await client.post('/transactions', {
-      accountId: Number(accountId),
-      categoryId: Number(categoryId),
-      type: 'EXPENSE',
-      amount: Number(amount),
-      description: description || buildDescription({ pn, pa, source: 'upi' }),
-      txnDate: date,
-    })
+    await client.post('/transactions', body)
   }
   if (pa) rememberPayeeCategory(pa, categoryId, cat.name)
   window.dispatchEvent(new Event('mm-transactions-changed'))

@@ -92,4 +92,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     @Query("select min(t.txnDate) from Transaction t where t.user.id = :userId")
     LocalDate findEarliestTxnDate(@Param("userId") Long userId);
+
+    /** Expenses of this amount in a date range (used to heal subscription "already paid via QR"). */
+    @Query("select t from Transaction t where t.user.id = :userId and t.type = 'EXPENSE' " +
+            "and t.amount = :amount and t.txnDate between :from and :to " +
+            "and (t.description is null or lower(t.description) not like 'transfer:%') " +
+            "order by t.txnDate desc, t.createdAt desc")
+    List<Transaction> findExpensesByAmountInRange(@Param("userId") Long userId,
+                                                   @Param("amount") BigDecimal amount,
+                                                   @Param("from") LocalDate from,
+                                                   @Param("to") LocalDate to);
 }

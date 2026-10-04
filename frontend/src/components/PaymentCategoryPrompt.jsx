@@ -14,6 +14,7 @@ import {
   isPaymentNotifySupported,
 } from '../utils/paymentNotify.js'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import ModalPortal from '../utils/ModalPortal.jsx'
 
 function sortCategories(categories) {
   return [...categories].sort((a, b) => {
@@ -191,14 +192,14 @@ export default function PaymentCategoryPrompt() {
   const expenseCategories = sortCategories(categories.filter((c) => c.name !== 'Salary'))
 
   return (
-    <>
+    <ModalPortal>
       {toast && (
-        <div className="fixed top-16 inset-x-0 z-[70] flex justify-center px-4 pointer-events-none">
+        <div className="fixed top-16 inset-x-0 z-[90] flex justify-center px-4 pointer-events-none">
           <div className="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg">{toast}</div>
         </div>
       )}
       {prompt && (
-        <div className="app-modal z-[65]" role="dialog" aria-modal="true">
+        <div className="app-modal" role="dialog" aria-modal="true">
           <div className="app-modal-backdrop" onClick={skip} />
           <div className="app-modal-panel">
             <div className="app-modal-body">
@@ -245,6 +246,6 @@ export default function PaymentCategoryPrompt() {
           </div>
         </div>
       )}
-    </>
+    </ModalPortal>
   )
 }

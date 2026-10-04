@@ -3,8 +3,16 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import Field from './Field.jsx'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import ModalPortal from '../utils/ModalPortal.jsx'
+import CategoryPicker from './CategoryPicker.jsx'
 
-const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
+/** Income picker — "Other" is a real category, not "add new". */
+const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market', 'Cashback', 'Refund', 'Interest', 'Other']
+
+const EXPENSE_DEFAULTS = [
+  'Dining Out', 'Groceries', 'Rent', 'Transport', 'Shopping', 'Entertainment',
+  'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks',
+]
 
 function sortCategories(categories) {
   return [...categories].sort((a, b) => {
@@ -12,6 +20,12 @@ function sortCategories(categories) {
     if (b.name === 'Other') return -1
     return a.name.localeCompare(b.name)
   })
+}
+
+function findCategoryByName(categories, name) {
+  const n = String(name || '').trim().toLowerCase()
+  if (!n) return null
+  return categories.find((c) => String(c.name || '').toLowerCase() === n) || null
 }
 
 /**
@@ -70,6 +84,38 @@ export default function TransactionEditSheet({
     localCategories.find((c) => String(c.id) === form.categoryId)?.name,
   )
 
+  async function ensureCategory(name) {
+    let match = findCategoryByName(localCategories, name)
+    if (match) return match
+    if (!onSave?.addCategory) return null
+    const data = await onSave.addCategory(name, { essential: name !== 'Other' })
+    if (!data) return null
+    setLocalCategories((prev) => [...prev, data])
+    return data
+  }
+
+  async function pickIncomeSource(name) {
+    if (name === '__new__') {
+      setAddingCategory(true)
+      setNewCategoryName('')
+      return
+    }
+    if (!name) {
+      setForm((f) => ({ ...f, categoryId: '' }))
+      return
+    }
+    try {
+      const match = await ensureCategory(name)
+      if (!match?.id) {
+        setError(t('Could not add category'))
+        return
+      }
+      setForm((f) => ({ ...f, categoryId: String(match.id) }))
+    } catch (err) {
+      setError(err?.response?.data?.message || t('Could not add category'))
+    }
+  }
+
   async function handleAddCategory(e) {
     e?.preventDefault?.()
     if (!newCategoryName.trim() || !onSave?.addCategory) return
@@ -94,10 +140,21 @@ export default function TransactionEditSheet({
     setBusy(true)
     setError('')
     try {
+      let categoryId = form.categoryId ? Number(form.categoryId) : null
+      // Income + Other selected in UI but categoryId empty → resolve real Other
+      if (form.type === 'INCOME' && categoryId == null) {
+        const other = await ensureCategory('Other')
+        categoryId = other?.id != null ? Number(other.id) : null
+      }
+      if (form.type === 'INCOME' && categoryId == null) {
+        setError(t('Select an income category'))
+        setBusy(false)
+        return
+      }
       await onSave?.update?.({
         id: txn.id,
         accountId: Number(form.accountId),
-        categoryId: form.categoryId ? Number(form.categoryId) : null,
+        categoryId,
         type: form.type,
         amount: Number(form.amount),
         description: form.description,
@@ -111,8 +168,15 @@ export default function TransactionEditSheet({
     }
   }
 
+  const incomeSelectValue = (() => {
+    const cat = localCategories.find((c) => String(c.id) === String(form.categoryId))
+    if (!cat) return ''
+    return cat.name
+  })()
+
   return (
-    <div className="app-modal z-[65]" role="dialog" aria-modal="true">
+    <ModalPortal>
+    <div className="app-modal" role="dialog" aria-modal="true">
       <div className="app-modal-backdrop" onClick={() => !busy && onClose?.()} />
       <div className="app-modal-panel">
         <div className="app-modal-body">
@@ -143,7 +207,13 @@ export default function TransactionEditSheet({
               onChange={(e) => {
                 setAddingCategory(false)
                 setCategoryQuery('')
-                setForm({ ...form, type: e.target.value, categoryId: '' })
+                const nextType = e.target.value
+                const other = nextType === 'INCOME' ? findCategoryByName(localCategories, 'Other') : null
+                setForm({
+                  ...form,
+                  type: nextType,
+                  categoryId: other?.id != null ? String(other.id) : '',
+                })
               }}
               className="w-full"
             >
@@ -160,6 +230,7 @@ export default function TransactionEditSheet({
                   placeholder={t('New category name')}
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory(e))}
                   className="flex-1"
                 />
                 <button type="button" onClick={handleAddCategory} className="px-3 py-2 rounded-md bg-brand-500 text-white text-sm font-medium">
@@ -170,41 +241,46 @@ export default function TransactionEditSheet({
                 </button>
               </div>
             ) : form.type === 'INCOME' ? (
-              <select
-                value={localCategories.find((c) => String(c.id) === form.categoryId && INCOME_SOURCES.includes(c.name))?.name || 'Other'}
-                onChange={(e) => {
-                  if (e.target.value === 'Other') {
-                    setAddingCategory(true)
-                    return
-                  }
-                  const match = localCategories.find((c) => c.name === e.target.value)
-                  setForm({ ...form, categoryId: match ? String(match.id) : '' })
-                }}
-                className="w-full"
-              >
-                {INCOME_SOURCES.map((name) => <option key={name} value={name}>{t(name)}</option>)}
-                <option value="Other">{t('Other (add new)')}</option>
-              </select>
+              <>
+                <select
+                  required
+                  value={incomeSelectValue}
+                  onChange={(e) => pickIncomeSource(e.target.value)}
+                  className="w-full"
+                >
+                  <option value="">{t('Select income category…')}</option>
+                  {INCOME_SOURCES.map((name) => (
+                    <option key={name} value={name}>{t(name)}</option>
+                  ))}
+                  {localCategories
+                    .filter((c) => !INCOME_SOURCES.includes(c.name))
+                    .filter((c) => !EXPENSE_DEFAULTS.includes(c.name))
+                    .map((c) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  <option value="__new__">{t('+ New income category')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  {t('Other = gift, reimbursement, or anything else. Cashback = BHIM/Paytm rewards.')}
+                </p>
+              </>
             ) : (
               <>
-                <input
-                  list="edit-expense-category-options"
-                  placeholder={t('Search or type a new category')}
-                  value={categoryQuery}
-                  onChange={(e) => handleCategoryInput(e.target.value)}
-                  className="w-full"
+                <CategoryPicker
+                  categories={localCategories}
+                  value={form.categoryId}
+                  onChange={(id, cat) => {
+                    setForm((f) => ({ ...f, categoryId: id }))
+                    setCategoryQuery(cat?.name || '')
+                  }}
+                  placeholder={t('Search categories…')}
                 />
-                <datalist id="edit-expense-category-options">
-                  {sortCategories(localCategories.filter((c) => c.name !== 'Other')).map((c) => (
-                    <option key={c.id} value={c.name} />
-                  ))}
-                </datalist>
                 <button
                   type="button"
                   onClick={() => setAddingCategory(true)}
                   className="mt-2 text-sm text-brand-500 font-medium"
                 >
-                  {t('Other (add new)')}
+                  {t('+ New category')}
                 </button>
               </>
             )}
@@ -267,5 +343,6 @@ export default function TransactionEditSheet({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
