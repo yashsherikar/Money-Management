@@ -181,6 +181,8 @@ export function enqueueSmsMoneyReview({
   const upiRef = captureUpiRef(raw)
   const isCashback = kind === 'cashback'
     || /\bcash\s*back\b|\bone97\b/i.test(String(raw || ''))
+  const isRefund = kind === 'refund' || /\brefund(?:ed)?\b|\brevers(?:ed|al)\b/i.test(String(raw || ''))
+  const isInterest = kind === 'interest' || /\binterest\b/i.test(String(raw || ''))
   const isSelfTransfer = kind === 'self_transfer' || reason === 'needs_destination'
   const bankBit = bankLabel && bankLabel !== 'PAYTM'
     ? `${String(bankLabel).replace(/\s*bank\s*$/i, '').trim().toUpperCase()} Bank`
@@ -189,14 +191,17 @@ export function enqueueSmsMoneyReview({
     ? 'Transfer between my accounts'
     : direction === 'CREDIT'
       ? (isCashback
-        // Cashback: Paytm · ICICI Bank  (no UPI / A/c)
         ? [`Cashback: ${brand?.name || merchant || 'Wallet'}`, bankBit].filter(Boolean).join(' · ')
-        : [
-          brand?.name || merchant || 'Credit',
-          upiRef && `UPI ${upiRef}`,
-          bankBit,
-          accountLast4 && `A/c …${accountLast4}`,
-        ].filter(Boolean).join(' · '))
+        : isRefund
+          ? [`Refund: ${brand?.name || merchant || 'Bank'}`, bankBit].filter(Boolean).join(' · ')
+          : isInterest
+            ? [`Interest: ${merchant || 'Savings'}`, bankBit].filter(Boolean).join(' · ')
+            : [
+              brand?.name || merchant || 'Credit',
+              upiRef && `UPI ${upiRef}`,
+              bankBit,
+              accountLast4 && `A/c …${accountLast4}`,
+            ].filter(Boolean).join(' · '))
       : (brand ? brand.name : (merchant || ''))
 
   const item = {

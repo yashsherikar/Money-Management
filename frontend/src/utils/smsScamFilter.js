@@ -73,23 +73,60 @@ export function unblockSmsSender(address) {
 }
 
 /** Real money movement verbs — required for bank txn SMS. */
-const MONEY_TXN_RE = /\b(?:debited|credited|spent|withdrawn|transferred|auto[- ]?debit|auto[- ]?pay(?:ed)?|mandate(?:\s+debit)?|imps|neft|rtgs|upi\s*ref|txn\s*(?:id|ref)|transaction\s*(?:id|ref)|a\/c\s*[x\d*]+)\b/i
+const MONEY_TXN_RE = /\b(?:debited|credited|spent|withdrawn|transferred|auto[- ]?debit|auto[- ]?pay(?:ed)?|mandate(?:\s+debit)?|imps|neft|rtgs|upi\s*ref|txn\s*(?:id|ref)|transaction\s*(?:id|ref)|a\/c\s*[x\d*]+|cash\s*back|cashback|refund(?:ed)?|revers(?:ed|al)|interest)\b/i
 
 const DEBIT_VERB_RE = /\b(?:debited|spent|withdrawn|auto[- ]?debit|purchase)\b|\bpaid\s+(?:to|from|via|using|rs|₹|inr)\b|\bhas\s+been\s+paid\b|\bsent\s+(?:to|rs|₹|inr)\b/i
-const CREDIT_VERB_RE = /\b(?:credited|received|deposited|inward|refund)\b/i
+const CREDIT_VERB_RE = /\b(?:credited|received|deposited|inward|refund(?:ed)?|revers(?:ed|al)|interest)\b|\bcash\s*back\b|\bcashback\b|\bscratch\s*card\b/i
+
+const AMOUNT_RE = /(?:₹|rs\.?\s*|inr\s*)\d|\d[\d,]*(?:\.\d{1,2})?\s*(?:₹|rs\.?|inr)/i
+
+/**
+ * Paytm / PhonePe scratch-card or wallet cashback — real money, not lottery spam.
+ * Often worded "Congratulations! You won Rs.5 cashback".
+ */
+export function isWalletCashbackSms(body = '') {
+  const lower = String(body || '').toLowerCase()
+  if (!lower.trim()) return false
+  if (/\b(?:lottery|jackpot|whatsapp)\b/i.test(lower)) return false
+  if (/\bhttps?:\/\/|\bwww\.|\bbit\.ly\b|\bclick\s+(?:here|now|link)\b/i.test(lower)) return false
+  if (/\bclaim (?:your )?(?:prize|reward|refund)\b/i.test(lower)) return false
+  const hasCashback = /\bcash\s*back\b|\bcashback\b|\bscratch\s*card\b|\bscratchcard\b|\breward\s+credit/i.test(lower)
+  if (!hasCashback) return false
+  if (!AMOUNT_RE.test(body)) return false
+  return true
+}
+
+/**
+ * Real bank ledger SMS (debit/credit/refund/interest) — never treat as lottery/scam.
+ * Catches refunds, reversals, salary, interest that arrive while QR pay is waiting.
+ */
+export function isBankLedgerSms(body = '') {
+  const lower = String(body || '').toLowerCase()
+  if (!lower.trim()) return false
+  if (/\botp\b|one[- ]time|verification code|do not share/i.test(lower)) return false
+  if (/\b(?:lottery|jackpot|whatsapp)\b/i.test(lower)) return false
+  if (/\bclaim (?:your )?(?:prize|reward|refund|cash)\b/i.test(lower)) return false
+  if (/\bhttps?:\/\/|\bwww\.|\bbit\.ly\b/i.test(lower) && /\b(?:click|claim|verify|kyc)\b/i.test(lower)) {
+    return false
+  }
+  if (!AMOUNT_RE.test(body)) return false
+  const moneyVerb = DEBIT_VERB_RE.test(lower) || CREDIT_VERB_RE.test(lower)
+    || /\b(?:refund(?:ed)?|revers(?:ed|al)|interest\s+credit)/i.test(lower)
+  if (!moneyVerb) return false
+  // Bank / account / UPI markers
+  return /\b(?:a\/c|acct|account|upi|imps|neft|rtgs|hdfc|icici|sbi|axis|kotak|yes\s*bank|idfc|pnb|paytm|one97|phonepe)\b/i.test(lower)
+}
 
 /** True only for real bank debit OR credit movement (not ads / OTP / chatter). */
 export function isRealDebitOrCreditSms(body = '') {
   const lower = String(body || '').toLowerCase()
   if (!lower.trim()) return false
   if (/\botp\b|one[- ]time|verification code|do not share/i.test(lower)) return false
+  if (isWalletCashbackSms(body) || isBankLedgerSms(body)) return true
   const debit = DEBIT_VERB_RE.test(lower)
   const credit = CREDIT_VERB_RE.test(lower)
   if (!debit && !credit) return false
-  // Must have a plausible amount
-  if (!/(?:₹|rs\.?\s*|inr\s*)\d|\d[\d,]*(?:\.\d{1,2})?\s*(?:₹|rs\.?|inr)/i.test(body)) {
-    return false
-  }
+  if (!AMOUNT_RE.test(body)) return false
   return true
 }
 
@@ -172,15 +209,21 @@ export function isLikelyScamSms({ body = '', address = '' } = {}) {
   const addr = String(address || '')
 
   if (isBlockedSmsSender(addr)) return true
+  // Real wallet cashback / bank ledger credits — never treat as lottery/scam
+  if (isWalletCashbackSms(text) || isBankLedgerSms(text)) return false
   if (isPromotionalSms({ body: text, address: addr })) return true
 
   // Phishing / urgency / lottery (common India scam SMS)
   // URL + kyc/block / no bank markers — real bank SMS rarely include raw links
   if (/\bhttps?:\/\/|\bwww\./i.test(lower)) {
-    if (/\b(?:kyc|blocked|suspend|verify|update|claim|refund|lottery|prize|otp|pin)\b/i.test(lower)) {
+    // "refund credited to a/c" with a bank domain is rare; claim/verify links are scam
+    if (/\b(?:kyc|blocked|suspend|verify|update|claim|lottery|prize|otp|pin)\b/i.test(lower)) {
       return true
     }
-    if (!/\b(?:a\/c|acct|account|upi|imps|neft|rtgs|debited|credited|spent|paid)\b/i.test(lower)) {
+    if (/\brefund\b/i.test(lower) && /\b(?:click|claim|verify)\b/i.test(lower)) {
+      return true
+    }
+    if (!/\b(?:a\/c|acct|account|upi|imps|neft|rtgs|debited|credited|spent|paid|cashback|refund)\b/i.test(lower)) {
       return true
     }
   }
@@ -214,7 +257,7 @@ export function isLikelyScamSms({ body = '', address = '' } = {}) {
     } catch { /* ignore */ }
   }
 
-  // Explicit patterns that are almost never real bank money SMS
+  // "Congratulations + ₹" is usually spam — except wallet cashback (handled above)
   if (/\bcongratulations?\b/i.test(lower) && /(?:₹|rs\.?|inr)/i.test(lower)) return true
   if (/\bfree (?:gift|iphone|reward)\b/i.test(lower)) return true
 
@@ -222,7 +265,7 @@ export function isLikelyScamSms({ body = '', address = '' } = {}) {
   const digits = addr.replace(/\D/g, '')
   const isPersonalMobile = /^(?:91)?[6-9]\d{9}$/.test(digits)
   if (isPersonalMobile) {
-    const bankLike = /\b(?:a\/c|acct|debited|credited|upi ref|imps|neft|hdfc|icici|sbi|axis|kotak)\b/i.test(lower)
+    const bankLike = /\b(?:a\/c|acct|debited|credited|upi ref|imps|neft|hdfc|icici|sbi|axis|kotak|paytm|cashback)\b/i.test(lower)
     if (!bankLike) return true
   }
 

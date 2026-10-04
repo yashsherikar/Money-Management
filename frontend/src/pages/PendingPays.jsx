@@ -28,6 +28,8 @@ function statusLabel(status, t, item) {
       return t('Paid')
     case 'not_paid':
       return t('Not paid')
+    case 'failed':
+      return t('Payment failed')
     case 'expired':
       return t('Expired')
     default:
@@ -48,6 +50,7 @@ function statusClass(status) {
     case 'confirmed':
       return 'text-teal bg-teal/10'
     case 'not_paid':
+    case 'failed':
       return 'text-pink bg-pink/10'
     case 'expired':
       return 'text-slate-500 bg-slate-500/10'

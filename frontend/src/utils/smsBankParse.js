@@ -26,8 +26,10 @@ const BANK_HINTS = [
 // Do NOT treat bare "subscription" as autopay — promo ads say that without a real debit.
 const AUTOPAY_RE = /\bauto[- ]?pay\b|\bauto[- ]?debit\b|\bmandate\b|\bstanding instruction\b|\bsi debit\b|\be[- ]?nach\b|\bnach\b|\brecurring\s+(?:payment|debit)\b/i
 const SAVINGS_RE = /\bsavings?\b|\bppf\b|\brd\b|\brecurring deposit\b|\bsukanya\b|\bnps\b|\bemergency fund\b|\bsweep\b|\bto your (?:savings|rd|ppf)\b|\bsaved\b/i
-const CREDIT_RE = /\bcredited\b|\breceived\b|\bdeposited\b|\binward\b|\brefund\b|\bsalary\b/i
+const CREDIT_RE = /\bcredited\b|\breceived\b|\bdeposited\b|\binward\b|\brefund(?:ed)?\b|\brevers(?:ed|al)\b|\binterest\b|\bsalary\b|\bcash\s*back\b|\bcashback\b|\bscratch\s*card\b/i
 const DEBIT_RE = /\bdebited\b|\bspent\b|\bpaid\s+(?:to|from|via|using|rs|₹|inr)\b|\bhas\s+been\s+paid\b|\bsent\b|\bwithdrawn\b|\bpurchase\b|\bauto[- ]?debit\b|\bemi\b/i
+const REFUND_RE = /\brefund(?:ed)?\b|\brevers(?:ed|al)\b|\bcharge\s*back\b|\bamount\s+reversed\b|\btxn\s+reversed\b|\btransaction\s+reversed\b/i
+const INTEREST_RE = /\binterest\b|\bint\.?\s+credit\b|\bintrst\b/i
 
 const MONTHS = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
@@ -79,12 +81,13 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   if (shouldIgnoreMoneySms({ body: text, address })) return null
 
   const amount =
-    matchAmount(text, /(?:₹|rs\.?\s*|inr\s*)(\d[\d,]*(?:\.\d{1,2})?)/i)
-    || matchAmount(text, /(?:debited|credited|spent|paid|sent|received|deposited)\s+(?:for\s+)?(?:by\s+)?(?:with\s+)?(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]*(?:\.\d{1,2})?)/i)
-    || matchAmount(text, /(?:by|of|for)\s+(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]*(?:\.\d{1,2})?)/i)
-  if (!amount || Number(amount) < 1) return null
+    matchAmount(text, /(?:₹|rs\.?\s*|inr\s*)(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
+    || matchAmount(text, /(?:debited|credited|spent|paid|sent|received|deposited|won)\s+(?:for\s+)?(?:by\s+)?(?:with\s+)?(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
+    || matchAmount(text, /(?:by|of|for)\s+(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
+  if (!amount || Number(amount) < 0.01) return null
 
-  const isCredit = CREDIT_RE.test(lower) && !DEBIT_RE.test(lower)
+  const looksCashbackWording = /\bcash\s*back\b|\bcashback\b|\bscratch\s*card\b|\bscratchcard\b|\breward\s+credit/i.test(lower)
+  const isCredit = (CREDIT_RE.test(lower) || looksCashbackWording) && !DEBIT_RE.test(lower)
   const isDebit = DEBIT_RE.test(lower)
     || (/\b(?:debited|spent|withdrawn|auto[- ]?debit)\b/i.test(lower))
     || (!isCredit
@@ -92,6 +95,8 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
       && /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text)
       && /\ba\/c\b|\bacct\b|\baccount\b|\bupi\b/i.test(lower))
   if (!isCredit && !isDebit) return null
+  // Debits under ₹1 are noise; cashback/credits can be paise (₹0.50 etc.)
+  if (isDebit && !isCredit && Number(amount) < 1) return null
 
   const direction = isCredit ? 'CREDIT' : 'DEBIT'
   const bank = detectBankFromSms({ body: text, address })
@@ -106,11 +111,15 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   merchant = cleanMerchant(merchant)
 
   const isCashback = isCredit && isCashbackCredit({ lower, merchant, text })
+  const isRefund = isCredit && REFUND_RE.test(lower) && !isCashback
+  const isInterest = isCredit && INTEREST_RE.test(lower) && !isCashback && !isRefund
 
   const isTransferWording = /\bneft\b|\bimps\b|\brtgs\b|\btransferred\b|\btransfer\b|\bself\s*transfer\b|\bto\s+self\b|\bown\s+a\/c\b|\bown\s+account\b/i.test(lower)
 
   let kind = 'payment'
   if (isCashback) kind = 'cashback'
+  else if (isRefund) kind = 'refund'
+  else if (isInterest) kind = 'interest'
   else if (isAutopay && isSavings) kind = 'savings'
   else if (isAutopay) kind = 'autopay'
   else if (isSavings) kind = 'savings'
@@ -141,7 +150,10 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   const infoParts = [
     bankLabel && `Bank: ${bankLabel}`,
     accountLast4 && `A/c …${accountLast4}`,
-    kind === 'cashback' ? 'Cashback' : (direction === 'CREDIT' ? 'Credit' : 'Debit'),
+    kind === 'cashback' ? 'Cashback'
+      : kind === 'refund' ? 'Refund'
+        : kind === 'interest' ? 'Interest'
+          : (direction === 'CREDIT' ? 'Credit' : 'Debit'),
     upiRef && `UPI ${upiRef}`,
     kind === 'autopay' && 'Autopay',
     kind === 'savings' && 'Savings',
@@ -176,16 +188,23 @@ function cleanMerchant(raw) {
 /**
  * Paytm / PhonePe / wallet cashback credits often look like:
  * "credited with Rs 2.00 … from ONE97 COMMUNICA. UPI:…"
- * (may not literally say "cashback" in the SMS).
+ * "Congratulations! You won Rs.5 cashback on Paytm"
+ * (may not literally say "cashback" in the bank SMS).
  */
 function isCashbackCredit({ lower = '', merchant = '', text = '' } = {}) {
-  if (/\bcash\s*back\b|\bcashback\b|\breward\s+point|\breward\s+credit\b|\bcashback\s+credited\b/i.test(lower)) {
+  if (/\bcash\s*back\b|\bcashback\b|\breward\s+point|\breward\s+credit\b|\bcashback\s+credited\b|\bscratch\s*card\b|\bscratchcard\b/i.test(lower)) {
+    return true
+  }
+  // "won Rs.5" + wallet brand (scratch reward) without the word cashback
+  if (/\b(?:won|win)\b/i.test(lower)
+      && /\b(?:paytm|one97|phonepe|gpay|google\s*pay|amazon\s*pay)\b/i.test(lower)
+      && /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text)) {
     return true
   }
   const from = `${merchant} ${text}`.toLowerCase()
   // Corporate / wallet senders that credit small UPI amounts as cashback
   if (/\bone97\b|\bpaytm\b|\bphonepe\b|\bgoogle pay\b|\bgpay\b|\bamazon\s*pay\b|\bmobikwik\b|\bfreecharge\b/i.test(from)
-      && /\bupi\b/i.test(lower)) {
+      && (/\bupi\b/i.test(lower) || /\bcredited\b|\breceived\b/i.test(lower))) {
     return true
   }
   return false
@@ -228,11 +247,11 @@ function guessBankLabel(address) {
   return m ? m[1] : a.slice(0, 12)
 }
 
-function matchAmount(text, re) {
+function matchAmount(text, re, min = 1) {
   const m = text.match(re)
   if (!m) return null
   const n = Number(String(m[1]).replace(/,/g, ''))
-  if (!Number.isFinite(n) || n < 1) return null
+  if (!Number.isFinite(n) || n < min) return null
   return n.toFixed(2)
 }
 
@@ -247,7 +266,8 @@ function capture(text, re) {
  */
 export function isSelfTransferCandidate(parsed) {
   if (!parsed) return false
-  if (parsed.kind === 'cashback' || parsed.kind === 'autopay' || parsed.kind === 'savings') {
+  if (parsed.kind === 'cashback' || parsed.kind === 'refund' || parsed.kind === 'interest'
+      || parsed.kind === 'autopay' || parsed.kind === 'savings') {
     return false
   }
   if (parsed.kind === 'transfer' || parsed.kind === 'self_transfer') return true
@@ -294,7 +314,8 @@ export function findLinkedAccountInSms(parsed, accounts, excludeAccountId = null
  */
 export function classifySelfTransfer(parsed, accounts) {
   if (!parsed || !accounts?.length || accounts.length < 2) return null
-  if (parsed.kind === 'cashback' || parsed.kind === 'autopay' || parsed.kind === 'savings') {
+  if (parsed.kind === 'cashback' || parsed.kind === 'refund' || parsed.kind === 'interest'
+      || parsed.kind === 'autopay' || parsed.kind === 'savings') {
     return null
   }
 
