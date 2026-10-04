@@ -53,8 +53,8 @@ export default function PendingPayConfirm() {
         await clearNotificationPayAction(pending.notificationId)
       }
       try {
-        const { handleDetectedUpiPayment } = await import('../utils/paymentNotify.js')
-        await handleDetectedUpiPayment({
+        const { handleDetectedUpiPayment, closePendingAfterUpiLog } = await import('../utils/paymentNotify.js')
+        const parsed = {
           amount: Number(pending.am || pending.amount),
           pa: pending.pa,
           payeeName: pending.pn || pending.name,
@@ -62,7 +62,11 @@ export default function PendingPayConfirm() {
           personal: true,
           kind: pending.kind === 'scan_pay' ? 'scan_pay' : 'p2p',
           forceLog: true,
-        })
+          categoryId: pending.categoryId || null,
+          description: pending.description || null,
+        }
+        const logResult = await handleDetectedUpiPayment(parsed)
+        await closePendingAfterUpiLog(parsed, logResult)
       } catch { /* ignore log failure */ }
       clearPendingUpiConfirm()
       setPending(null)

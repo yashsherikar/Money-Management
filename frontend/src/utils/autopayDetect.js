@@ -20,6 +20,10 @@ import { scheduleSubscriptionReminders } from './subscriptionReminders.js'
 import { currentUserId, isLoggedIn, userGetItem, userSetItem } from './userStorage.js'
 import { isSmsFromPresent } from './smsListenGate.js'
 import { shouldIgnoreMoneySms } from './smsScamFilter.js'
+import { findDueMatches, pickConfidentDueMatch } from './matchDueSms.js'
+import { confirmDuePaid } from './confirmDuePaid.js'
+import { namesLookSame } from './smsPayParse.js'
+import { localDateYmd } from './localDate.js'
 
 const HISTORY_KEY = 'mm_autopay_history'
 const SEEN_KEY = 'mm_autopay_seen'
@@ -111,12 +115,25 @@ function historyHasDedupe(dedupeKey) {
   return loadHistory().some((h) => h.dedupeKey === dedupeKey)
 }
 
+/** Identity overlap between bank SMS and a pending Pay row (VPA / payee name). */
+function pendingIdentityMatches(parsed, pending) {
+  const smsPa = String(parsed.pa || '').toLowerCase()
+  const pendingPa = String(pending.pa || '').toLowerCase()
+  if (pendingPa && smsPa && pendingPa === smsPa) return true
+  if (namesLookSame(parsed.merchant || parsed.payeeName, pending.pn || pending.name)) return true
+  // Confirmed + already in ledger: allow nameless SMS to suppress forgot-expense
+  if (pending.status === 'confirmed' && pending.transactionLogged
+      && !parsed.merchant && !parsed.payeeName && !smsPa) {
+    return true
+  }
+  return false
+}
+
 /** Same debit already confirmed via Pay now / payment request SMS match. */
 function matchesConfirmedPayNow(parsed) {
   if (!parsed || parsed.direction !== 'DEBIT') return false
   const amt = Number(parsed.amount)
   const smsDate = Number(parsed.date) || Date.now()
-  const smsName = String(parsed.merchant || parsed.payeeName || '').toLowerCase()
   return listPendingP2pPays().some((p) => {
     if (p.status !== 'confirmed' && p.status !== 'waiting_sms') return false
     if (Math.abs(Number(p.amount) - amt) > 0.011) return false
@@ -125,19 +142,13 @@ function matchesConfirmedPayNow(parsed) {
     // SMS within pay window (2 min before create → 24h after)
     if (smsDate < created - 2 * 60_000) return false
     if (smsDate > confirmed + 24 * 60 * 60_000) return false
-    // Confirmed pays always block; waiting pays block if name/VPA hints match
-    if (p.status === 'confirmed') return true
-    const pn = String(p.pn || p.name || '').toLowerCase()
-    if (pn && smsName && (smsName.includes(pn.slice(0, 4)) || pn.includes(smsName.slice(0, 4)))) return true
-    if (p.pa && parsed.pa && String(p.pa).toLowerCase() === String(parsed.pa).toLowerCase()) return true
-    return false
+    // Never block unrelated same-₹ debits — require VPA/name overlap
+    return pendingIdentityMatches(parsed, p)
   })
 }
 
 function txnDateFromSms(parsed) {
-  const d = parsed?.date ? new Date(parsed.date) : new Date()
-  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10)
-  return d.toISOString().slice(0, 10)
+  return localDateYmd(parsed?.date || Date.now())
 }
 
 function formatBankLabel(label) {
@@ -248,7 +259,7 @@ async function alreadyLoggedSimilar(accountId, amount, direction, txnDate) {
   }
 }
 
-function queueReview(parsed, dedupeKey, reason, suggestedAccountId, suggestedCategoryId) {
+function queueReview(parsed, dedupeKey, reason, suggestedAccountId, suggestedCategoryId, matchedDues = null) {
   return enqueueSmsMoneyReview({
     dedupeKey,
     amount: parsed.amount,
@@ -262,6 +273,7 @@ function queueReview(parsed, dedupeKey, reason, suggestedAccountId, suggestedCat
     address: parsed.address,
     suggestedAccountId,
     suggestedCategoryId,
+    matchedDues,
     reason,
     date: parsed.date,
   })
@@ -371,6 +383,23 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
       || matchAccountToBank(accs, parsed.bank, { preferSavings: false })
     const txnDate = txnDateFromSms(parsed)
 
+    // Debit SMS amount matches recurring / EMI / emergency fund → confirm that, not generic category
+    let matchedDues = null
+    if (parsed.direction === 'DEBIT' && parsed.kind !== 'cashback') {
+      try {
+        matchedDues = await findDueMatches({
+          amount: parsed.amount,
+          merchant: parsed.merchant,
+          raw: parsed.raw || body,
+        })
+        const confident = pickConfidentDueMatch(matchedDues)
+        if (confident) {
+          await confirmDuePaid(confident.relatedType, confident.relatedId)
+          return { dueConfirmed: confident }
+        }
+      } catch { /* fall through to normal path */ }
+    }
+
     // No bank match confidence for unknown bank + multiple accounts → ask user
     const bankMatched = !!(parsed.bank && account && parsed.bank.keywords.some((k) =>
       String(account.name || '').toLowerCase().includes(k),
@@ -394,8 +423,22 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
         !account ? 'no_account' : !cat.confident ? 'needs_category' : 'needs_confirm',
         account?.id || null,
         cat.id,
+        matchedDues?.length ? matchedDues : null,
       )
       return { queued: true, reason: !cat.confident ? 'needs_category' : 'needs_confirm', parsed }
+    }
+
+    // Plain payment debit whose amount matches EMI/recurring/EF — ask which, don't silent-miscategorize
+    if (matchedDues?.length && (parsed.kind === 'payment' || parsed.kind === 'transfer') && !brand) {
+      queueReview(
+        parsed,
+        dedupeKey,
+        'due_match',
+        account?.id || null,
+        cat.id,
+        matchedDues,
+      )
+      return { queued: true, reason: 'due_match', parsed }
     }
 
     if (await alreadyLoggedSimilar(account.id, parsed.amount, parsed.direction, txnDate)) {

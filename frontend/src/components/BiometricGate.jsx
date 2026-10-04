@@ -123,8 +123,7 @@ export default function BiometricGate({ children }) {
 
   useEffect(() => {
     if (!isNativePlatform()) return undefined
-    let handle
-    CapApp.addListener('appStateChange', ({ isActive }) => {
+    const sub = CapApp.addListener('appStateChange', ({ isActive }) => {
       if (!needsGate) return
 
       if (!isActive) {
@@ -146,8 +145,8 @@ export default function BiometricGate({ children }) {
       if (awayMs < RESUME_LOCK_AFTER_MS) return
 
       startLock()
-    }).then((h) => { handle = h })
-    return () => handle?.remove()
+    })
+    return () => { Promise.resolve(sub).then((h) => h?.remove?.()).catch(() => {}) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsGate, startLock])
 

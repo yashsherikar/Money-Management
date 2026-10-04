@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 import client, { networkErrorMessage } from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { buildHistoryInsights } from '../utils/historyInsights.js'
+import { buildHistoryInsights, formatPeakSpendMonth } from '../utils/historyInsights.js'
 
 const RANGES = [
   { id: 3, label: '3M' },
@@ -64,7 +64,13 @@ export default function History() {
     async function load() {
       try {
         const res = await client.get('/history/insights', { params: { months } })
-        if (!cancelled) setData(res.data)
+        if (!cancelled) {
+          const payload = res.data || null
+          if (payload) {
+            payload.peakSpendMonth = formatPeakSpendMonth(payload.peakSpendMonth)
+          }
+          setData(payload)
+        }
         return
       } catch (err) {
         const status = err?.response?.status

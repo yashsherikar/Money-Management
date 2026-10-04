@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import client from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import {
@@ -9,6 +9,7 @@ import {
 import {
   listenForUpiPaymentNotifications,
   handleDetectedUpiPayment,
+  closePendingAfterUpiLog,
   updateLoggedUpiCategory,
   isPaymentNotifySupported,
 } from '../utils/paymentNotify.js'
@@ -37,15 +38,26 @@ export default function PaymentCategoryPrompt() {
   const [categoryId, setCategoryId] = useState('')
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
+  const accountsRef = useRef([])
+  const categoriesRef = useRef([])
+  const tRef = useRef(t)
+  tRef.current = t
 
   useEffect(() => {
     Promise.all([client.get('/accounts'), client.get('/categories')])
       .then(([a, c]) => {
         setAccounts(a.data)
         setCategories(c.data)
+        accountsRef.current = a.data || []
+        categoriesRef.current = c.data || []
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    accountsRef.current = accounts
+    categoriesRef.current = categories
+  }, [accounts, categories])
 
   useEffect(() => {
     const pending = readPendingCategoryPrompt()
@@ -79,17 +91,24 @@ export default function PaymentCategoryPrompt() {
   }, [t])
 
   useEffect(() => {
-    if (!isPaymentNotifySupported() || !accounts.length) return undefined
+    if (!isPaymentNotifySupported()) return undefined
     return listenForUpiPaymentNotifications(async (parsed) => {
-      const result = await handleDetectedUpiPayment(parsed, { accounts, categories })
+      const accs = accountsRef.current
+      const cats = categoriesRef.current
+      if (!accs.length) return
+      const result = await handleDetectedUpiPayment(parsed, { accounts: accs, categories: cats })
+      await closePendingAfterUpiLog(parsed, result)
       if (result.logged && !result.needsCategory) {
-        setToast(t('Expense logged.') + (result.categoryName ? ` (${result.categoryName})` : ''))
+        setToast(tRef.current('Expense logged.') + (result.categoryName ? ` (${result.categoryName})` : ''))
         setTimeout(() => setToast(''), 4000)
       } else if (result.needsCategory) {
         setPrompt(readPendingCategoryPrompt())
+      } else if (result.duplicate) {
+        setToast(tRef.current('Expense already logged'))
+        setTimeout(() => setToast(''), 3000)
       }
     })
-  }, [accounts, categories, t])
+  }, [])
 
   async function saveCategory() {
     if (!prompt || !categoryId || busy) return
@@ -109,17 +128,31 @@ export default function PaymentCategoryPrompt() {
           pn: prompt.pn,
           categoryId,
           categories,
+          txnDate: prompt.txnDate,
         })
       } else if (prompt.refineOnly && !prompt.transactionId) {
         if (prompt.pa) rememberPayeeCategory(prompt.pa, categoryId, cat?.name)
         window.dispatchEvent(new Event('mm-transactions-changed'))
       } else {
-        // Not logged yet — create with chosen category remembered first
+        // Not logged yet — create with chosen category
         if (prompt.pa) rememberPayeeCategory(prompt.pa, categoryId, cat?.name)
         const result = await handleDetectedUpiPayment(
-          { amount: prompt.amount, pa: prompt.pa, payeeName: prompt.pn, source: prompt.source || 'manual' },
+          {
+            amount: prompt.amount,
+            pa: prompt.pa,
+            payeeName: prompt.pn,
+            source: prompt.source || 'manual',
+            categoryId,
+            description: prompt.description || null,
+          },
           { accounts, categories },
         )
+        await closePendingAfterUpiLog({
+          amount: prompt.amount,
+          pa: prompt.pa,
+          payeeName: prompt.pn,
+          source: prompt.source || 'manual',
+        }, result)
         // If auto-picked Other somehow, force update to chosen category
         if (result?.transactionId && String(result.categoryName || '').toLowerCase() === 'other'
             && cat && String(cat.name).toLowerCase() !== 'other') {
@@ -132,6 +165,7 @@ export default function PaymentCategoryPrompt() {
             pn: prompt.pn,
             categoryId,
             categories,
+            txnDate: prompt.txnDate,
           })
         }
       }

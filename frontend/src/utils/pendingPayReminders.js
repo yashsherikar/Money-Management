@@ -157,10 +157,11 @@ export function startPendingPayReminderWatcher() {
   const onChange = () => {
     checkPendingPayRemindersDue()
   }
-  window.addEventListener('mm-pending-p2p-changed', onChange)
-  document.addEventListener('visibilitychange', () => {
+  const onVis = () => {
     if (document.visibilityState === 'visible') checkPendingPayRemindersDue()
-  })
+  }
+  window.addEventListener('mm-pending-p2p-changed', onChange)
+  document.addEventListener('visibilitychange', onVis)
 
   // Channel + tap routing: notificationBootstrap.bootstrapNotifications()
 
@@ -168,5 +169,6 @@ export function startPendingPayReminderWatcher() {
     if (reminderTimer) clearInterval(reminderTimer)
     reminderTimer = null
     window.removeEventListener('mm-pending-p2p-changed', onChange)
+    document.removeEventListener('visibilitychange', onVis)
   }
 }

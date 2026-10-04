@@ -167,6 +167,7 @@ export function enqueueSmsMoneyReview({
   suggestedCategoryId = null,
   suggestedToAccountId = null,
   pendingSelfTransferId = null,
+  matchedDues = null,
   reason = 'needs_confirm',
   date = Date.now(),
 }) {
@@ -223,6 +224,7 @@ export function enqueueSmsMoneyReview({
     suggestedCategoryId,
     suggestedToAccountId,
     pendingSelfTransferId,
+    matchedDues: Array.isArray(matchedDues) ? matchedDues.slice(0, 6) : null,
     suggestedDescription,
     reason,
     date: Number(date) || Date.now(),
@@ -268,7 +270,8 @@ export function dismissSmsMoneyReviewsForSms({ body = '', address = '', amount =
       || addr.includes(String(x.address || '').toLowerCase().slice(0, 8))
     const sameKey = x.dedupeKey && amt != null
       && x.dedupeKey.startsWith(`${Number(amt).toFixed(2)}|DEBIT|`)
-    if (sameAmt && (sameBody || sameKey || (sameAddr && sameAmt))) {
+    // Require body or dedupe overlap — never dismiss another same-₹ debit by sender alone
+    if (sameAmt && (sameBody || sameKey)) {
       all[i] = { ...x, status: 'dismissed', updatedAt: Date.now(), dismissReason: 'pay_now_sms' }
       changed = true
     }

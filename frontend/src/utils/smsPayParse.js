@@ -86,7 +86,7 @@ export function namesLookSame(a, b) {
  * Amount-only match is allowed only when this is the unique waiting pay of that amount
  * (avoids confirming the wrong QR pay when another same-₹ debit arrives).
  */
-export function smsMatchesPending(parsed, pending, { allWaiting = null } = {}) {
+export function smsMatchesPending(parsed, pending, { allWaiting = null, requireIdentity = false } = {}) {
   if (!parsed || !pending) return false
   if (pending.status !== 'waiting_sms' && pending.status !== 'pending') return false
 
@@ -116,6 +116,9 @@ export function smsMatchesPending(parsed, pending, { allWaiting = null } = {}) {
   if (pending.kind === 'payment_request' || pending.kind === 'split_bill') {
     if (smsName && pendingName && !namesLookSame(smsName, pendingName)) return false
   }
+
+  // Failures / strict paths: never amount-only
+  if (requireIdentity) return false
 
   // Amount + time only — only if unique waiting pay with this amount
   const peers = (allWaiting || []).filter((p) =>
@@ -174,9 +177,11 @@ function scorePending(parsed, pending) {
 }
 
 /** Among matching pendings, pick best (VPA → name → closest time). */
-export function pickBestPendingMatch(parsed, pendings) {
+export function pickBestPendingMatch(parsed, pendings, { requireIdentity = false } = {}) {
   const waiting = pendings || []
-  const candidates = waiting.filter((p) => smsMatchesPending(parsed, p, { allWaiting: waiting }))
+  const candidates = waiting.filter((p) =>
+    smsMatchesPending(parsed, p, { allWaiting: waiting, requireIdentity }),
+  )
   if (!candidates.length) return null
   candidates.sort((a, b) => scorePending(parsed, b) - scorePending(parsed, a))
   return candidates[0]

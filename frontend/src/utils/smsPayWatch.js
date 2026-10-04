@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { parseBankPaymentSms, parseUpiPaymentFailedSms, pickBestPendingMatch } from './smsPayParse.js'
+import { parseBankPaymentSms, parseUpiPaymentFailedSms, pickBestPendingMatch, namesLookSame } from './smsPayParse.js'
 import {
   waitingP2pPays,
   markPendingP2pConfirmed,
@@ -106,7 +106,8 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
     })
     if (failed) {
       const waiting = waitingP2pPays()
-      const match = pickBestPendingMatch(failed, waiting)
+      // Failures need VPA/name — never amount-only (wrong pending would stop waiting)
+      const match = pickBestPendingMatch(failed, waiting, { requireIdentity: true })
       if (match) {
         markPendingP2pFailed(match.id, { smsRaw: failed.raw, reason: 'payment_failed' })
         return { payFailed: true, pendingId: match.id }
@@ -167,7 +168,7 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
       }
     }
 
-    // Pending already confirmed (app reopen / re-drain) — still suppress forgot-expense
+    // Pending already confirmed (app reopen / re-drain) — suppress only with identity match
     const confirmed = listPendingP2pPays().find((p) => {
       if (p.status !== 'confirmed') return false
       if (Math.abs(Number(p.amount) - Number(parsed.amount)) > 0.011) return false
@@ -176,7 +177,13 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
       const smsDate = Number(msg?.date || parsed.date) || Date.now()
       if (smsDate < created - 2 * 60_000) return false
       if (smsDate > confirmedAt + 24 * 60 * 60_000) return false
-      return true
+      const smsPa = String(parsed.pa || '').toLowerCase()
+      const pendingPa = String(p.pa || '').toLowerCase()
+      if (pendingPa && smsPa && pendingPa === smsPa) return true
+      if (namesLookSame(parsed.payeeName, p.pn || p.name)) return true
+      // Already logged this pay — suppress nameless bank SMS after manual/notify confirm
+      if (p.transactionLogged && !parsed.payeeName && !smsPa) return true
+      return false
     })
     if (confirmed) {
       rememberProcessed(key)
@@ -200,10 +207,6 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
 
 async function confirmPendingFromSms(msg, parsed, match, key, { accounts, categories } = {}) {
   rememberProcessed(key)
-  markPendingP2pConfirmed(match.id, {
-    smsRaw: parsed.raw,
-    source: 'sms',
-  })
 
   // Do not show "forgot expense / pick category" for this same bank SMS
   markSmsConsumedByPayConfirm({
@@ -213,44 +216,64 @@ async function confirmPendingFromSms(msg, parsed, match, key, { accounts, catego
     date: msg?.date || parsed.date || Date.now(),
   })
 
-  const forLog = {
-    amount: match.amount,
-    pa: match.pa || parsed.pa,
-    payeeName: match.pn || parsed.payeeName,
-    source: 'sms',
-    personal: match.personal,
-    kind: match.personal === false ? 'merchant' : 'p2p',
-    forceLog: true,
-  }
-
   let logResult = { logged: false }
-  try {
-    let accs = accounts
-    let cats = categories
-    if (!accs?.length || !cats?.length) {
-      const [a, c] = await Promise.all([
-        client.get('/accounts').catch(() => ({ data: [] })),
-        client.get('/categories').catch(() => ({ data: [] })),
-      ])
-      accs = a.data || []
-      cats = c.data || []
+
+  // Already logged via notify / "Did you pay?" — mark confirmed, never double-POST
+  if (match.transactionLogged) {
+    markPendingP2pConfirmed(match.id, {
+      smsRaw: parsed.raw,
+      source: 'sms',
+      transactionLogged: true,
+      transactionId: match.transactionId || null,
+    })
+    logResult = { logged: true, duplicate: true, transactionId: match.transactionId }
+  } else {
+    markPendingP2pConfirmed(match.id, {
+      smsRaw: parsed.raw,
+      source: 'sms',
+    })
+
+    const forLog = {
+      amount: match.amount,
+      pa: match.pa || parsed.pa,
+      payeeName: match.pn || parsed.payeeName,
+      source: 'sms',
+      personal: match.personal,
+      kind: match.personal === false ? 'merchant' : 'p2p',
+      forceLog: true,
+      categoryId: match.categoryId || null,
+      description: match.description || null,
     }
-    logResult = await handleDetectedUpiPayment(forLog, {
-      accounts: accs,
-      categories: cats,
-    })
-    updatePendingP2pPay(match.id, {
-      transactionLogged: !!logResult?.logged,
-      transactionId: logResult?.transactionId || null,
-      logError: logResult?.logged
-        ? null
-        : (logResult?.error || (logResult?.needsAccount ? 'needs_account' : 'log_failed')),
-    })
-  } catch (err) {
-    updatePendingP2pPay(match.id, {
-      transactionLogged: false,
-      logError: err?.response?.data?.message || err?.message || 'log_failed',
-    })
+
+    try {
+      let accs = accounts
+      let cats = categories
+      if (!accs?.length || !cats?.length) {
+        const [a, c] = await Promise.all([
+          client.get('/accounts').catch(() => ({ data: [] })),
+          client.get('/categories').catch(() => ({ data: [] })),
+        ])
+        accs = a.data || []
+        cats = c.data || []
+      }
+      logResult = await handleDetectedUpiPayment(forLog, {
+        accounts: accs,
+        categories: cats,
+      })
+      const ok = !!logResult?.logged || !!logResult?.duplicate
+      updatePendingP2pPay(match.id, {
+        transactionLogged: ok,
+        transactionId: logResult?.transactionId || match.transactionId || null,
+        logError: ok
+          ? null
+          : (logResult?.error || (logResult?.needsAccount ? 'needs_account' : 'log_failed')),
+      })
+    } catch (err) {
+      updatePendingP2pPay(match.id, {
+        transactionLogged: false,
+        logError: err?.response?.data?.message || err?.message || 'log_failed',
+      })
+    }
   }
 
   // Payment request / split: auto mark sent + drop "Did you pay?"

@@ -3,6 +3,15 @@
  * is unavailable (older backend / not redeployed yet).
  */
 import { formatTxnDisplay } from './txnDisplay.js'
+import { isTransferDescription } from './smsBankParse.js'
+
+/** Normalize API peakSpendMonth "YYYY-MM" → "Mar 26" */
+export function formatPeakSpendMonth(ym) {
+  if (!ym) return null
+  const s = String(ym).trim()
+  if (/^\d{4}-\d{2}$/.test(s)) return monthLabel(s)
+  return s
+}
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -86,6 +95,7 @@ export function buildHistoryInsights(transactions, monthsRequested = 12) {
   for (const t of inRange) {
     const d = parseTxnDate(t)
     if (!d) continue
+    if (isTransferDescription(t.description)) continue
     const ym = yearMonth(d)
     const bucket = monthlyMap.get(ym)
     const amt = Number(t.amount) || 0
@@ -152,7 +162,7 @@ export function buildHistoryInsights(transactions, monthsRequested = 12) {
     totalIncome,
     totalExpense,
     totalSavings: totalIncome - totalExpense,
-    peakSpendMonth,
+    peakSpendMonth: peakSpendMonth ? monthLabel(peakSpendMonth) : null,
     peakSpendAmount,
     topMerchant: topMerchants[0]?.name || null,
     topMerchantAmount: topMerchants[0]?.amount || 0,

@@ -201,11 +201,12 @@ function isCashbackCredit({ lower = '', merchant = '', text = '' } = {}) {
       && /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text)) {
     return true
   }
+  // ONE97 corporate credits that look like wallet rewards (small amounts only — not P2P)
   const from = `${merchant} ${text}`.toLowerCase()
-  // Corporate / wallet senders that credit small UPI amounts as cashback
-  if (/\bone97\b|\bpaytm\b|\bphonepe\b|\bgoogle pay\b|\bgpay\b|\bamazon\s*pay\b|\bmobikwik\b|\bfreecharge\b/i.test(from)
-      && (/\bupi\b/i.test(lower) || /\bcredited\b|\breceived\b/i.test(lower))) {
-    return true
+  if (/\bone97\b/i.test(from) && (/\bupi\b/i.test(lower) || /\bcredited\b|\breceived\b/i.test(lower))) {
+    const m = text.match(/(?:₹|rs\.?\s*|inr\s*)\s*(\d[\d,]*(?:\.\d{1,2})?)/i)
+    const amt = m ? Number(String(m[1]).replace(/,/g, '')) : null
+    if (amt != null && amt > 0 && amt <= 50) return true
   }
   return false
 }
