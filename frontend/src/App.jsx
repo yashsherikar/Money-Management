@@ -36,6 +36,7 @@ import PendingPays from './pages/PendingPays.jsx'
 import History from './pages/History.jsx'
 import PaymentCategoryPrompt from './components/PaymentCategoryPrompt.jsx'
 import SmsMoneyReviewPrompt from './components/SmsMoneyReviewPrompt.jsx'
+import SmsBackgroundAsk from './components/SmsBackgroundAsk.jsx'
 
 function Protected({ children }) {
   return (
@@ -114,6 +115,7 @@ export default function App() {
     <PendingPayConfirm />
     <PaymentCategoryPrompt />
     <SmsMoneyReviewPrompt />
+    <SmsBackgroundAsk />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />

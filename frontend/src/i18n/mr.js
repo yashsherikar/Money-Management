@@ -610,6 +610,22 @@ export const mr = {
   'Turn off Battery Saver for Money Manager (set Battery → Unrestricted). Otherwise Android may not deliver bank SMS when the app is killed.':
     'Money Manager साठी Battery Saver बंद करा (Battery → Unrestricted). नाहीतर अॅप बंद असताना बँक SMS येणार नाही.',
   'Allow background': 'बॅकग्राउंड परवानगी द्या',
+  'Allow background for bank SMS?': 'बँक SMS साठी बॅकग्राउंड परवानगी द्या?',
+  'So Money Manager can read new debit/credit SMS even when the app is closed or killed, Android must set Battery to Unrestricted. Without this, Battery Saver often blocks SMS.':
+    'अॅप बंद किंवा बंद केलेले असतानाही नवीन डेबिट/क्रेडिट SMS वाचण्यासाठी Battery → Unrestricted हवे. नाहीतर Battery Saver SMS थांबवते.',
+  'Live bank SMS only — past inbox is never imported':
+    'फक्त लाइव्ह बँक SMS — जुना inbox कधीही आणत नाही',
+  'Works for new and existing users who have not allowed this yet':
+    'नवीन आणि जुन्या वापरकर्त्यांसाठी — अजून परवानगी नसल्यास',
+  'You can also turn this on later in Settings → Bank SMS':
+    'नंतर Settings → Bank SMS मध्येही चालू करू शकता',
+  'SMS permission is also needed — Allow will request it first':
+    'SMS परवानगीही हवी — Allow आधी ती मागेल',
+  'Status: SMS on, background still restricted':
+    'स्थिती: SMS चालू, बॅकग्राउंड अजून मर्यादित',
+  'Status: SMS permission off': 'स्थिती: SMS परवानगी बंद',
+  Allow: 'परवानगी द्या',
+  'Opening…': 'उघडत आहे…',
   'Autostart / OEM settings': 'Autostart / फोन सेटिंग्ज',
   'Battery settings': 'बॅटरी सेटिंग्ज',
   'Pending pays': 'प्रलंबित पे',
