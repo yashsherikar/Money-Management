@@ -506,6 +506,8 @@ export const mr = {
     'जेवण टिप: Dining Out = पूर्ण जेवण · Snacks = बर्गर, चहा, चाट · Groceries = घरचे साहित्य',
   'Food tip: Dining Out = lunch/dinner · Snacks = burger, chai · Groceries = home. Alone or with partner? Put that in Description.':
     'जेवण टिप: Dining Out = लंच/डिनर · Snacks = बर्गर, चहा · Groceries = घरचे. एकटे किंवा पार्टनरसोबत? Description मध्ये लिहा.',
+  'Food tip: Snacks = coffee, drinks, breakfast, burger, chai · Dining Out = lunch/dinner/restaurant · Groceries = home cooking.':
+    'जेवण टिप: Snacks = कॉफी, ड्रिंक्स, नाश्ता, बर्गर, चहा · Dining Out = लंच/डिनर/रेस्टॉरंट · Groceries = घरचे साहित्य.',
   '+ New category': '+ नवीन श्रेणी',
   'Could not add category': 'श्रेणी जोडता आली नाही',
   Account: 'खाते',

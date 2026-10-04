@@ -9,6 +9,7 @@ import ModalPortal from '../utils/ModalPortal.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 import { detectMerchantBrand } from '../utils/subscriptionBrands.jsx'
+import { suggestFoodCategoryName } from '../utils/foodCategory.js'
 import { scanUpiQrNative, cancelUpiQrScan } from '../utils/scanUpiQr.js'
 import {
   parseUpiQr,
@@ -188,11 +189,7 @@ export default function ScanPay() {
 
     let nextCat = categoryId
     if (!nextCat && brand && !hintPersonal) {
-      const grocery = /zepto|blinkit|instamart|bigbasket|dmart|grocery/i.test(`${brand.id} ${brand.name}`)
-      const food = /dining|restaurant|food|cafe|burger|pizza|kfc|mcdonald|swiggy|zomato|zepto/i.test(
-        `${brand.id} ${brand.name}`,
-      )
-      const want = grocery ? 'Groceries' : food ? 'Dining Out' : null
+      const want = suggestFoodCategoryName(`${brand.id} ${brand.name}`)
       if (want) {
         const hit = cats.find((c) => String(c.name).toLowerCase() === want.toLowerCase())
         if (hit) nextCat = String(hit.id)

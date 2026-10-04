@@ -534,6 +534,189 @@ export function LogoBhim({ size = 40, className }) {
   return <LogoText bg="#FF6F00" title="BHIM" text="BHIM" size={size} fontSize={6.5} className={className} />
 }
 
+export function LogoChaayos({ size = 40, className }) {
+  return <LogoText bg="#6B2D5B" title="Chaayos" text="Chai" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoChaiPoint({ size = 40, className }) {
+  return <LogoText bg="#C45C26" title="Chai Point" text="CP" size={size} fontSize={9} className={className} />
+}
+
+export function LogoBlueTokai({ size = 40, className }) {
+  return <LogoText bg="#1B4F72" title="Blue Tokai" text="BT" size={size} fontSize={9} className={className} />
+}
+
+export function LogoThirdWave({ size = 40, className }) {
+  return <LogoText bg="#2C1810" title="Third Wave" text="TW" size={size} fontSize={9} className={className} />
+}
+
+export function LogoCosta({ size = 40, className }) {
+  return <LogoText bg="#6D1F2C" title="Costa Coffee" text="Costa" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoBarista({ size = 40, className }) {
+  return <LogoText bg="#5C3317" title="Barista" text="Bar" size={size} fontSize={8} className={className} />
+}
+
+export function LogoSaravana({ size = 40, className }) {
+  return <LogoText bg="#E85D04" title="Saravana Bhavan" text="SB" size={size} fontSize={9} className={className} />
+}
+
+export function LogoSagarRatna({ size = 40, className }) {
+  return <LogoText bg="#0B6E4F" title="Sagar Ratna" text="SR" size={size} fontSize={9} className={className} />
+}
+
+export function LogoChineseWok({ size = 40, className }) {
+  return <LogoText bg="#C41E3A" title="Chinese Wok" text="CW" size={size} fontSize={9} className={className} />
+}
+
+export function LogoMainlandChina({ size = 40, className }) {
+  return <LogoText bg="#8B0000" title="Mainland China" text="MC" size={size} fontSize={9} className={className} />
+}
+
+/** Generic drink / food marks when merchant name is the food itself */
+export function LogoCoffee({ size = 40, className }) {
+  return (
+    <Wrap bg="#6F4E37" size={size} pad={0.14} className={className} title="Coffee">
+      <path fill="#fff" d="M7 8h8.5c.8 0 1.5.7 1.5 1.5v.5h.8c1.2 0 2.2 1 2.2 2.2S19 14.4 17.8 14.4H17v.3c0 2.4-2 4.3-4.5 4.3H9.5C7 19 5 17.1 5 14.7V9.5C5 8.7 5.7 8 6.5 8H7zm10 4.4h.8c.5 0 .9-.4.9-.9s-.4-.9-.9-.9H17v1.8z" />
+      <path fill="none" stroke="#D7CCC8" strokeWidth="1.1" strokeLinecap="round" d="M9.5 5.2c.4-1 1.2-1.5 1.8-1.5M12.2 5c.5-1.1 1.4-1.6 2.1-1.5" />
+    </Wrap>
+  )
+}
+
+export function LogoTea({ size = 40, className }) {
+  return (
+    <Wrap bg="#2E7D32" size={size} pad={0.14} className={className} title="Tea / Chai">
+      <path fill="#fff" d="M6.5 9h9c.8 0 1.5.7 1.5 1.5v4.2c0 2.3-1.9 4.2-4.2 4.2H9.2C6.9 18.9 5 17 5 14.7v-4.2C5 9.7 5.7 9 6.5 9zm11 2.2h1c1.1 0 2 .9 2 2s-.9 2-2 2h-1v-4z" />
+      <path fill="none" stroke="#A5D6A7" strokeWidth="1.2" strokeLinecap="round" d="M9 5.5c.5-1.2 1.4-1.8 2.2-1.8M12.5 5.2c.6-1.3 1.6-1.9 2.4-1.7" />
+      <ellipse cx="11.2" cy="13.2" rx="3.2" ry="1.1" fill="#81C784" opacity="0.85" />
+    </Wrap>
+  )
+}
+
+export function LogoLimbuPani({ size = 40, className }) {
+  return (
+    <Wrap bg="#F4D03F" size={size} pad={0.12} className={className} title="Limbu Pani">
+      <path fill="#F9A825" d="M8 7.5h8v1.2c0 .4-.3.7-.7.7H8.7c-.4 0-.7-.3-.7-.7V7.5z" />
+      <path fill="#FFF8E1" d="M8.2 9.2h7.6v8.2c0 1.4-1.2 2.5-2.6 2.5h-2.4c-1.4 0-2.6-1.1-2.6-2.5V9.2z" />
+      <path fill="#C6FF00" d="M9 11.5h6v4.5c0 .8-.7 1.4-1.5 1.4h-3c-.8 0-1.5-.6-1.5-1.4v-4.5z" opacity="0.9" />
+      <circle cx="16.8" cy="6.8" r="2.4" fill="#FFEB3B" stroke="#F9A825" strokeWidth="0.8" />
+      <path fill="#F9A825" d="M16.8 4.2v1.2M15.2 5.5l.9.7M18.4 5.5l-.9.7" stroke="#F9A825" strokeWidth="0.7" />
+    </Wrap>
+  )
+}
+
+export function LogoJuice({ size = 40, className }) {
+  return (
+    <Wrap bg="#FF8C00" size={size} pad={0.14} className={className} title="Juice">
+      <path fill="#fff" d="M9 5.5h6l.8 2.2H8.2L9 5.5z" />
+      <path fill="#FFE0B2" d="M8.5 8h7v10.2c0 1.2-1 2.2-2.2 2.2h-2.6c-1.2 0-2.2-1-2.2-2.2V8z" />
+      <path fill="#FF6D00" d="M9.2 11h5.6v5.8c0 .7-.6 1.3-1.3 1.3h-3c-.7 0-1.3-.6-1.3-1.3V11z" />
+      <circle cx="12" cy="7.2" r="0.7" fill="#FFCC80" />
+    </Wrap>
+  )
+}
+
+export function LogoSoftDrink({ size = 40, className }) {
+  return (
+    <Wrap bg="#E53935" size={size} pad={0.14} className={className} title="Soft Drink">
+      <path fill="#fff" d="M9.2 4.5h5.6l.6 1.8H8.6l.6-1.8z" />
+      <path fill="#FFCDD2" d="M8.8 6.5h6.4v12.2c0 1-.8 1.8-1.8 1.8h-2.8c-1 0-1.8-.8-1.8-1.8V6.5z" />
+      <path fill="#fff" d="M10 9.5c1.2 1.6 2.8 1.6 4 0 1.2 1.6 2 3.2 0 5.2-1.5-1.4-2.5-1.4-4 0-1.8-2-.8-3.6 0-5.2z" opacity="0.95" />
+    </Wrap>
+  )
+}
+
+export function LogoDosa({ size = 40, className }) {
+  return (
+    <Wrap bg="#E8A838" size={size} pad={0.12} className={className} title="Dosa">
+      <ellipse cx="12" cy="13" rx="9" ry="6.5" fill="#FFF3E0" />
+      <ellipse cx="12" cy="12.2" rx="7.5" ry="5" fill="#FFCC80" />
+      <path fill="#FFA726" d="M5.5 12.5c2-3.5 5-5.2 8.5-5.2 2.2 0 4.2.7 5.8 1.8-1.8 1-4.2 1.6-6.8 1.6-2.8 0-5.4-.7-7.5-1.8z" opacity="0.85" />
+      <ellipse cx="11" cy="13.5" rx="2.2" ry="1.4" fill="#8D6E63" />
+    </Wrap>
+  )
+}
+
+export function LogoChinese({ size = 40, className }) {
+  return (
+    <Wrap bg="#C62828" size={size} pad={0.12} className={className} title="Chinese">
+      <ellipse cx="12" cy="16.5" rx="8" ry="2.2" fill="#B71C1C" />
+      <path fill="#FFECB3" d="M5.5 15.5c0-4.5 2.9-8.5 6.5-8.5s6.5 4 6.5 8.5H5.5z" />
+      <path fill="none" stroke="#5D4037" strokeWidth="1.1" strokeLinecap="round" d="M8 10.5c1.2 1.5 2.5 2.2 4 2.2s2.8-.7 4-2.2M7.5 13c1.4 1.2 2.8 1.8 4.5 1.8s3.1-.6 4.5-1.8" />
+      <path fill="#FFECB3" d="M16.5 6.5l4-3.2.6.8-4 3.2zM18.2 8.2l3.8-1.2.4.9-3.8 1.2z" />
+    </Wrap>
+  )
+}
+
+export function LogoPaniPuri({ size = 40, className }) {
+  return (
+    <Wrap bg="#FF6F00" size={size} pad={0.14} className={className} title="Pani Puri">
+      <circle cx="12" cy="13" r="7.5" fill="#FFE0B2" />
+      <circle cx="12" cy="12.2" r="5.8" fill="#FFB74D" />
+      <ellipse cx="12" cy="10.5" rx="3.2" ry="1.6" fill="#8D6E63" />
+      <circle cx="12" cy="9.2" r="1.4" fill="#FFF8E1" />
+      <path fill="#4CAF50" d="M10.5 14.5h3l-.5 2.5h-2z" opacity="0.8" />
+    </Wrap>
+  )
+}
+
+export function LogoBiryani({ size = 40, className }) {
+  return (
+    <Wrap bg="#8B4513" size={size} pad={0.12} className={className} title="Biryani">
+      <ellipse cx="12" cy="16.8" rx="8.5" ry="2.4" fill="#5D4037" />
+      <path fill="#FFCC80" d="M5 15.5c0-4.8 3.1-9 7-9s7 4.2 7 9H5z" />
+      <path fill="#E65100" d="M7 12.5c1.5.8 3.2 1.2 5 1.2s3.5-.4 5-1.2c-.5 1.8-2.4 3.2-5 3.2s-4.5-1.4-5-3.2z" opacity="0.85" />
+      <ellipse cx="12" cy="6.8" rx="3.5" ry="1.2" fill="#6D4C41" />
+      <rect x="10.8" y="4.2" width="2.4" height="2.8" rx="0.6" fill="#6D4C41" />
+    </Wrap>
+  )
+}
+
+export function LogoPizzaFood({ size = 40, className }) {
+  return (
+    <Wrap bg="#D32F2F" size={size} pad={0.12} className={className} title="Pizza">
+      <path fill="#FFCC80" d="M12 4.5L20.5 19H3.5L12 4.5z" />
+      <path fill="#E53935" d="M12 7.2L17.8 17.2H6.2L12 7.2z" />
+      <circle cx="10.5" cy="12.5" r="1.1" fill="#FFEB3B" />
+      <circle cx="13.5" cy="14.2" r="1" fill="#FFEB3B" />
+      <circle cx="12" cy="11" r="0.9" fill="#8BC34A" />
+    </Wrap>
+  )
+}
+
+export function LogoBurgerFood({ size = 40, className }) {
+  return (
+    <Wrap bg="#F57C00" size={size} pad={0.12} className={className} title="Burger">
+      <ellipse cx="12" cy="8" rx="8" ry="3" fill="#FFCC80" />
+      <rect x="4.5" y="10" width="15" height="2" rx="0.5" fill="#8BC34A" />
+      <rect x="4.5" y="12.2" width="15" height="2.4" rx="0.6" fill="#6D4C41" />
+      <ellipse cx="12" cy="16.5" rx="8" ry="2.8" fill="#FFCC80" />
+    </Wrap>
+  )
+}
+
+export function LogoIceCream({ size = 40, className }) {
+  return (
+    <Wrap bg="#EC407A" size={size} pad={0.14} className={className} title="Ice Cream">
+      <circle cx="12" cy="9" r="5.5" fill="#F8BBD0" />
+      <circle cx="9.5" cy="8.2" r="2.2" fill="#fff" opacity="0.85" />
+      <circle cx="14.2" cy="8.5" r="2" fill="#F48FB1" />
+      <path fill="#FFCC80" d="M9.2 13.5h5.6L13.2 21h-2.4L9.2 13.5z" />
+    </Wrap>
+  )
+}
+
+export function LogoSamosa({ size = 40, className }) {
+  return (
+    <Wrap bg="#D4A017" size={size} pad={0.14} className={className} title="Samosa">
+      <path fill="#FFE082" d="M4.5 18.5L12 4.5l7.5 14H4.5z" />
+      <path fill="#FFB300" d="M7.2 17L12 8.2 16.8 17H7.2z" />
+      <path fill="#8D6E63" d="M10.5 14.5h3l-1.5 2.5z" opacity="0.7" />
+    </Wrap>
+  )
+}
+
 export function LogoLetter({ brand, size = 40, className }) {
   const darkText = ['blinkit', 'ola', 'subway', 'rapido', 'dunzo'].includes(brand?.id)
   return (
@@ -584,6 +767,29 @@ export const BRAND_LOGO_COMPONENTS = {
   tacobell: LogoTacoBell,
   faasos: LogoFaasos,
   behrouz: LogoBehrouz,
+  chaayos: LogoChaayos,
+  chaipoint: LogoChaiPoint,
+  bluetokai: LogoBlueTokai,
+  thirdwave: LogoThirdWave,
+  costa: LogoCosta,
+  barista: LogoBarista,
+  saravana: LogoSaravana,
+  sagarratna: LogoSagarRatna,
+  chinesewok: LogoChineseWok,
+  mainlandchina: LogoMainlandChina,
+  limbupani: LogoLimbuPani,
+  coffee: LogoCoffee,
+  tea: LogoTea,
+  juice: LogoJuice,
+  softdrink: LogoSoftDrink,
+  dosa: LogoDosa,
+  chinese: LogoChinese,
+  panipuri: LogoPaniPuri,
+  biryani: LogoBiryani,
+  pizzafood: LogoPizzaFood,
+  burgerfood: LogoBurgerFood,
+  icecream: LogoIceCream,
+  samosa: LogoSamosa,
   zomato: LogoZomato,
   swiggy: LogoSwiggy,
   instamart: LogoInstamart,

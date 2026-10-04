@@ -24,6 +24,7 @@ import { findDueMatches, pickConfidentDueMatch } from './matchDueSms.js'
 import { confirmDuePaid } from './confirmDuePaid.js'
 import { namesLookSame } from './smsPayParse.js'
 import { localDateYmd } from './localDate.js'
+import { suggestFoodCategoryName } from './foodCategory.js'
 
 const HISTORY_KEY = 'mm_autopay_history'
 const SEEN_KEY = 'mm_autopay_seen'
@@ -247,6 +248,15 @@ function resolveCategory(categories, parsed) {
     // Cashback / refund / interest may only have Other — still auto-save
     if (!isOther || autoOtherKinds.has(parsed.kind)) {
       return { id: hit.id, confident: true, name: hit.name }
+    }
+  }
+
+  // Coffee / drinks / breakfast / snacks / dining from merchant + SMS text
+  if (parsed.direction === 'DEBIT') {
+    const foodWant = suggestFoodCategoryName(`${parsed.merchant || ''} ${parsed.raw || ''}`)
+    if (foodWant) {
+      const foodHit = categories.find((c) => String(c.name).toLowerCase() === foodWant.toLowerCase())
+      if (foodHit) return { id: foodHit.id, confident: true, name: foodHit.name }
     }
   }
 
