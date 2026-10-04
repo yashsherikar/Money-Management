@@ -2,7 +2,8 @@
 const MCC_TO_CATEGORY = {
   '5411': 'Groceries', '5422': 'Groceries', '5441': 'Groceries', '5451': 'Groceries',
   '5462': 'Groceries', '5499': 'Groceries',
-  '5812': 'Dining Out', '5813': 'Dining Out', '5814': 'Dining Out',
+  // 5812 restaurants → Dining Out; 5814 fast food / QSR → Snacks; 5813 bars → Dining Out
+  '5812': 'Dining Out', '5813': 'Dining Out', '5814': 'Snacks',
   '4111': 'Transport', '4121': 'Transport', '4131': 'Transport', '4789': 'Transport',
   '5541': 'Transport', '5542': 'Transport', '7523': 'Transport',
   '5122': 'Healthcare', '5912': 'Healthcare', '8011': 'Healthcare', '8021': 'Healthcare',

@@ -29,6 +29,7 @@ import { useNavigate } from 'react-router-dom'
 import { suppressResumeLock, savePendingUpiConfirm } from '../appLock.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 import { detectMerchantBrand } from '../utils/subscriptionBrands.jsx'
+import { suggestFoodCategoryName } from '../utils/foodCategory.js'
 
 /** Payment apps. GPay hidden for P2P (unreliable); PhonePe / Paytm / BHIM work. */
 const APPS = [
@@ -182,13 +183,10 @@ export default function Pay() {
         personal: isP2p,
       })
     }
-    // Brand → sensible default when MCC unknown
+    // Brand → sensible default when MCC unknown (coffee/drinks/breakfast → Snacks)
     if (!nextCat && brand && !isP2p) {
-      const food = /dining|restaurant|food|cafe|coffee|burger|pizza|kfc|mcdonald|zepto|swiggy|zomato|blinkit|instamart/i.test(
-        `${brand.id} ${brand.name} ${(brand.keywords || []).join(' ')}`,
-      )
-      const grocery = /grocery|zepto|blinkit|instamart|bigbasket|dmart/i.test(`${brand.id} ${brand.name}`)
-      const want = grocery ? 'Groceries' : food ? 'Dining Out' : null
+      const brandText = `${brand.id} ${brand.name} ${(brand.keywords || []).join(' ')}`
+      const want = suggestFoodCategoryName(brandText)
       if (want) {
         const hit = categories.find((c) => String(c.name).toLowerCase() === want.toLowerCase())
         if (hit) nextCat = String(hit.id)
@@ -592,7 +590,7 @@ export default function Pay() {
             {t('Category')} <span className="text-red-500">*</span>
           </label>
           <p className="text-xs text-slate-500 mb-1.5">
-            {t('Food tip: Dining Out = lunch/dinner · Snacks = burger, chai · Groceries = home. Alone or with partner? Put that in Description.')}
+            {t('Food tip: Snacks = coffee, drinks, breakfast, burger, chai · Dining Out = lunch/dinner/restaurant · Groceries = home cooking.')}
           </p>
           {addingCategory ? (
             <div className="flex gap-2">
