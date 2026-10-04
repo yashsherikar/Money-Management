@@ -96,8 +96,6 @@ export async function checkSmsPermission() {
   }
 }
 
-const BATTERY_PROMPT_KEY = 'mm_sms_battery_prompted_v1'
-
 export async function getSmsBatteryStatus() {
   if (!isSmsPaySupported()) {
     return { ignoringOptimizations: true, batteryOptimized: false, manufacturer: '', brand: '' }
@@ -142,21 +140,13 @@ export async function openSmsAutostartSettings() {
 }
 
 /**
- * After SMS is granted: if Battery Saver still restricts the app, prompt once
- * so RECEIVE_SMS works when the process is killed.
+ * Open system Unrestricted / battery dialog (used by Settings + SmsBackgroundAsk).
+ * Soft "Allow / Ask me later" UI lives in SmsBackgroundAsk — do not auto-fire this.
  */
 export async function ensureSmsBackgroundAllowed({ force = false } = {}) {
   if (!isSmsPaySupported()) return { ok: true }
   const status = await getSmsBatteryStatus()
-  if (status.ignoringOptimizations) return { ok: true, ...status }
-  if (!force) {
-    try {
-      if (localStorage.getItem(BATTERY_PROMPT_KEY) === '1') return { ok: false, skipped: true, ...status }
-    } catch { /* ignore */ }
-  }
-  try {
-    localStorage.setItem(BATTERY_PROMPT_KEY, '1')
-  } catch { /* ignore */ }
+  if (status.ignoringOptimizations && !force) return { ok: true, ...status }
   const ret = await requestIgnoreBatteryOptimizations()
   return { ok: !!ret?.ignoringOptimizations, prompted: true, ...status, ...ret }
 }
@@ -173,8 +163,10 @@ export async function requestSmsPermission() {
       await SmsReader.startWatch({ sinceMs: getSmsListenFrom() }).catch(() => {})
       // Only live SMS queued while granting (not inbox history)
       drainLiveSmsQueue().catch(() => {})
-      // Battery Saver / Doze often blocks SMS when app is killed — ask Unrestricted
-      ensureSmsBackgroundAllowed().catch(() => {})
+      // Background Unrestricted is asked via SmsBackgroundAsk (Allow / Ask me later)
+      try {
+        window.dispatchEvent(new CustomEvent('mm-sms-permission-changed'))
+      } catch { /* ignore */ }
     }
     return { ...ret, granted }
   } catch {
