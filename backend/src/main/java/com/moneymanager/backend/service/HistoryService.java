@@ -128,14 +128,16 @@ public class HistoryService {
             displayNames.putIfAbsent(name.toLowerCase(Locale.ROOT), name);
         }
 
+        // Must be effectively final for the stream lambda below
+        final BigDecimal expenseTotalForPct = totalExpense;
         List<MerchantSpend> topMerchants = merchantTotals.entrySet().stream()
                 .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
                 .limit(10)
                 .map(e -> {
                     BigDecimal amount = e.getValue();
-                    BigDecimal pct = totalExpense.compareTo(BigDecimal.ZERO) == 0
+                    BigDecimal pct = expenseTotalForPct.compareTo(BigDecimal.ZERO) == 0
                             ? BigDecimal.ZERO
-                            : amount.multiply(BigDecimal.valueOf(100)).divide(totalExpense, 1, RoundingMode.HALF_UP);
+                            : amount.multiply(BigDecimal.valueOf(100)).divide(expenseTotalForPct, 1, RoundingMode.HALF_UP);
                     return new MerchantSpend(
                             displayNames.getOrDefault(e.getKey(), e.getKey()),
                             amount,
