@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import client, { networkErrorMessage } from '../api/client'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import { buildHistoryInsights } from '../utils/historyInsights.js'
 
 const RANGES = [
   { id: 3, label: '3M' },
@@ -59,19 +60,38 @@ export default function History() {
     let cancelled = false
     setLoading(true)
     setError('')
-    client.get('/history/insights', { params: { months } })
-      .then((res) => {
+
+    async function load() {
+      try {
+        const res = await client.get('/history/insights', { params: { months } })
         if (!cancelled) setData(res.data)
-      })
-      .catch((err) => {
+        return
+      } catch (err) {
+        const status = err?.response?.status
+        // Older Render deploy may not have /history/insights yet → build from txns
+        if (status === 404 || status === 405 || status === 501) {
+          try {
+            const tx = await client.get('/transactions')
+            if (!cancelled) setData(buildHistoryInsights(tx.data || [], months))
+            return
+          } catch (fallbackErr) {
+            if (!cancelled) {
+              setData(null)
+              setError(networkErrorMessage(fallbackErr, t('Could not load history')))
+            }
+            return
+          }
+        }
         if (!cancelled) {
           setData(null)
           setError(networkErrorMessage(err, t('Could not load history')))
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      }
+    }
+
+    load().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
     return () => { cancelled = true }
   }, [months, reloadTick, t])
 

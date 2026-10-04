@@ -8,6 +8,7 @@ import { syncUnloggedConfirmedPays } from './utils/paymentNotify.js'
 import { syncAllSubscriptionReminders } from './utils/subscriptionReminders.js'
 import { syncAllEmergencyFundReminders } from './utils/emergencyFundReminders.js'
 import client from './api/client'
+import { startBackendWakeWatcher } from './utils/wakeBackend.js'
 import BiometricGate from './components/BiometricGate.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
@@ -49,6 +50,9 @@ export default function App() {
   useEffect(() => {
     listenForNotificationTaps(navigate)
   }, [navigate])
+
+  // Ping Render early (and again after long background) so login/API aren't the cold wake
+  useEffect(() => startBackendWakeWatcher(), [])
 
   // Permissions, Android channels, FCM token → backend (cold start with saved session)
   useEffect(() => {

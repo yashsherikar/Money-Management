@@ -69,14 +69,16 @@ Run backend tests: `cd backend; mvn test`
 - Fill in `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` in the Render dashboard. `JWT_SECRET` is auto-generated. Capacitor Android (`https://localhost`) is allowed in code for CORS.
 - Free tier spins down after 15 min idle; first request after that takes ~30–60s to wake up.
 - **Hybrid keep-alive (recommended):**
-  1. **Morning wake (long timeout)** — GitHub Action `.github/workflows/morning-wake.yml` runs ~07:45 IST, waits up to 120s + retries. (cron-job.org free times out at ~30s, so it is a bad first wake.) Push to GitHub → Actions → enable workflows → “Morning Render wake” → Run workflow once to test.
-  2. **Daytime keep-alive (cron-job.org)** — after the morning wake, ping every 14 minutes so Render never hits the 15‑minute sleep:
+  1. **Scheduled wake (long timeout)** — GitHub Action `.github/workflows/morning-wake.yml` at ~07:45, 13:00, and 20:00 IST; waits up to 120s + retries. (cron-job.org free times out at ~30s, so it is a bad first wake.) Push to GitHub → Actions → enable workflows → “Morning Render wake” → **Run workflow** once to test.
+  2. **Daytime keep-alive (cron-job.org)** — after a successful wake, ping every 14 minutes so Render never hits the 15‑minute sleep:
      - URL: `https://moneymanager-backend-498b.onrender.com/api/ping`
      - Method: `GET`
      - Schedule (Asia/Kolkata): `*/14 8-23 * * *` (every 14 min, 08:00–23:59)
+     - Timeout: longest available (or ≥60s if the plan allows)
      - Expected body: `OK` (2 bytes)
      - Re-enable the job if it was auto-disabled after failures
-  3. Optional instead of GitHub Action for morning: [Pipedream](https://pipedream.com) scheduled HTTP GET to the same `/api/ping` URL with a long timeout; then keep cron-job.org for daytime only.
+  3. **App wake** — the Android app also hits `/api/ping` on open / login / return from background (up to ~90s), so a cold server still comes up even if cron missed.
+  4. Optional instead of GitHub Action: [Pipedream](https://pipedream.com) scheduled HTTP GET to the same `/api/ping` URL with a long timeout; then keep cron-job.org for daytime only.
   - If cron logs say `Failed (output too large)`, the URL is wrong (HTML 404/502 page) — fix to `/api/ping` on the `-498b` host and re-enable.
 
 **3. Android APK (primary client — no Vercel / web app)**

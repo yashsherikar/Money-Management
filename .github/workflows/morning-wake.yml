@@ -5,14 +5,18 @@ name: Morning Render wake
 
 on:
   schedule:
-    # 07:45 Asia/Kolkata = 02:15 UTC (IST is UTC+5:30)
+    # 07:45 Asia/Kolkata = 02:15 UTC (IST is UTC+5:30) — first wake of the day
     - cron: '15 2 * * *'
+    # Midday IST ~13:00 = 07:30 UTC — backup if daytime cron-job.org stopped
+    - cron: '30 7 * * *'
+    # Evening IST ~20:00 = 14:30 UTC
+    - cron: '30 14 * * *'
   workflow_dispatch: # allow manual "Run workflow" from GitHub UI
 
 jobs:
   wake:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - name: Ping /api/ping until awake
         env:
@@ -20,20 +24,21 @@ jobs:
         run: |
           set -e
           echo "Waking: $PING_URL"
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6; do
             echo "Attempt $attempt…"
-            if curl -fsS --max-time 120 --retry 0 -o /tmp/ping-body -w "http=%{http_code} time=%{time_total}s\n" "$PING_URL"; then
-              body="$(cat /tmp/ping-body)"
-              echo "Body: $body"
-              if [ "$body" = "OK" ]; then
-                echo "Wake succeeded."
-                exit 0
-              fi
-              echo "Unexpected body, retrying…"
-            else
-              echo "curl failed (cold start / 502), retrying in 20s…"
+            # -f fails on 502 during boot; we catch and retry
+            code="$(curl -sS --max-time 120 --retry 0 -o /tmp/ping-body -w "%{http_code}" "$PING_URL" || true)"
+            body="$(tr -d '\r\n' </tmp/ping-body 2>/dev/null || true)"
+            echo "http=$code body=$body"
+            if [ "$code" = "200" ] && [ "$body" = "OK" ]; then
+              echo "Wake succeeded."
+              # Second ping — confirms instance stays up after boot
+              sleep 5
+              curl -fsS --max-time 30 "$PING_URL" >/dev/null && echo "Keep-alive OK" || true
+              exit 0
             fi
-            sleep 20
+            echo "Not ready (cold start / 502), retrying in 25s…"
+            sleep 25
           done
           echo "Wake failed after retries."
           exit 1

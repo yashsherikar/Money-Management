@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { EyeIcon, EyeOffIcon } from '../components/icons.jsx'
 import { networkErrorMessage } from '../api/client'
 import { bootstrapNotifications } from '../utils/notificationBootstrap.js'
+import { wakeBackend } from '../utils/wakeBackend.js'
 
 export default function Login() {
   const { user, login } = useAuth()
@@ -28,6 +29,8 @@ export default function Login() {
     }
     setLoading(true)
     try {
+      // Wake Render first — login must not be the cold-start victim
+      await wakeBackend({ force: true })
       await login(trimmed, password)
       bootstrapNotifications({ refreshPush: true }).catch(() => {})
       navigate('/', { replace: true })
@@ -61,6 +64,11 @@ export default function Login() {
       <form onSubmit={handleSubmit} className="auth-card w-full max-w-sm p-7 animate-page-in">
         <h1 className="text-lg font-semibold text-slate-900 mb-5">{t('Log in')}</h1>
         {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2.5 rounded-xl">{error}</div>}
+        {loading && (
+          <div className="mb-4 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl">
+            {t('Waking server if needed — first open can take up to a minute…')}
+          </div>
+        )}
         <label className="block text-sm font-medium text-slate-700 mb-1">{t('Email')}</label>
         <input
           type="email"
