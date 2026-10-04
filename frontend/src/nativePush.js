@@ -144,8 +144,8 @@ async function tryConfirmFromTap(detail) {
 
 /** Call once at app startup (native only) so tapping a notification navigates or logs paid. */
 export function listenForNotificationTaps(navigate) {
-  if (!isNativePlatform()) return
-  window.addEventListener('mm-notification-tap', async (e) => {
+  if (!isNativePlatform()) return () => {}
+  const onTap = async (e) => {
     const detail = e.detail || {}
     try {
       if (detail.paid) {
@@ -160,5 +160,7 @@ export function listenForNotificationTaps(navigate) {
     }
     const url = detail.url?.split('?')[0] || detail.url
     if (url) navigate(url)
-  })
+  }
+  window.addEventListener('mm-notification-tap', onTap)
+  return () => window.removeEventListener('mm-notification-tap', onTap)
 }

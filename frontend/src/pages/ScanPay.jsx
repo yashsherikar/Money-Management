@@ -140,12 +140,11 @@ export default function ScanPay() {
   // with the app chrome still hidden (barcode-scanner-active).
   useEffect(() => {
     if (!scanning) return undefined
-    let handle = null
-    CapApp.addListener('backButton', () => {
+    const sub = CapApp.addListener('backButton', () => {
       handleCancelScan()
-    }).then((h) => { handle = h })
+    })
     return () => {
-      handle?.remove()
+      Promise.resolve(sub).then((h) => h?.remove?.()).catch(() => {})
     }
   }, [scanning])
 

@@ -62,6 +62,8 @@ export function addPendingP2pPay({
   requestId = null,
   participantId = null,
   notificationId = null,
+  categoryId = null,
+  description = null,
 } = {}) {
   if (!isLoggedIn()) return null
   const now = Date.now()
@@ -76,6 +78,8 @@ export function addPendingP2pPay({
     requestId: requestId || null,
     participantId: participantId || null,
     notificationId: notificationId || null,
+    categoryId: categoryId != null ? String(categoryId) : null,
+    description: description ? String(description).trim().slice(0, 220) : null,
     status: 'waiting_sms',
     createdAt: now,
     updatedAt: now,

@@ -156,6 +156,8 @@ export default function PendingPays() {
           personal: item.personal,
           kind: item.personal === false ? 'merchant' : 'p2p',
           forceLog: true,
+          categoryId: item.categoryId || null,
+          description: item.description || null,
         },
       )
       updatePendingP2pPay(item.id, {
@@ -192,6 +194,8 @@ export default function PendingPays() {
         personal: item.personal,
         kind: item.personal === false ? 'merchant' : 'p2p',
         forceLog: true,
+        categoryId: item.categoryId || null,
+        description: item.description || null,
       })
       updatePendingP2pPay(item.id, {
         transactionLogged: !!logResult?.logged,

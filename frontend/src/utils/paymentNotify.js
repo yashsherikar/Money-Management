@@ -7,6 +7,7 @@ import {
   rememberPayeeCategory,
 } from './savedPayees.js'
 import client from '../api/client'
+import { localDateYmd } from './localDate.js'
 
 const PaymentNotify = registerPlugin('PaymentNotify')
 
@@ -41,8 +42,7 @@ export async function getLastPaymentNotifyRaw() {
 export function listenForUpiPaymentNotifications(onPayment) {
   if (!isPaymentNotifySupported()) return () => {}
 
-  let handle = null
-  PaymentNotify.addListener('upiPaymentNotify', async (event) => {
+  const sub = PaymentNotify.addListener('upiPaymentNotify', async (event) => {
     const parsed = parseUpiPaymentNotification(event)
       || parseUpiPaymentNotification({
         title: event?.title,
@@ -53,14 +53,81 @@ export function listenForUpiPaymentNotifications(onPayment) {
 
     const lastPa = sessionStorage.getItem('mm_last_pay_pa') || ''
     const lastPn = sessionStorage.getItem('mm_last_pay_pn') || ''
+    const lastCat = sessionStorage.getItem('mm_last_pay_cat') || ''
+    const lastDesc = sessionStorage.getItem('mm_last_pay_desc') || ''
     if (!parsed.pa && lastPa) parsed.pa = lastPa
     if (!parsed.payeeName && lastPn) parsed.payeeName = lastPn
+    if (!parsed.categoryId && lastCat) parsed.categoryId = lastCat
+    if (!parsed.description && lastDesc) parsed.description = lastDesc
+
+    // Merge category/description from waiting pending pay if still open
+    try {
+      const { waitingP2pPays } = await import('./pendingP2pPays.js')
+      const { pickBestPendingMatch } = await import('./smsPayParse.js')
+      const match = pickBestPendingMatch({
+        amount: parsed.amount,
+        pa: parsed.pa,
+        payeeName: parsed.payeeName,
+        date: Date.now(),
+      }, waitingP2pPays())
+      if (match) {
+        if (!parsed.categoryId && match.categoryId) parsed.categoryId = match.categoryId
+        if (!parsed.description && match.description) parsed.description = match.description
+        if (!parsed.pa && match.pa) parsed.pa = match.pa
+        if (!parsed.payeeName && match.pn) parsed.payeeName = match.pn
+        parsed._pendingId = match.id
+      }
+    } catch { /* ignore */ }
 
     onPayment?.(parsed)
-  }).then((h) => { handle = h })
+  })
 
   return () => {
-    handle?.remove?.()
+    Promise.resolve(sub).then((h) => h?.remove?.()).catch(() => {})
+  }
+}
+
+/** After notify/manual log — close matching waiting pending so SMS won't double-post. */
+export async function closePendingAfterUpiLog(parsed, logResult) {
+  try {
+    const {
+      waitingP2pPays,
+      markPendingP2pConfirmed,
+      updatePendingP2pPay,
+      getPendingP2pPay,
+    } = await import('./pendingP2pPays.js')
+    const { pickBestPendingMatch } = await import('./smsPayParse.js')
+
+    let match = null
+    if (parsed?._pendingId) {
+      match = getPendingP2pPay(parsed._pendingId)
+      if (match && match.status !== 'waiting_sms' && match.status !== 'pending') match = null
+    }
+    if (!match) {
+      match = pickBestPendingMatch({
+        amount: parsed?.amount,
+        pa: parsed?.pa,
+        payeeName: parsed?.payeeName || parsed?.pn,
+        date: Date.now(),
+      }, waitingP2pPays())
+    }
+    if (!match) return null
+
+    markPendingP2pConfirmed(match.id, {
+      source: parsed?.source || 'notify',
+      transactionLogged: !!logResult?.logged,
+      transactionId: logResult?.transactionId || null,
+    })
+    if (logResult?.logged) {
+      updatePendingP2pPay(match.id, {
+        transactionLogged: true,
+        transactionId: logResult.transactionId || null,
+        logError: null,
+      })
+    }
+    return match
+  } catch {
+    return null
   }
 }
 
@@ -119,7 +186,8 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
   }
 
   const dedupeKey = `${pa}|${amount.toFixed(2)}|${Math.floor(Date.now() / 180_000)}`
-  if (recentKeys.has(dedupeKey) && !parsed.forceLog) {
+  // Always honor in-session dedupe — forceLog must not create double expenses
+  if (recentKeys.has(dedupeKey)) {
     return { logged: false, duplicate: true }
   }
 
@@ -151,7 +219,14 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
   let category = null
   let usedFallback = true
 
-  if (known?.categoryId && cats?.some((c) => String(c.id) === String(known.categoryId))) {
+  // Pre-selected on QR/Pay screen (or pending pay) — never ask again after pay
+  const rawPreCatId = parsed.categoryId != null ? String(parsed.categoryId) : ''
+  const validPreCat = !!(rawPreCatId && cats?.some((c) => String(c.id) === rawPreCatId))
+  if (validPreCat) {
+    category = cats.find((c) => String(c.id) === rawPreCatId)
+    usedFallback = false
+    if (pa) rememberPayeeCategory(pa, category.id, category.name)
+  } else if (known?.categoryId && cats?.some((c) => String(c.id) === String(known.categoryId))) {
     category = cats.find((c) => String(c.id) === String(known.categoryId))
     usedFallback = false
   } else {
@@ -172,7 +247,14 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
     }
   }
 
-  const description = buildDescription({ pn, pa, source, kind })
+  const note = String(parsed.description || '').trim()
+  const description = note
+    ? [
+      note,
+      pn && !note.toLowerCase().includes(String(pn).toLowerCase()) ? pn : null,
+      source === 'sms' ? 'UPI SMS' : (kind === 'merchant' ? 'UPI Merchant' : null),
+    ].filter(Boolean).join(' · ').slice(0, 220)
+    : buildDescription({ pn, pa, source, kind })
   try {
     const res = await client.post('/transactions', {
       accountId: Number(primary.id),
@@ -180,7 +262,7 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
       type: 'EXPENSE',
       amount,
       description,
-      txnDate: new Date().toISOString().slice(0, 10),
+      txnDate: localDateYmd(),
     })
     const transactionId = res?.data?.id ?? res?.data?.transactionId ?? null
     recentKeys.add(dedupeKey)
@@ -188,7 +270,8 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
 
     window.dispatchEvent(new Event('mm-transactions-changed'))
 
-    if (usedFallback && category?.id) {
+    // Skip post-pay category prompt only when a valid Pay-screen category was used
+    if (usedFallback && category?.id && !validPreCat) {
       savePendingCategoryPrompt({
         pa,
         pn,
@@ -199,6 +282,7 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
         source,
         kind,
         refineOnly: true,
+        txnDate: localDateYmd(),
       })
       return {
         logged: true,
@@ -222,9 +306,12 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
 }
 
 /** Update category on an already-logged transaction (after refine prompt). */
-export async function updateLoggedUpiCategory({ transactionId, accountId, amount, description, pa, pn, categoryId, categories }) {
+export async function updateLoggedUpiCategory({
+  transactionId, accountId, amount, description, pa, pn, categoryId, categories, txnDate,
+} = {}) {
   const cat = categories?.find((c) => String(c.id) === String(categoryId))
   if (!cat) throw new Error('Category missing')
+  const date = txnDate || localDateYmd()
 
   if (transactionId) {
     await client.put(`/transactions/${transactionId}`, {
@@ -233,7 +320,7 @@ export async function updateLoggedUpiCategory({ transactionId, accountId, amount
       type: 'EXPENSE',
       amount: Number(amount),
       description: description || buildDescription({ pn, pa, source: 'upi' }),
-      txnDate: new Date().toISOString().slice(0, 10),
+      txnDate: date,
     })
   } else {
     await client.post('/transactions', {
@@ -242,7 +329,7 @@ export async function updateLoggedUpiCategory({ transactionId, accountId, amount
       type: 'EXPENSE',
       amount: Number(amount),
       description: description || buildDescription({ pn, pa, source: 'upi' }),
-      txnDate: new Date().toISOString().slice(0, 10),
+      txnDate: date,
     })
   }
   if (pa) rememberPayeeCategory(pa, categoryId, cat.name)
@@ -250,12 +337,14 @@ export async function updateLoggedUpiCategory({ transactionId, accountId, amount
   return { categoryName: cat.name }
 }
 
-export function rememberLastPayAttempt({ pa, pn, amount }) {
+export function rememberLastPayAttempt({ pa, pn, amount, categoryId = null, description = null } = {}) {
   try {
     sessionStorage.setItem('mm_last_pay_pa', String(pa || ''))
     sessionStorage.setItem('mm_last_pay_pn', String(pn || ''))
     sessionStorage.setItem('mm_last_pay_am', String(amount || ''))
     sessionStorage.setItem('mm_last_pay_at', String(Date.now()))
+    sessionStorage.setItem('mm_last_pay_cat', categoryId != null ? String(categoryId) : '')
+    sessionStorage.setItem('mm_last_pay_desc', description ? String(description).slice(0, 220) : '')
   } catch { /* ignore */ }
 }
 
@@ -289,15 +378,20 @@ export async function syncUnloggedConfirmedPays() {
         source: item.source || 'sms',
         kind: item.personal === false ? 'merchant' : 'p2p',
         forceLog: true,
+        categoryId: item.categoryId || null,
+        description: item.description || null,
+        personal: item.personal,
       },
       { accounts, categories },
     )
+    // duplicate ⇒ already logged this session — treat as success so we don't retry forever
+    const ok = !!logResult?.logged || !!logResult?.duplicate
     updatePendingP2pPay(item.id, {
-      transactionLogged: !!logResult?.logged,
+      transactionLogged: ok,
       transactionId: logResult?.transactionId || item.transactionId || null,
-      logError: logResult?.logged
+      logError: ok
         ? null
-        : (logResult?.error || (logResult?.duplicate ? 'duplicate' : 'log_failed')),
+        : (logResult?.error || 'log_failed'),
     })
     results.push({ id: item.id, ...logResult })
   }

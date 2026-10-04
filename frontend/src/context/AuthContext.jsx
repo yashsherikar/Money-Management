@@ -32,6 +32,9 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', data.token)
     localStorage.setItem('user', JSON.stringify({ id: data.userId, email: data.email, name: data.name }))
     setUser({ id: data.userId, email: data.email, name: data.name })
+    try {
+      window.dispatchEvent(new Event('mm-auth-login'))
+    } catch { /* ignore */ }
   }
 
   async function login(email, password) {

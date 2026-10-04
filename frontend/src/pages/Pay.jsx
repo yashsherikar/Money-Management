@@ -18,7 +18,7 @@ import {
   buildUpiPayLink,
   savePayQrToGallery,
 } from '../utils/upiQr.js'
-import { listSavedPayees, upsertSavedPayee } from '../utils/savedPayees.js'
+import { listSavedPayees, upsertSavedPayee, findPayeeByPa, rememberPayeeCategory } from '../utils/savedPayees.js'
 import { rememberLastPayAttempt } from '../utils/paymentNotify.js'
 import { addPendingP2pPay } from '../utils/pendingP2pPays.js'
 import { requestSmsPermission, isSmsPaySupported, checkSmsPermission } from '../utils/smsPayWatch.js'
@@ -125,6 +125,8 @@ export default function Pay() {
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [defaultAccountId, setDefaultAccountId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [note, setNote] = useState('')
 
   useEffect(() => {
     setPayees(listSavedPayees())
@@ -154,14 +156,17 @@ export default function Pay() {
     setName(parsed.pn || '')
     setMc(parsed.mc || '')
     setTn(parsed.tn || '')
+    setNote(parsed.tn || '')
     const isP2p = parsed.personal ?? isPersonalUpi(parsed.mc)
     setPersonal(isP2p)
     if (parsed.am) setAmount(formatUpiAmount(parsed.am))
+    const known = findPayeeByPa(parsed.pa)
+    if (known?.categoryId) setCategoryId(String(known.categoryId))
     setScanned(true)
     setHint(
       isP2p
-        ? t('Personal QR scanned. Apps below copy UPI ID (enter amount in the app), or save QR to gallery with amount.')
-        : t('Merchant QR scanned. Apps below open with name + amount filled.'),
+        ? t('Personal QR scanned. Fill category, then pay — we won’t ask again after.')
+        : t('Merchant QR scanned. Fill category + amount, then pay — no category prompt after.'),
     )
   }
 
@@ -170,6 +175,8 @@ export default function Pay() {
     setName(p.pn || '')
     setMc('')
     setTn('')
+    setNote('')
+    setCategoryId(p.categoryId ? String(p.categoryId) : '')
     setPersonal(true)
     setScanned(false)
     setError('')
@@ -243,24 +250,40 @@ export default function Pay() {
       setError(amErr)
       return
     }
+    if (!categoryId) {
+      setError(t('Select a category before paying'))
+      return
+    }
     const am = formatUpiAmount(amount)
+    const cat = categories.find((c) => String(c.id) === String(categoryId))
+    const payNote = String(note || tn || '').trim()
     setPaying(appId)
     try {
-      upsertSavedPayee({ pa: cleanPa, pn: name })
+      upsertSavedPayee({ pa: cleanPa, pn: name, categoryId, categoryName: cat?.name })
+      rememberPayeeCategory(cleanPa, categoryId, cat?.name)
       setPayees(listSavedPayees())
-      rememberLastPayAttempt({ pa: cleanPa, pn: name, amount: am })
+      rememberLastPayAttempt({
+        pa: cleanPa,
+        pn: name,
+        amount: am,
+        categoryId,
+        description: payNote || name || cleanPa,
+      })
+
+      const pendingPayload = {
+        pa: cleanPa,
+        pn: name,
+        amount: Number(am),
+        categoryId,
+        description: payNote || name || cleanPa,
+      }
 
       if (personal) {
         // GPay: native opens payee (no amount) — paste is unreliable in GPay.
         // PhonePe/Paytm: copies UPI ID for paste.
         suppressResumeLock(15 * 60_000)
         await copyVpaAndOpenApp({ pa: cleanPa, amount: am, pn: name, app: appId })
-        addPendingP2pPay({
-          pa: cleanPa,
-          pn: name,
-          amount: Number(am),
-          personal: true,
-        })
+        addPendingP2pPay({ ...pendingPayload, personal: true })
         // Ask SMS if needed so late bank SMS can auto-confirm
         if (isSmsPaySupported()) {
           const perm = await checkSmsPermission()
@@ -277,7 +300,7 @@ export default function Pay() {
           pa: cleanPa,
           am,
           pn: name,
-          tn,
+          tn: payNote || tn,
           includeName: true,
           merchant: true,
           mc,
@@ -291,12 +314,7 @@ export default function Pay() {
           app: appId,
         })
         // Same pending + SMS → Transactions path as P2P
-        addPendingP2pPay({
-          pa: cleanPa,
-          pn: name,
-          amount: Number(am),
-          personal: false,
-        })
+        addPendingP2pPay({ ...pendingPayload, personal: false })
         if (isSmsPaySupported()) {
           const perm = await checkSmsPermission()
           if (!perm?.granted) await requestSmsPermission().catch(() => {})
@@ -492,11 +510,39 @@ export default function Pay() {
             className="w-full px-3 py-2 border border-slate-300 rounded-md"
           />
         </div>
-        {(mc || tn) && (
-          <div className="text-xs text-slate-500 space-y-0.5">
-            {mc ? <div>MCC {mc}</div> : null}
-            {tn ? <div>{t('Note')}: {tn}</div> : null}
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            {t('Category')} <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-md"
+          >
+            <option value="">{t('Select category…')}</option>
+            {[...categories]
+              .sort((a, b) => {
+                if (a.name === 'Other') return 1
+                if (b.name === 'Other') return -1
+                return a.name.localeCompare(b.name)
+              })
+              .map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('Description')}</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t('e.g. Lunch, grocery, rent')}
+            className="w-full px-3 py-2 border border-slate-300 rounded-md"
+          />
+        </div>
+        {mc && (
+          <div className="text-xs text-slate-500">MCC {mc}</div>
         )}
       </div>
 

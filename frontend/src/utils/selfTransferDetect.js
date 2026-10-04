@@ -15,11 +15,10 @@ import {
   listPendingSelfTransfers,
 } from './pendingSelfTransfers.js'
 import { enqueueSmsMoneyReview } from './smsMoneyReview.js'
+import { localDateYmd } from './localDate.js'
 
 function txnDateFromSms(parsed) {
-  const d = parsed?.date ? new Date(parsed.date) : new Date()
-  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10)
-  return d.toISOString().slice(0, 10)
+  return localDateYmd(parsed?.date || Date.now())
 }
 
 function pickTransferCategory(categories) {
@@ -288,9 +287,7 @@ export async function confirmSelfTransferFromReview(item, {
     throw new Error('Pick both source and destination accounts')
   }
   const cat = pickTransferCategory(categories)
-  const txnDate = item?.date
-    ? new Date(item.date).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10)
+  const txnDate = localDateYmd(item?.date || Date.now())
 
   const posted = await postSelfTransferPair({
     fromAccount,

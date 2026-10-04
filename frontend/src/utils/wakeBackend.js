@@ -10,6 +10,46 @@ function pingUrl() {
 
 let inFlight = null
 let lastOkAt = 0
+let waking = false
+let wakeStartedAt = 0
+let wakeAttempt = 0
+const wakeListeners = new Set()
+
+function notifyWake() {
+  wakeListeners.forEach((fn) => {
+    try { fn() } catch { /* ignore */ }
+  })
+}
+
+function setWaking(next, attempt = 0) {
+  waking = next
+  if (next) {
+    if (!wakeStartedAt) wakeStartedAt = Date.now()
+    wakeAttempt = attempt
+  } else {
+    wakeStartedAt = 0
+    wakeAttempt = 0
+  }
+  notifyWake()
+}
+
+export function subscribeWake(listener) {
+  wakeListeners.add(listener)
+  return () => wakeListeners.delete(listener)
+}
+
+export function getWakeSnapshot() {
+  return waking
+}
+
+export function getWakeMeta() {
+  return {
+    waking,
+    startedAt: wakeStartedAt,
+    attempt: wakeAttempt,
+    lastOkAt,
+  }
+}
 
 /** @returns {Promise<boolean>} true if /ping returned OK */
 export function wakeBackend({ force = false } = {}) {
@@ -20,9 +60,12 @@ export function wakeBackend({ force = false } = {}) {
   }
   if (inFlight) return inFlight
 
+  setWaking(true, 1)
+
   inFlight = (async () => {
     const url = pingUrl()
     for (let attempt = 1; attempt <= 4; attempt += 1) {
+      setWaking(true, attempt)
       const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null
       const timer = ctrl ? setTimeout(() => ctrl.abort(), 90_000) : null
       try {
@@ -46,6 +89,7 @@ export function wakeBackend({ force = false } = {}) {
     return false
   })().finally(() => {
     inFlight = null
+    setWaking(false)
   })
 
   return inFlight

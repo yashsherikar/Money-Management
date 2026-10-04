@@ -10,8 +10,10 @@ import {
   listActiveSmsMoneyReviews,
 } from '../utils/smsMoneyReview.js'
 import { confirmSelfTransferFromReview } from '../utils/selfTransferDetect.js'
+import { confirmDuePaid } from '../utils/confirmDuePaid.js'
 import { detectMerchantBrand, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import { localDateYmd } from '../utils/localDate.js'
 
 function money(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -43,6 +45,7 @@ export default function SmsMoneyReviewPrompt() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [pendingCount, setPendingCount] = useState(0)
+  const [useOtherCategory, setUseOtherCategory] = useState(false)
 
   function showNext() {
     const next = peekNextSmsMoneyReview()
@@ -61,7 +64,23 @@ export default function SmsMoneyReviewPrompt() {
       desc = next.merchant || ''
     }
     setDescription(desc)
+    setUseOtherCategory(!(next.matchedDues && next.matchedDues.length))
     setError('')
+  }
+
+  async function confirmMatch(match) {
+    if (!item || !match || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await confirmDuePaid(match.relatedType, match.relatedId)
+      markSmsMoneyReviewSaved(item.id, null)
+      showNext()
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || t('Save failed'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -79,14 +98,16 @@ export default function SmsMoneyReviewPrompt() {
     if (!localStorage.getItem('token')) return undefined
     showNext()
     const onChange = () => showNext()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') onChange()
+    }
     window.addEventListener('mm-sms-money-review-changed', onChange)
     window.addEventListener('focus', onChange)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') onChange()
-    })
+    document.addEventListener('visibilitychange', onVis)
     return () => {
       window.removeEventListener('mm-sms-money-review-changed', onChange)
       window.removeEventListener('focus', onChange)
+      document.removeEventListener('visibilitychange', onVis)
     }
   }, [])
 
@@ -156,7 +177,7 @@ export default function SmsMoneyReviewPrompt() {
         type,
         amount: Number(item.amount),
         description: desc,
-        txnDate: new Date(item.date || Date.now()).toISOString().slice(0, 10),
+        txnDate: localDateYmd(item.date || Date.now()),
       })
       markSmsMoneyReviewSaved(item.id, data?.id)
       window.dispatchEvent(new Event('mm-transactions-changed'))
@@ -325,64 +346,121 @@ export default function SmsMoneyReviewPrompt() {
           </>
         ) : (
           <>
-            <p className="text-sm text-slate-600 mb-3">
-              {isCredit
-                ? t('Add category and description to save this credit, or mark Scam to ignore this sender.')
-                : t('You forgot to add this. Pick category and description, or mark Scam to block this sender.')}
-            </p>
+            {item.matchedDues?.length > 0 && !useOtherCategory ? (
+              <>
+                <p className="text-sm text-slate-600 mb-3">
+                  {t('This amount matches something in your app. Pick what you paid, or choose Another expense.')}
+                </p>
+                <div className="space-y-2 mb-3">
+                  {item.matchedDues.map((m) => (
+                    <button
+                      key={`${m.relatedType}-${m.relatedId}`}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => confirmMatch(m)}
+                      className="w-full text-left rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-3 hover:bg-brand-500/15 disabled:opacity-60"
+                    >
+                      <div className="text-xs font-bold uppercase tracking-wide text-brand-soft">
+                        {m.kind === 'emi' ? t('EMI')
+                          : m.kind === 'emergency_fund' ? t('Emergency fund')
+                            : t('Recurring')}
+                      </div>
+                      <div className="font-semibold text-slate-100 mt-0.5">{m.label}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{money(m.amount)}</div>
+                    </button>
+                  ))}
+                </div>
+                {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setUseOtherCategory(true)}
+                  className="w-full rounded-md py-3 font-semibold border border-slate-300 text-slate-700 bg-slate-50 mb-2"
+                >
+                  {t('Another expense…')}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={markScam}
+                  className="w-full rounded-md py-2.5 text-sm font-semibold text-red-700"
+                >
+                  {t('Scam')}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600 mb-3">
+                  {isCredit
+                    ? t('Add category and description to save this credit, or mark Scam to ignore this sender.')
+                    : t('You forgot to add this. Pick category and description, or mark Scam to block this sender.')}
+                </p>
 
-            <label className="block text-[13px] font-bold text-muted mb-1">
-              {t('Category')} <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full mb-3"
-            >
-              <option value="">{t('Select category…')}</option>
-              {catList.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+                {item.matchedDues?.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setUseOtherCategory(false)}
+                    className="mb-3 text-xs font-semibold text-brand-400"
+                  >
+                    ← {t('Back to matches')}
+                  </button>
+                )}
 
-            <label className="block text-[13px] font-bold text-muted mb-1">
-              {t('Description')} <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full mb-4"
-              placeholder={t('e.g. Uber to office, Zomato dinner')}
-            />
+                <label className="block text-[13px] font-bold text-muted mb-1">
+                  {t('Category')} <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full mb-3"
+                >
+                  <option value="">{t('Select category…')}</option>
+                  {catList.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
 
-            {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
+                <label className="block text-[13px] font-bold text-muted mb-1">
+                  {t('Description')} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full mb-4"
+                  placeholder={t('e.g. Uber to office, Zomato dinner')}
+                />
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={!canAdd}
-                onClick={save}
-                className={`rounded-md py-3 font-semibold ${
-                  canAdd
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                {busy ? t('Saving…') : t('Add')}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={markScam}
-                className="rounded-md py-3 font-semibold border border-red-300 text-red-700 bg-red-50"
-              >
-                {t('Scam')}
-              </button>
-            </div>
-            {!canAdd && (
-              <p className="text-[11px] text-slate-500 mt-2 text-center">
-                {t('Pick category and description to enable Add.')}
-              </p>
+                {error && <div className="text-sm text-red-600 mb-3">{error}</div>}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={!canAdd}
+                    onClick={save}
+                    className={`rounded-md py-3 font-semibold ${
+                      canAdd
+                        ? 'bg-brand-600 text-white'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {busy ? t('Saving…') : t('Add')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={markScam}
+                    className="rounded-md py-3 font-semibold border border-red-300 text-red-700 bg-red-50"
+                  >
+                    {t('Scam')}
+                  </button>
+                </div>
+                {!canAdd && (
+                  <p className="text-[11px] text-slate-500 mt-2 text-center">
+                    {t('Pick category and description to enable Add.')}
+                  </p>
+                )}
+              </>
             )}
           </>
         )}

@@ -8,8 +8,9 @@ import { syncUnloggedConfirmedPays } from './utils/paymentNotify.js'
 import { syncAllSubscriptionReminders } from './utils/subscriptionReminders.js'
 import { syncAllEmergencyFundReminders } from './utils/emergencyFundReminders.js'
 import client from './api/client'
-import { startBackendWakeWatcher } from './utils/wakeBackend.js'
+import { startBackendWakeWatcher, wakeBackend } from './utils/wakeBackend.js'
 import BiometricGate from './components/BiometricGate.jsx'
+import ConnectingScreen from './components/ConnectingScreen.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Layout from './components/Layout.jsx'
 import DueReminders from './components/DueReminders.jsx'
@@ -48,11 +49,15 @@ export default function App() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    listenForNotificationTaps(navigate)
+    const stop = listenForNotificationTaps(navigate)
+    return typeof stop === 'function' ? stop : undefined
   }, [navigate])
 
   // Ping Render early (and again after long background) so login/API aren't the cold wake
-  useEffect(() => startBackendWakeWatcher(), [])
+  useEffect(() => {
+    const stop = startBackendWakeWatcher()
+    return typeof stop === 'function' ? stop : undefined
+  }, [])
 
   // Permissions, Android channels, FCM token → backend (cold start with saved session)
   useEffect(() => {
@@ -70,8 +75,9 @@ export default function App() {
 
   // Retry any Paid (SMS/manual) pays that never reached Transactions + reschedule subscription alerts
   useEffect(() => {
-    const run = () => {
+    const run = async () => {
       if (!localStorage.getItem('token')) return
+      await wakeBackend().catch(() => {})
       syncUnloggedConfirmedPays().catch(() => {})
       client.get('/recurring-transactions')
         .then((res) => syncAllSubscriptionReminders(res.data || []))
@@ -87,11 +93,13 @@ export default function App() {
       if (document.visibilityState === 'visible') run()
     }
     window.addEventListener('mm-p2p-sms-confirmed', onAuth)
+    window.addEventListener('mm-auth-login', onAuth)
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVis)
     const t = setInterval(run, 90_000)
     return () => {
       window.removeEventListener('mm-p2p-sms-confirmed', onAuth)
+      window.removeEventListener('mm-auth-login', onAuth)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVis)
       clearInterval(t)
@@ -100,6 +108,7 @@ export default function App() {
 
   return (
     <BiometricGate>
+    <ConnectingScreen />
     <LoadingBar />
     <DueReminders />
     <PendingPayConfirm />
