@@ -195,18 +195,20 @@ function isCashbackCredit({ lower = '', merchant = '', text = '' } = {}) {
   if (/\bcash\s*back\b|\bcashback\b|\breward\s+point|\breward\s+credit\b|\bcashback\s+credited\b|\bscratch\s*card\b|\bscratchcard\b/i.test(lower)) {
     return true
   }
-  // "won Rs.5" + wallet brand (scratch reward) without the word cashback
-  if (/\b(?:won|win)\b/i.test(lower)
-      && /\b(?:paytm|one97|phonepe|gpay|google\s*pay|amazon\s*pay)\b/i.test(lower)
+  // "won Rs.5" / "earned Rs.75" + wallet/UPI brand without the word cashback
+  if (/\b(?:won|win|earned|earn)\b/i.test(lower)
+      && /\b(?:paytm|one97|phonepe|gpay|google\s*pay|amazon\s*pay|bhim|npci)\b/i.test(lower)
       && /(?:₹|rs\.?\s*|inr\s*)\d/i.test(text)) {
     return true
   }
-  // ONE97 corporate credits that look like wallet rewards (small amounts only — not P2P)
+  // Wallet / BHIM corporate credits that look like rewards (not large P2P)
   const from = `${merchant} ${text}`.toLowerCase()
-  if (/\bone97\b/i.test(from) && (/\bupi\b/i.test(lower) || /\bcredited\b|\breceived\b/i.test(lower))) {
+  if (/\b(?:one97|bhim|npci)\b/i.test(from)
+      && (/\bupi\b/i.test(lower) || /\bcredited\b|\breceived\b|\breward\b/i.test(lower))) {
     const m = text.match(/(?:₹|rs\.?\s*|inr\s*)\s*(\d[\d,]*(?:\.\d{1,2})?)/i)
     const amt = m ? Number(String(m[1]).replace(/,/g, '')) : null
-    if (amt != null && amt > 0 && amt <= 50) return true
+    // BHIM/Paytm cashback often ₹1–₹100; keep under typical P2P transfers
+    if (amt != null && amt > 0 && amt <= 200) return true
   }
   return false
 }

@@ -29,14 +29,25 @@ export const SUBSCRIPTION_BRANDS = [
   { id: 'dominos', name: "Domino's", color: '#006491', letter: 'D', keywords: ["domino's", 'dominos', 'domino'] },
   { id: 'pizzahut', name: 'Pizza Hut', color: '#EE3A24', letter: 'PH', keywords: ['pizza hut', 'pizzahut'] },
   { id: 'subway', name: 'Subway', color: '#008C15', letter: 'SUB', keywords: ['subway'] },
+  { id: 'tacobell', name: 'Taco Bell', color: '#702082', letter: 'TB', keywords: ['taco bell', 'tacobell'] },
+  { id: 'haldiram', name: "Haldiram's", color: '#C8102E', letter: 'H', keywords: ['haldiram', "haldiram's"] },
+  { id: 'ccd', name: 'Cafe Coffee Day', color: '#4B2C20', letter: 'CCD', keywords: ['cafe coffee day', 'coffee day', '\\bccd\\b'] },
+  { id: 'wowmomo', name: 'Wow! Momo', color: '#E31E24', letter: 'W', keywords: ['wow momo', 'wow! momo', 'wowmomo'] },
+  { id: 'baskin', name: 'Baskin Robbins', color: '#D71921', letter: '31', keywords: ['baskin', 'baskin robbins'] },
+  { id: 'faasos', name: 'Faasos', color: '#FF6B00', letter: 'F', keywords: ['faasos'] },
+  { id: 'behrouz', name: 'Behrouz', color: '#7A1F1F', letter: 'B', keywords: ['behrouz'] },
 
   // Food / quick commerce
   { id: 'zomato', name: 'Zomato', color: '#E23744', letter: 'Z', keywords: ['zomato gold', 'zomato'] },
-  { id: 'swiggy', name: 'Swiggy', color: '#FC8019', letter: 'S', keywords: ['swiggy one', 'swiggy instamart', 'swiggy'] },
+  { id: 'instamart', name: 'Instamart', color: '#FC8019', letter: 'IM', keywords: ['swiggy instamart', 'instamart'] },
+  { id: 'swiggy', name: 'Swiggy', color: '#FC8019', letter: 'S', keywords: ['swiggy one', 'swiggy'] },
   { id: 'blinkit', name: 'Blinkit', color: '#F8C51B', letter: 'B', keywords: ['blinkit', 'grofers'] },
   { id: 'zepto', name: 'Zepto', color: '#FF2E63', letter: 'Z', keywords: ['zepto'] },
   { id: 'bigbasket', name: 'BigBasket', color: '#84C225', letter: 'bb', keywords: ['bigbasket', 'big basket'] },
   { id: 'dunzo', name: 'Dunzo', color: '#00D26A', letter: 'D', keywords: ['dunzo'] },
+  { id: 'dmart', name: 'DMart', color: '#0078C1', letter: 'DM', keywords: ['dmart', 'd-mart', 'avenue supermarts'] },
+  { id: 'reliancefresh', name: 'Reliance Fresh', color: '#E31837', letter: 'RF', keywords: ['reliance fresh', 'reliancefresh'] },
+  { id: 'more', name: 'More', color: '#E30613', letter: 'More', keywords: ['more supermarket', 'more megastore', 'more retail'] },
 
   // Ride / travel
   {
@@ -50,7 +61,10 @@ export const SUBSCRIPTION_BRANDS = [
   { id: 'rapido', name: 'Rapido', color: '#F9A825', letter: 'R', keywords: ['rapido'] },
   { id: 'irctc', name: 'IRCTC', color: '#213D77', letter: 'I', keywords: ['irctc'] },
   { id: 'makemytrip', name: 'MakeMyTrip', color: '#E31837', letter: 'M', keywords: ['makemytrip', 'make my trip'] },
+  { id: 'goibibo', name: 'Goibibo', color: '#FE5B00', letter: 'go', keywords: ['goibibo', 'goi bibo'] },
   { id: 'redbus', name: 'redBus', color: '#D84E55', letter: 'r', keywords: ['redbus', 'red bus'] },
+  { id: 'indigo', name: 'IndiGo', color: '#003366', letter: '6E', keywords: ['indigo', 'goindigo'] },
+  { id: 'airindia', name: 'Air India', color: '#DA0C0C', letter: 'AI', keywords: ['air india', 'airindia'] },
 
   // Shopping / marketplaces
   { id: 'amazon', name: 'Amazon', color: '#232F3E', letter: 'a', keywords: ['amazon.in', 'amzn', 'amazon pay', 'amazon'] },
@@ -60,6 +74,31 @@ export const SUBSCRIPTION_BRANDS = [
   { id: 'meesho', name: 'Meesho', color: '#F43397', letter: 'Me', keywords: ['meesho'] },
   { id: 'jiomart', name: 'JioMart', color: '#0A2885', letter: 'Jm', keywords: ['jiomart', 'jio mart', 'jio-mart'] },
   { id: 'nykaa', name: 'Nykaa', color: '#FC2779', letter: 'Ny', keywords: ['nykaa'] },
+  { id: 'lenskart', name: 'Lenskart', color: '#00BAC6', letter: 'LK', keywords: ['lenskart'] },
+  { id: 'croma', name: 'Croma', color: '#00B1A4', letter: 'Cr', keywords: ['croma'] },
+  { id: 'decathlon', name: 'Decathlon', color: '#0082C3', letter: 'DEC', keywords: ['decathlon'] },
+
+  // Entertainment / lifestyle
+  { id: 'bookmyshow', name: 'BookMyShow', color: '#C4242B', letter: 'BMS', keywords: ['bookmyshow', 'book my show', 'bms'] },
+  { id: 'pvr', name: 'PVR', color: '#1B1B1B', letter: 'PVR', keywords: ['pvr inox', 'pvr cinemas', '\\bpvr\\b'] },
+  { id: 'cultfit', name: 'Cult.fit', color: '#111111', letter: 'cult', keywords: ['cult.fit', 'cultfit', 'curefit'] },
+  { id: 'urbancompany', name: 'Urban Company', color: '#6E3FF3', letter: 'UC', keywords: ['urban company', 'urbanclap'] },
+
+  // Health
+  { id: 'pharmeasy', name: 'PharmEasy', color: '#10847E', letter: 'PE', keywords: ['pharmeasy', 'pharm easy'] },
+  { id: 'onemg', name: '1mg', color: '#FF6F61', letter: '1mg', keywords: ['1mg', 'onemg', 'tata 1mg'] },
+  { id: 'apollo', name: 'Apollo', color: '#0B6E4F', letter: 'A', keywords: ['apollo pharmacy', 'apollo hospital', 'apollopharmacy'] },
+
+  // Investing
+  { id: 'groww', name: 'Groww', color: '#00B386', letter: 'G', keywords: ['groww'] },
+  { id: 'zerodha', name: 'Zerodha', color: '#387ED1', letter: 'K', keywords: ['zerodha', 'kite.zerodha', 'coin.zerodha'] },
+
+  // Banks (SMS sender / UPI)
+  { id: 'hdfc', name: 'HDFC Bank', color: '#004C8F', letter: 'H', keywords: ['hdfc bank', 'hdfcbank', 'hdfc'] },
+  { id: 'sbi', name: 'SBI', color: '#22409A', letter: 'SBI', keywords: ['state bank', 'sbi bank', '\\bsbi\\b', 'yono sbi'] },
+  { id: 'icici', name: 'ICICI Bank', color: '#F58220', letter: 'I', keywords: ['icici bank', 'icicibank', 'icici'] },
+  { id: 'axis', name: 'Axis Bank', color: '#97144D', letter: 'AX', keywords: ['axis bank', 'axisbank', 'axis'] },
+  { id: 'kotak', name: 'Kotak', color: '#ED1C24', letter: 'K', keywords: ['kotak bank', 'kotak mahindra', 'kotak'] },
 
   // Telecom / payments
   { id: 'jio', name: 'Jio', color: '#0A2885', letter: 'J', keywords: ['jio recharge', 'reliance jio', 'jiocinema', 'jio fiber', 'myjio', 'jio'] },
@@ -75,6 +114,7 @@ export const SUBSCRIPTION_BRANDS = [
     // ONE97 = Paytm corporate sender on bank credit SMS
     keywords: ['paytm', 'one97', 'one97 communica', 'paytmbank', 'paytm bank'],
   },
+  { id: 'bhim', name: 'BHIM', color: '#FF6F00', letter: 'BHIM', keywords: ['bhim upi', '\\bbhim\\b'] },
   // CRED app only — NEVER match bank "credit" / "credited" / "CREDIT".
   {
     id: 'cred',

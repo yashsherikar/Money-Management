@@ -17,6 +17,10 @@ import {
   isSmsPaySupported,
   checkSmsPermission,
   requestSmsPermission,
+  getSmsBatteryStatus,
+  requestIgnoreBatteryOptimizations,
+  openSmsAutostartSettings,
+  ensureSmsBackgroundAllowed,
 } from '../utils/smsPayWatch.js'
 import { countWaitingP2pPays } from '../utils/pendingP2pPays.js'
 
@@ -43,6 +47,8 @@ export default function Settings() {
   const [payNotifyOn, setPayNotifyOn] = useState(false)
   const [lastPayRaw, setLastPayRaw] = useState(null)
   const [smsOk, setSmsOk] = useState(false)
+  const [smsBatteryOk, setSmsBatteryOk] = useState(true)
+  const [smsOem, setSmsOem] = useState('')
   const [waitingCount, setWaitingCount] = useState(0)
 
   function load() {
@@ -61,17 +67,22 @@ export default function Settings() {
     load()
     ;(native ? isNativePushEnabled() : isPushEnabled()).then(setPushOn)
     refreshPayNotify()
-    if (isSmsPaySupported()) {
-      checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
+    async function refreshSms() {
+      if (!isSmsPaySupported()) return
+      const p = await checkSmsPermission()
+      setSmsOk(!!p?.granted)
       setWaitingCount(countWaitingP2pPays())
+      if (p?.granted) {
+        const b = await getSmsBatteryStatus()
+        setSmsBatteryOk(!!b?.ignoringOptimizations)
+        setSmsOem([b?.brand, b?.manufacturer].filter(Boolean).join(' / '))
+      }
     }
+    refreshSms()
     const onVis = () => {
       if (document.visibilityState === 'visible') {
         refreshPayNotify()
-        if (isSmsPaySupported()) {
-          checkSmsPermission().then((p) => setSmsOk(!!p?.granted))
-          setWaitingCount(countWaitingP2pPays())
-        }
+        refreshSms()
       }
     }
     document.addEventListener('visibilitychange', onVis)
@@ -255,6 +266,13 @@ export default function Settings() {
                   {smsOk ? t('SMS permission on') : t('SMS permission off')}
                   {waitingCount > 0 ? ` · ${waitingCount} ${t('waiting')}` : ''}
                 </p>
+                {smsOk && (
+                  <p className={`text-xs mt-1 font-medium ${smsBatteryOk ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {smsBatteryOk
+                      ? t('Background: Unrestricted (SMS works when app is killed)')
+                      : t('Background restricted — Battery Saver may block SMS when app is closed')}
+                  </p>
+                )}
               </div>
               <div className="flex flex-col gap-2 shrink-0">
                 {!smsOk ? (
@@ -263,6 +281,10 @@ export default function Settings() {
                     onClick={async () => {
                       const r = await requestSmsPermission()
                       setSmsOk(!!r?.granted)
+                      if (r?.granted) {
+                        const b = await getSmsBatteryStatus()
+                        setSmsBatteryOk(!!b?.ignoringOptimizations)
+                      }
                     }}
                     className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium"
                   >
@@ -279,6 +301,64 @@ export default function Settings() {
                 )}
               </div>
             </div>
+            {smsOk && !smsBatteryOk && (
+              <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                <p className="text-xs text-amber-900">
+                  {t('Turn off Battery Saver for Money Manager (set Battery → Unrestricted). Otherwise Android may not deliver bank SMS when the app is killed.')}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await ensureSmsBackgroundAllowed({ force: true })
+                      const b = await getSmsBatteryStatus()
+                      setSmsBatteryOk(!!b?.ignoringOptimizations)
+                    }}
+                    className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium"
+                  >
+                    {t('Allow background')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await openSmsAutostartSettings()
+                    }}
+                    className="border border-amber-300 bg-white rounded-md px-3 py-1.5 text-sm font-medium text-amber-900"
+                  >
+                    {t('Autostart / OEM settings')}
+                  </button>
+                </div>
+                {smsOem ? (
+                  <p className="text-[11px] text-amber-800/80 mt-2">
+                    {t('Phone')}: {smsOem}
+                  </p>
+                ) : null}
+              </div>
+            )}
+            {smsOk && smsBatteryOk && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await openSmsAutostartSettings()
+                  }}
+                  className="border border-slate-300 rounded-md px-3 py-1.5 text-xs font-medium text-slate-700"
+                >
+                  {t('Autostart / OEM settings')}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await requestIgnoreBatteryOptimizations()
+                    const b = await getSmsBatteryStatus()
+                    setSmsBatteryOk(!!b?.ignoringOptimizations)
+                  }}
+                  className="border border-slate-300 rounded-md px-3 py-1.5 text-xs font-medium text-slate-700"
+                >
+                  {t('Battery settings')}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

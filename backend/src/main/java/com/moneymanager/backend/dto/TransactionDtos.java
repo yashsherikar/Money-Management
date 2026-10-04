@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 
 public class TransactionDtos {
@@ -28,6 +29,8 @@ public class TransactionDtos {
             BigDecimal amount,
             String description,
             LocalDate txnDate,
+            /** When the row was logged — used to order same-day txns by time. */
+            Instant createdAt,
             /** True when this expense can still be opened as a split (≤ 2 days, not already split). */
             boolean canSplit,
             /** Set when this expense is already linked to a split bill. */

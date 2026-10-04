@@ -40,7 +40,7 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public List<TransactionResponse> list(User user, LocalDate from, LocalDate to) {
         List<Transaction> txns = transactionRepository
-                .findByUserIdAndTxnDateBetweenOrderByTxnDateDesc(user.getId(), from, to);
+                .findByUserIdAndTxnDateBetweenOrderByTxnDateDescCreatedAtDesc(user.getId(), from, to);
         Map<Long, Long> splitByTxnId = new HashMap<>();
         if (!txns.isEmpty()) {
             List<Long> ids = txns.stream().map(Transaction::getId).toList();
@@ -145,6 +145,7 @@ public class TransactionService {
                 t.getAmount(),
                 t.getDescription(),
                 t.getTxnDate(),
+                t.getCreatedAt(),
                 canSplit,
                 splitBillId
         );

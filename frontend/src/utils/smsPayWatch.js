@@ -29,6 +29,43 @@ let listenerHandle = null
 let watchTimer = null
 const processedKeys = new Set()
 
+/** Serialize credit/debit/cashback SMS so simultaneous bursts never race. */
+const smsJobQueue = []
+let smsJobsRunning = false
+let drainBusy = false
+let drainAgain = false
+
+async function runSmsJobs() {
+  if (smsJobsRunning) return
+  smsJobsRunning = true
+  try {
+    while (smsJobQueue.length) {
+      const job = smsJobQueue.shift()
+      try {
+        await job()
+      } catch { /* one bad SMS must not block the rest */ }
+    }
+  } finally {
+    smsJobsRunning = false
+    // More jobs may have been pushed while we were finishing
+    if (smsJobQueue.length) runSmsJobs()
+  }
+}
+
+/** Enqueue SMS work (process one message or a drain batch) in order. */
+function enqueueSmsJob(fn) {
+  return new Promise((resolve) => {
+    smsJobQueue.push(async () => {
+      try {
+        resolve(await fn())
+      } catch {
+        resolve(null)
+      }
+    })
+    runSmsJobs()
+  })
+}
+
 function smsKey(msg, parsed) {
   const body = (msg?.body || msg?.text || parsed?.raw || '').slice(0, 120)
   const date = msg?.date || parsed?.date || 0
@@ -59,6 +96,71 @@ export async function checkSmsPermission() {
   }
 }
 
+const BATTERY_PROMPT_KEY = 'mm_sms_battery_prompted_v1'
+
+export async function getSmsBatteryStatus() {
+  if (!isSmsPaySupported()) {
+    return { ignoringOptimizations: true, batteryOptimized: false, manufacturer: '', brand: '' }
+  }
+  try {
+    const ret = await SmsReader.getBatteryStatus()
+    return {
+      ignoringOptimizations: !!ret?.ignoringOptimizations,
+      batteryOptimized: !!ret?.batteryOptimized,
+      manufacturer: ret?.manufacturer || '',
+      brand: ret?.brand || '',
+      ...ret,
+    }
+  } catch {
+    return { ignoringOptimizations: false, batteryOptimized: true, manufacturer: '', brand: '' }
+  }
+}
+
+/** System dialog → Unrestricted / ignore battery optimizations (needed when app is killed). */
+export async function requestIgnoreBatteryOptimizations() {
+  if (!isSmsPaySupported()) return { ignoringOptimizations: true, opened: false }
+  try {
+    return await SmsReader.requestIgnoreBatteryOptimizations()
+  } catch {
+    return { ignoringOptimizations: false, opened: false }
+  }
+}
+
+export async function openSmsBatterySettings() {
+  if (!isSmsPaySupported()) return
+  try {
+    await SmsReader.openBatterySettings()
+  } catch { /* ignore */ }
+}
+
+/** OEM Autostart / allow background (Xiaomi, Oppo, Vivo, etc.). */
+export async function openSmsAutostartSettings() {
+  if (!isSmsPaySupported()) return
+  try {
+    await SmsReader.openAutostartSettings()
+  } catch { /* ignore */ }
+}
+
+/**
+ * After SMS is granted: if Battery Saver still restricts the app, prompt once
+ * so RECEIVE_SMS works when the process is killed.
+ */
+export async function ensureSmsBackgroundAllowed({ force = false } = {}) {
+  if (!isSmsPaySupported()) return { ok: true }
+  const status = await getSmsBatteryStatus()
+  if (status.ignoringOptimizations) return { ok: true, ...status }
+  if (!force) {
+    try {
+      if (localStorage.getItem(BATTERY_PROMPT_KEY) === '1') return { ok: false, skipped: true, ...status }
+    } catch { /* ignore */ }
+  }
+  try {
+    localStorage.setItem(BATTERY_PROMPT_KEY, '1')
+  } catch { /* ignore */ }
+  const ret = await requestIgnoreBatteryOptimizations()
+  return { ok: !!ret?.ignoringOptimizations, prompted: true, ...status, ...ret }
+}
+
 export async function requestSmsPermission() {
   if (!isSmsPaySupported()) return { granted: false }
   try {
@@ -70,6 +172,8 @@ export async function requestSmsPermission() {
       await SmsReader.startWatch({ sinceMs: getSmsListenFrom() }).catch(() => {})
       // Only live SMS queued while granting (not inbox history)
       drainLiveSmsQueue().catch(() => {})
+      // Battery Saver / Doze often blocks SMS when app is killed — ask Unrestricted
+      ensureSmsBackgroundAllowed().catch(() => {})
     }
     return { ...ret, granted }
   } catch {
@@ -307,49 +411,65 @@ async function confirmPendingFromSms(msg, parsed, match, key, { accounts, catego
   return { pending: updated, parsed, logResult }
 }
 
-let drainBusy = false
-
 /**
  * Process live SMS that arrived while the app was killed/backgrounded.
  * Uses the native RECEIVE_SMS queue only — never reads SMS inbox history.
+ * If more SMS arrive mid-drain, loops again so none are skipped.
  */
 export async function drainLiveSmsQueue() {
   if (!isSmsPaySupported()) return []
   if (!isLoggedIn()) return []
-  if (drainBusy) return []
+  if (drainBusy) {
+    drainAgain = true
+    return []
+  }
   const perm = await checkSmsPermission()
   if (!perm?.granted) return []
 
-  drainBusy = true
-  const results = []
-  try {
-    const sinceMs = getSmsListenFrom()
-    await SmsReader.startWatch({ sinceMs }).catch(() => {})
-    const { messages } = await SmsReader.drainLiveQueue()
-    const list = Array.isArray(messages) ? messages : []
-    let accounts
-    let categories
-    try {
-      const [a, c] = await Promise.all([
-        client.get('/accounts').catch(() => ({ data: [] })),
-        client.get('/categories').catch(() => ({ data: [] })),
-      ])
-      accounts = a.data || []
-      categories = c.data || []
-    } catch { /* ignore */ }
-
-    const ordered = [...list].sort((x, y) => Number(x?.date || 0) - Number(y?.date || 0))
-    for (const msg of ordered) {
-      if (!isSmsFromPresent(msg)) continue
-      try {
-        const hit = await processIncomingSms(msg, { accounts, categories })
-        if (hit) results.push(hit)
-      } catch { /* ignore one bad SMS */ }
+  return enqueueSmsJob(async () => {
+    if (drainBusy) {
+      drainAgain = true
+      return []
     }
-  } catch { /* ignore */ } finally {
-    drainBusy = false
-  }
-  return results
+    drainBusy = true
+    const results = []
+    try {
+      let accounts
+      let categories
+      try {
+        const [a, c] = await Promise.all([
+          client.get('/accounts').catch(() => ({ data: [] })),
+          client.get('/categories').catch(() => ({ data: [] })),
+        ])
+        accounts = a.data || []
+        categories = c.data || []
+      } catch { /* ignore */ }
+
+      do {
+        drainAgain = false
+        const sinceMs = getSmsListenFrom()
+        await SmsReader.startWatch({ sinceMs }).catch(() => {})
+        const { messages } = await SmsReader.drainLiveQueue()
+        const list = Array.isArray(messages) ? messages : []
+        const ordered = [...list].sort((x, y) => Number(x?.date || 0) - Number(y?.date || 0))
+        for (const msg of ordered) {
+          if (!isSmsFromPresent(msg)) continue
+          try {
+            const hit = await processIncomingSms(msg, { accounts, categories })
+            if (hit) results.push(hit)
+          } catch { /* ignore one bad SMS — keep going through the burst */ }
+        }
+      } while (drainAgain)
+    } catch { /* ignore */ } finally {
+      drainBusy = false
+      if (drainAgain) {
+        // Native enqueue raced the last clear — schedule another pass
+        drainAgain = false
+        setTimeout(() => { drainLiveSmsQueue().catch(() => {}) }, 250)
+      }
+    }
+    return results
+  })
 }
 
 /** @deprecated name kept for Dashboard/PendingPays — drains live queue only, not inbox. */
@@ -365,16 +485,17 @@ export function startSmsPayWatcher() {
   started = true
   ensureSmsListenFrom()
 
-  const onSms = async (event) => {
-    try {
+  const onSms = (event) => {
+    // Never process parallel bankSms events — debit + credit + cashback often land together
+    enqueueSmsJob(async () => {
       const msg = {
         ...event,
         date: event?.date || Date.now(),
         body: event?.body || event?.text || '',
         address: event?.address || '',
       }
-      await processIncomingSms(msg)
-    } catch { /* ignore */ }
+      return processIncomingSms(msg)
+    })
   }
 
   SmsReader.addListener('bankSms', onSms).then((h) => { listenerHandle = h }).catch(() => {})

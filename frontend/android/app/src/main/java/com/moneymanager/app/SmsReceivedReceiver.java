@@ -8,9 +8,15 @@ import android.os.Bundle;
 import android.provider.Telephony;
 import android.telephony.SmsMessage;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Manifest-registered so live SMS is captured even when the app is killed.
- * Does not read inbox history — only the SMS that just arrived.
+ * Handles bursts: multiple debit/credit/cashback SMS in one second are each
+ * enqueued separately (PDU parts of the same SMS stay concatenated).
  */
 public class SmsReceivedReceiver extends BroadcastReceiver {
 
@@ -21,15 +27,21 @@ public class SmsReceivedReceiver extends BroadcastReceiver {
                 && !"android.provider.Telephony.SMS_RECEIVED".equals(intent.getAction())) {
             return;
         }
+
+        // Keep receiver alive until every SMS in this burst is persisted
+        final PendingResult pending = goAsync();
         try {
             Bundle bundle = intent.getExtras();
             if (bundle == null) return;
             Object[] pdus = (Object[]) bundle.get("pdus");
             if (pdus == null || pdus.length == 0) return;
             String format = bundle.getString("format");
-            StringBuilder body = new StringBuilder();
-            String address = "";
-            long ts = System.currentTimeMillis();
+
+            // Group PDU parts by originating address so multipart SMS stay one
+            // message, but two different bank SMS never get glued together.
+            Map<String, Assembled> bySender = new LinkedHashMap<>();
+            List<Assembled> order = new ArrayList<>();
+
             for (Object pdu : pdus) {
                 SmsMessage msg;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && format != null) {
@@ -38,22 +50,48 @@ public class SmsReceivedReceiver extends BroadcastReceiver {
                     msg = SmsMessage.createFromPdu((byte[]) pdu);
                 }
                 if (msg == null) continue;
-                if (address.isEmpty() && msg.getDisplayOriginatingAddress() != null) {
-                    address = msg.getDisplayOriginatingAddress();
-                }
-                if (msg.getTimestampMillis() > 0) ts = msg.getTimestampMillis();
+                String address = msg.getDisplayOriginatingAddress();
+                if (address == null) address = "";
                 String part = msg.getMessageBody();
-                if (part != null) body.append(part);
-            }
-            String text = body.toString().trim();
-            if (text.isEmpty()) return;
-            if (!SmsReaderPlugin.looksLikePaymentSms(text)) return;
+                if (part == null) part = "";
+                long ts = msg.getTimestampMillis() > 0 ? msg.getTimestampMillis() : System.currentTimeMillis();
 
-            // App open → deliver to JS immediately; killed → queue for next open
-            if (SmsReaderPlugin.emitIfAlive(address, text, ts)) {
-                return;
+                Assembled row = bySender.get(address);
+                if (row == null) {
+                    row = new Assembled(address, ts);
+                    bySender.put(address, row);
+                    order.add(row);
+                }
+                row.body.append(part);
+                if (ts > 0) row.ts = ts;
             }
-            SmsLiveStore.enqueue(context, address, text, ts);
-        } catch (Exception ignored) { }
+
+            Context app = context.getApplicationContext();
+            for (Assembled row : order) {
+                String text = row.body.toString().trim();
+                if (text.isEmpty()) continue;
+                if (!SmsReaderPlugin.looksLikePaymentSms(text)) continue;
+
+                // Always queue first — UI may be frozen / process about to die
+                SmsLiveStore.enqueue(app, row.address, text, row.ts);
+                SmsReaderPlugin.emitIfAlive(row.address, text, row.ts);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            try {
+                pending.finish();
+            } catch (Exception ignored) { }
+        }
+    }
+
+    private static final class Assembled {
+        final String address;
+        final StringBuilder body = new StringBuilder();
+        long ts;
+
+        Assembled(String address, long ts) {
+            this.address = address == null ? "" : address;
+            this.ts = ts;
+        }
     }
 }

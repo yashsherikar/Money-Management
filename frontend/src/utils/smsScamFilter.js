@@ -90,7 +90,9 @@ export function isWalletCashbackSms(body = '') {
   if (/\b(?:lottery|jackpot|whatsapp)\b/i.test(lower)) return false
   if (/\bhttps?:\/\/|\bwww\.|\bbit\.ly\b|\bclick\s+(?:here|now|link)\b/i.test(lower)) return false
   if (/\bclaim (?:your )?(?:prize|reward|refund)\b/i.test(lower)) return false
-  const hasCashback = /\bcash\s*back\b|\bcashback\b|\bscratch\s*card\b|\bscratchcard\b|\breward\s+credit/i.test(lower)
+  const hasCashback = /\bcash\s*back\b|\bcashback\b|\bscratch\s*card\b|\bscratchcard\b|\breward\s+credit|\breward\s+of\b/i.test(lower)
+    || (/\b(?:earned|earn|won|win)\b/i.test(lower)
+      && /\b(?:bhim|paytm|phonepe|one97|gpay|npci)\b/i.test(lower))
   if (!hasCashback) return false
   if (!AMOUNT_RE.test(body)) return false
   return true
@@ -114,7 +116,7 @@ export function isBankLedgerSms(body = '') {
     || /\b(?:refund(?:ed)?|revers(?:ed|al)|interest\s+credit)/i.test(lower)
   if (!moneyVerb) return false
   // Bank / account / UPI markers
-  return /\b(?:a\/c|acct|account|upi|imps|neft|rtgs|hdfc|icici|sbi|axis|kotak|yes\s*bank|idfc|pnb|paytm|one97|phonepe)\b/i.test(lower)
+  return /\b(?:a\/c|acct|account|upi|imps|neft|rtgs|hdfc|icici|sbi|axis|kotak|yes\s*bank|idfc|pnb|paytm|one97|phonepe|bhim|npci|google\s*pay|gpay)\b/i.test(lower)
 }
 
 /** True only for real bank debit OR credit movement (not ads / OTP / chatter). */

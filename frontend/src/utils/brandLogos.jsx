@@ -279,8 +279,263 @@ export function LogoApple({ size = 40, className }) {
   )
 }
 
+function LogoText({
+  bg, title, text, size = 40, color = '#fff', fontSize = 6, className = '', pad = 0.08, ring = false,
+}) {
+  return (
+    <Wrap
+      bg={bg}
+      size={size}
+      pad={pad}
+      className={`${ring ? 'ring-1 ring-slate-200 ' : ''}${className}`}
+      title={title}
+    >
+      <text
+        x="12"
+        y="15"
+        textAnchor="middle"
+        fill={color}
+        fontSize={fontSize}
+        fontWeight="800"
+        fontFamily="Arial, Helvetica, sans-serif"
+      >
+        {text}
+      </text>
+    </Wrap>
+  )
+}
+
+export function LogoBigBasket({ size = 40, className }) {
+  return <LogoText bg="#84C225" title="BigBasket" text="bb" size={size} fontSize={9} className={className} />
+}
+
+export function LogoDunzo({ size = 40, className }) {
+  return <LogoText bg="#00D26A" title="Dunzo" text="dunzo" size={size} color="#0a0a0a" fontSize={5} className={className} />
+}
+
+export function LogoRapido({ size = 40, className }) {
+  return (
+    <Wrap bg="#F9A825" size={size} pad={0.12} className={className} title="Rapido">
+      <path fill="#1a1a1a" d="M6 16.5c1.2-4 3-8.5 6-11.5 3 3 4.8 7.5 6 11.5-1.8-.8-3.8-1.2-6-1.2s-4.2.4-6 1.2z" />
+      <circle cx="12" cy="9" r="1.6" fill="#fff" />
+    </Wrap>
+  )
+}
+
+export function LogoIrctc({ size = 40, className }) {
+  return <LogoText bg="#213D77" title="IRCTC" text="IRCTC" size={size} fontSize={5.2} className={className} />
+}
+
+export function LogoMakeMyTrip({ size = 40, className }) {
+  return <LogoText bg="#E31837" title="MakeMyTrip" text="MMT" size={size} fontSize={7} className={className} />
+}
+
+export function LogoRedbus({ size = 40, className }) {
+  return <LogoText bg="#D84E55" title="redBus" text="redBus" size={size} fontSize={5} className={className} />
+}
+
+export function LogoMyntra({ size = 40, className }) {
+  return <LogoText bg="#FF3F6C" title="Myntra" text="Myntra" size={size} fontSize={5} className={className} />
+}
+
+export function LogoAjio({ size = 40, className }) {
+  return <LogoText bg="#2C2C54" title="AJIO" text="AJIO" size={size} fontSize={7} className={className} />
+}
+
+export function LogoMeesho({ size = 40, className }) {
+  return <LogoText bg="#F43397" title="Meesho" text="Meesho" size={size} fontSize={5} className={className} />
+}
+
+export function LogoJioMart({ size = 40, className }) {
+  return <LogoText bg="#0A2885" title="JioMart" text="JioMart" size={size} fontSize={4.5} className={className} />
+}
+
+export function LogoNykaa({ size = 40, className }) {
+  return <LogoText bg="#FC2779" title="Nykaa" text="Nykaa" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoVi({ size = 40, className }) {
+  return <LogoText bg="#EE2737" title="Vi" text="Vi" size={size} fontSize={10} className={className} />
+}
+
+export function LogoCred({ size = 40, className }) {
+  return <LogoText bg="#1A1A1A" title="CRED" text="CRED" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoTataPlay({ size = 40, className }) {
+  return <LogoText bg="#E31837" title="Tata Play" text="Tata" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoZee5({ size = 40, className }) {
+  return <LogoText bg="#8230C9" title="ZEE5" text="ZEE5" size={size} fontSize={7} className={className} />
+}
+
+export function LogoSonyLiv({ size = 40, className }) {
+  return <LogoText bg="#000" title="SonyLIV" text="LIV" size={size} fontSize={8} className={className} />
+}
+
+export function LogoGaana({ size = 40, className }) {
+  return <LogoText bg="#E72C30" title="Gaana" text="gaana" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoWynk({ size = 40, className }) {
+  return <LogoText bg="#E4002B" title="Wynk" text="Wynk" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoLinkedIn({ size = 40, className }) {
+  return <LogoText bg="#0A66C2" title="LinkedIn" text="in" size={size} fontSize={10} className={className} />
+}
+
+export function LogoMicrosoft({ size = 40, className }) {
+  return (
+    <Wrap bg="#fff" size={size} pad={0.18} className={`ring-1 ring-slate-200 ${className || ''}`} title="Microsoft">
+      <rect x="2" y="2" width="9" height="9" fill="#F25022" />
+      <rect x="13" y="2" width="9" height="9" fill="#7FBA00" />
+      <rect x="2" y="13" width="9" height="9" fill="#00A4EF" />
+      <rect x="13" y="13" width="9" height="9" fill="#FFB900" />
+    </Wrap>
+  )
+}
+
+export function LogoGoogleOne({ size = 40, className }) {
+  return <LogoText bg="#4285F4" title="Google One" text="One" size={size} fontSize={7.5} className={className} />
+}
+
+export function LogoDmart({ size = 40, className }) {
+  return <LogoText bg="#0078C1" title="DMart" text="DMart" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoBookMyShow({ size = 40, className }) {
+  return <LogoText bg="#C4242B" title="BookMyShow" text="BMS" size={size} fontSize={7} className={className} />
+}
+
+export function LogoPvr({ size = 40, className }) {
+  return <LogoText bg="#1B1B1B" title="PVR" text="PVR" size={size} fontSize={8} className={className} />
+}
+
+export function LogoCultfit({ size = 40, className }) {
+  return <LogoText bg="#111" title="Cult.fit" text="cult" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoUrbanCompany({ size = 40, className }) {
+  return <LogoText bg="#6E3FF3" title="Urban Company" text="UC" size={size} fontSize={9} className={className} />
+}
+
+export function LogoPharmeasy({ size = 40, className }) {
+  return <LogoText bg="#10847E" title="PharmEasy" text="PE" size={size} fontSize={9} className={className} />
+}
+
+export function Logo1mg({ size = 40, className }) {
+  return <LogoText bg="#FF6F61" title="1mg" text="1mg" size={size} fontSize={7.5} className={className} />
+}
+
+export function LogoLenskart({ size = 40, className }) {
+  return <LogoText bg="#00BAC6" title="Lenskart" text="LK" size={size} fontSize={9} className={className} />
+}
+
+export function LogoCroma({ size = 40, className }) {
+  return <LogoText bg="#00B1A4" title="Croma" text="croma" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoDecathlon({ size = 40, className }) {
+  return <LogoText bg="#0082C3" title="Decathlon" text="DEC" size={size} fontSize={7} className={className} />
+}
+
+export function LogoIndigo({ size = 40, className }) {
+  return <LogoText bg="#003366" title="IndiGo" text="6E" size={size} fontSize={9} className={className} />
+}
+
+export function LogoAirIndia({ size = 40, className }) {
+  return <LogoText bg="#DA0C0C" title="Air India" text="AI" size={size} fontSize={9} className={className} />
+}
+
+export function LogoGoibibo({ size = 40, className }) {
+  return <LogoText bg="#FE5B00" title="Goibibo" text="go" size={size} fontSize={9} className={className} />
+}
+
+export function LogoGroww({ size = 40, className }) {
+  return <LogoText bg="#00B386" title="Groww" text="Groww" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoZerodha({ size = 40, className }) {
+  return <LogoText bg="#387ED1" title="Zerodha" text="Kite" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoHdfc({ size = 40, className }) {
+  return <LogoText bg="#004C8F" title="HDFC Bank" text="HDFC" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoSbi({ size = 40, className }) {
+  return (
+    <Wrap bg="#22409A" size={size} pad={0.14} className={className} title="SBI">
+      <circle cx="12" cy="12" r="8" fill="none" stroke="#F7A81B" strokeWidth="2.2" />
+      <circle cx="12" cy="12" r="3.2" fill="#F7A81B" />
+    </Wrap>
+  )
+}
+
+export function LogoIcici({ size = 40, className }) {
+  return <LogoText bg="#F58220" title="ICICI Bank" text="ICICI" size={size} fontSize={5} className={className} />
+}
+
+export function LogoAxis({ size = 40, className }) {
+  return <LogoText bg="#97144D" title="Axis Bank" text="AXIS" size={size} fontSize={6} className={className} />
+}
+
+export function LogoKotak({ size = 40, className }) {
+  return <LogoText bg="#ED1C24" title="Kotak" text="Kotak" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoHaldiram({ size = 40, className }) {
+  return <LogoText bg="#C8102E" title="Haldiram's" text="Haldi" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoCcd({ size = 40, className }) {
+  return <LogoText bg="#4B2C20" title="Cafe Coffee Day" text="CCD" size={size} fontSize={7} className={className} />
+}
+
+export function LogoWowMomo({ size = 40, className }) {
+  return <LogoText bg="#E31E24" title="Wow! Momo" text="WOW" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoBaskin({ size = 40, className }) {
+  return <LogoText bg="#D71921" title="Baskin Robbins" text="31" size={size} fontSize={10} className={className} />
+}
+
+export function LogoTacoBell({ size = 40, className }) {
+  return <LogoText bg="#702082" title="Taco Bell" text="TB" size={size} fontSize={9} className={className} />
+}
+
+export function LogoFaasos({ size = 40, className }) {
+  return <LogoText bg="#FF6B00" title="Faasos" text="Faasos" size={size} fontSize={5} className={className} />
+}
+
+export function LogoBehrouz({ size = 40, className }) {
+  return <LogoText bg="#7A1F1F" title="Behrouz" text="Beh" size={size} fontSize={7} className={className} />
+}
+
+export function LogoInstamart({ size = 40, className }) {
+  return <LogoText bg="#FC8019" title="Instamart" text="IM" size={size} fontSize={9} className={className} />
+}
+
+export function LogoRelianceFresh({ size = 40, className }) {
+  return <LogoText bg="#E31837" title="Reliance Fresh" text="Fresh" size={size} fontSize={5.5} className={className} />
+}
+
+export function LogoMore({ size = 40, className }) {
+  return <LogoText bg="#E30613" title="More" text="More" size={size} fontSize={6.5} className={className} />
+}
+
+export function LogoApollo({ size = 40, className }) {
+  return <LogoText bg="#0B6E4F" title="Apollo" text="Apollo" size={size} fontSize={5} className={className} />
+}
+
+export function LogoBhim({ size = 40, className }) {
+  return <LogoText bg="#FF6F00" title="BHIM" text="BHIM" size={size} fontSize={6.5} className={className} />
+}
+
 export function LogoLetter({ brand, size = 40, className }) {
-  const darkText = brand?.id === 'blinkit' || brand?.id === 'ola' || brand?.id === 'subway'
+  const darkText = ['blinkit', 'ola', 'subway', 'rapido', 'dunzo'].includes(brand?.id)
   return (
     <span
       className={`inline-flex items-center justify-center rounded-full text-white font-bold shrink-0 shadow-sm ${className || ''}`}
@@ -306,6 +561,15 @@ export const BRAND_LOGO_COMPONENTS = {
   amazon: LogoAmazon,
   amazonprime: LogoPrime,
   disney: LogoDisney,
+  tataplay: LogoTataPlay,
+  zee5: LogoZee5,
+  sony: LogoSonyLiv,
+  gaana: LogoGaana,
+  wynk: LogoWynk,
+  apple: LogoApple,
+  linkedin: LogoLinkedIn,
+  microsoft: LogoMicrosoft,
+  googleone: LogoGoogleOne,
   kfc: LogoKfc,
   starbucks: LogoStarbucks,
   mcdonalds: LogoMcdonalds,
@@ -313,17 +577,61 @@ export const BRAND_LOGO_COMPONENTS = {
   dominos: LogoDominos,
   pizzahut: LogoPizzaHut,
   subway: LogoSubway,
+  haldiram: LogoHaldiram,
+  ccd: LogoCcd,
+  wowmomo: LogoWowMomo,
+  baskin: LogoBaskin,
+  tacobell: LogoTacoBell,
+  faasos: LogoFaasos,
+  behrouz: LogoBehrouz,
   zomato: LogoZomato,
   swiggy: LogoSwiggy,
-  uber: LogoUber,
+  instamart: LogoInstamart,
   blinkit: LogoBlinkit,
   zepto: LogoZepto,
+  bigbasket: LogoBigBasket,
+  dunzo: LogoDunzo,
+  dmart: LogoDmart,
+  reliancefresh: LogoRelianceFresh,
+  more: LogoMore,
+  uber: LogoUber,
+  ola: LogoOla,
+  rapido: LogoRapido,
+  irctc: LogoIrctc,
+  makemytrip: LogoMakeMyTrip,
+  redbus: LogoRedbus,
+  goibibo: LogoGoibibo,
+  indigo: LogoIndigo,
+  airindia: LogoAirIndia,
+  flipkart: LogoFlipkart,
+  myntra: LogoMyntra,
+  ajio: LogoAjio,
+  meesho: LogoMeesho,
+  jiomart: LogoJioMart,
+  nykaa: LogoNykaa,
+  lenskart: LogoLenskart,
+  croma: LogoCroma,
+  decathlon: LogoDecathlon,
+  jio: LogoJio,
+  airtel: LogoAirtel,
+  vi: LogoVi,
   phonepe: LogoPhonePe,
   gpay: LogoGpay,
   paytm: LogoPaytm,
-  jio: LogoJio,
-  airtel: LogoAirtel,
-  flipkart: LogoFlipkart,
-  ola: LogoOla,
-  apple: LogoApple,
+  bhim: LogoBhim,
+  cred: LogoCred,
+  bookmyshow: LogoBookMyShow,
+  pvr: LogoPvr,
+  cultfit: LogoCultfit,
+  urbancompany: LogoUrbanCompany,
+  pharmeasy: LogoPharmeasy,
+  onemg: Logo1mg,
+  apollo: LogoApollo,
+  groww: LogoGroww,
+  zerodha: LogoZerodha,
+  hdfc: LogoHdfc,
+  sbi: LogoSbi,
+  icici: LogoIcici,
+  axis: LogoAxis,
+  kotak: LogoKotak,
 }

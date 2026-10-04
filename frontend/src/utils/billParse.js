@@ -11,7 +11,8 @@ const PAYMENT_MODES = [
 ]
 
 const CATEGORY_HINTS = [
-  { name: 'Food', re: /\brestaurant\b|\bcafe\b|\bfood\b|\bdining\b|\bswiggy\b|\bzomato\b|\bhotel\b|\bkfc\b|\bdomino/i },
+  { name: 'Snacks', re: /\bsnack\b|\bchaat\b|\bpani\s*puri\b|\bvada\s*pav\b|\bstreet\s*food\b|\btea\b|\bchai\b|\bburger\b|\bsamosa\b|\bnasta\b|\bnashta\b/i },
+  { name: 'Dining Out', re: /\brestaurant\b|\bcafe\b|\bfood\b|\bdining\b|\bswiggy\b|\bzomato\b|\bhotel\b|\bkfc\b|\bdomino|\blunch\b|\bdinner\b|\bthali\b/i },
   { name: 'Groceries', re: /\bgrocery\b|\bsupermarket\b|\bdmart\b|\bbig bazaar\b|\breliance fresh\b|\bmore\b|\bvegetables?\b/i },
   { name: 'Fuel', re: /\bpetrol\b|\bdiesel\b|\bfuel\b|\bpump\b|\biocl\b|\bbpcl\b|\bhpcl\b/i },
   { name: 'Travel', re: /\btaxi\b|\buber\b|\bola\b|\brailway\b|\birctc\b|\bflight\b|\bindigo\b|\bcab\b|\bfare\b/i },

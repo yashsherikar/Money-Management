@@ -1,11 +1,16 @@
 package com.moneymanager.app;
 
 import android.Manifest;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.provider.Telephony;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
@@ -175,7 +180,177 @@ public class SmsReaderPlugin extends Plugin {
         // Manifest receiver handles live SMS; nothing else to register.
         JSObject ret = new JSObject();
         ret.put("watching", true);
+        ret.put("batteryOptimized", !isIgnoringBatteryOptimizations());
         call.resolve(ret);
+    }
+
+    /**
+     * Battery Saver / Doze often stops killed apps from receiving SMS.
+     * Unrestricted = ignoring optimizations.
+     */
+    @PluginMethod
+    public void getBatteryStatus(PluginCall call) {
+        JSObject ret = new JSObject();
+        boolean ignoring = isIgnoringBatteryOptimizations();
+        ret.put("ignoringOptimizations", ignoring);
+        ret.put("batteryOptimized", !ignoring);
+        ret.put("manufacturer", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER);
+        ret.put("brand", Build.BRAND == null ? "" : Build.BRAND);
+        call.resolve(ret);
+    }
+
+    /** System dialog: Allow Money Manager to run in background (Unrestricted). */
+    @PluginMethod
+    public void requestIgnoreBatteryOptimizations(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) {
+            call.reject("no context");
+            return;
+        }
+        try {
+            if (isIgnoringBatteryOptimizations()) {
+                JSObject ret = new JSObject();
+                ret.put("ignoringOptimizations", true);
+                ret.put("opened", false);
+                call.resolve(ret);
+                return;
+            }
+            Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+            intent.setData(Uri.parse("package:" + ctx.getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("ignoringOptimizations", false);
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            // Fallback: app battery settings screen
+            try {
+                openAppBatterySettings(ctx);
+                JSObject ret = new JSObject();
+                ret.put("ignoringOptimizations", false);
+                ret.put("opened", true);
+                ret.put("fallback", true);
+                call.resolve(ret);
+            } catch (Exception e2) {
+                call.reject(e2.getMessage() == null ? "battery settings failed" : e2.getMessage());
+            }
+        }
+    }
+
+    /** Open app details / battery screen if the dialog is unavailable. */
+    @PluginMethod
+    public void openBatterySettings(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) {
+            call.reject("no context");
+            return;
+        }
+        try {
+            openAppBatterySettings(ctx);
+            call.resolve(new JSObject());
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "open failed" : e.getMessage());
+        }
+    }
+
+    /**
+     * OEM Autostart screens (Xiaomi / Oppo / Vivo / Huawei / Samsung) —
+     * Battery Saver alone is often not enough on these phones.
+     */
+    @PluginMethod
+    public void openAutostartSettings(PluginCall call) {
+        Context ctx = getContext();
+        if (ctx == null) {
+            call.reject("no context");
+            return;
+        }
+        String mfr = (Build.MANUFACTURER == null ? "" : Build.MANUFACTURER).toLowerCase();
+        String brand = (Build.BRAND == null ? "" : Build.BRAND).toLowerCase();
+        Intent[] candidates = oemAutostartIntents(ctx, mfr, brand);
+        Exception last = null;
+        for (Intent intent : candidates) {
+            try {
+                if (intent.resolveActivity(ctx.getPackageManager()) == null) continue;
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getActivity().startActivity(intent);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                ret.put("manufacturer", Build.MANUFACTURER);
+                call.resolve(ret);
+                return;
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        try {
+            Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            fallback.setData(Uri.parse("package:" + ctx.getPackageName()));
+            fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(fallback);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            ret.put("fallback", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(last != null && last.getMessage() != null ? last.getMessage() : "autostart settings failed");
+        }
+    }
+
+    private boolean isIgnoringBatteryOptimizations() {
+        Context ctx = getContext();
+        if (ctx == null) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
+        PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+        if (pm == null) return false;
+        return pm.isIgnoringBatteryOptimizations(ctx.getPackageName());
+    }
+
+    private void openAppBatterySettings(Context ctx) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(intent);
+            return;
+        } catch (Exception ignored) { }
+        Intent details = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        details.setData(Uri.parse("package:" + ctx.getPackageName()));
+        details.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getActivity().startActivity(details);
+    }
+
+    private Intent[] oemAutostartIntents(Context ctx, String mfr, String brand) {
+        java.util.ArrayList<Intent> list = new java.util.ArrayList<>();
+        if (mfr.contains("xiaomi") || mfr.contains("redmi") || brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco")) {
+            list.add(comp("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+            list.add(comp("com.miui.securitycenter", "com.miui.powercenter.PowerSettings"));
+        }
+        if (mfr.contains("oppo") || brand.contains("oppo") || mfr.contains("realme") || brand.contains("realme")) {
+            list.add(comp("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"));
+            list.add(comp("com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity"));
+            list.add(comp("com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity"));
+        }
+        if (mfr.contains("vivo") || brand.contains("vivo") || brand.contains("iqoo")) {
+            list.add(comp("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));
+            list.add(comp("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));
+        }
+        if (mfr.contains("huawei") || mfr.contains("honor") || brand.contains("huawei") || brand.contains("honor")) {
+            list.add(comp("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));
+            list.add(comp("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"));
+        }
+        if (mfr.contains("samsung") || brand.contains("samsung")) {
+            list.add(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:" + ctx.getPackageName())));
+        }
+        list.add(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:" + ctx.getPackageName())));
+        return list.toArray(new Intent[0]);
+    }
+
+    private static Intent comp(String pkg, String cls) {
+        Intent i = new Intent();
+        i.setComponent(new ComponentName(pkg, cls));
+        return i;
     }
 
     private boolean hasSmsPermission() {
@@ -226,7 +401,9 @@ public class SmsReaderPlugin extends Plugin {
                 || b.contains("debited") || b.contains("credited") || b.contains("spent") || b.contains("paid")
                 || b.contains("received") || b.contains("deposited") || b.contains("sent")
                 || b.contains("upi") || b.contains("txn") || b.contains("transaction")
-                || b.contains("withdrawn") || b.contains("imps") || b.contains("neft") || b.contains("rtgs");
+                || b.contains("withdrawn") || b.contains("imps") || b.contains("neft") || b.contains("rtgs")
+                || b.contains("cashback") || b.contains("cash back") || b.contains("reward")
+                || b.contains("refund") || b.contains("bhim") || b.contains("scratch");
     }
 
     /** @return true if delivered to a live WebView bridge */
