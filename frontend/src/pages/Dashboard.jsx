@@ -7,12 +7,31 @@ import MoneyRow from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { countWaitingP2pPays } from '../utils/pendingP2pPays.js'
 import { scanInboxForPendingPays, isSmsPaySupported } from '../utils/smsPayWatch.js'
-import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { buildTxnRowDisplay } from '../utils/txnDisplay.js'
 
 const COLORS = ['#2F7BFF', '#2EE6C8', '#F5A524', '#FF5B7A', '#5B9BFF', '#38BDF8', '#F472B6', '#A3E635']
 
 function money(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+}
+
+/** Dark-theme pie tooltip — default Recharts text stays black and disappears on #1C2436. */
+function SpendTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const p = payload[0]
+  const color = p.payload?.fill || p.color || '#F3F6FA'
+  return (
+    <div className="history-tooltip">
+      <div className="history-tooltip-row">
+        <span className="inline-flex items-center gap-1.5 min-w-0">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+          <span style={{ color }}>{p.name}</span>
+        </span>
+        <strong>{money(p.value)}</strong>
+      </div>
+    </div>
+  )
 }
 
 export default function Dashboard() {
@@ -71,7 +90,11 @@ export default function Dashboard() {
   const unwantedExpenses = summary.unwantedExpenses ?? []
   const chartData = expenseByCategory
     .filter((c) => Number(c.amount) > 0)
-    .map((c) => ({ name: c.categoryName, value: Number(c.amount) }))
+    .map((c, i) => ({
+      name: c.categoryName,
+      value: Number(c.amount),
+      fill: COLORS[i % COLORS.length],
+    }))
 
   return (
     <div className="page-stack">
@@ -147,12 +170,15 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
                 <Pie data={chartData} dataKey="value" nameKey="name" outerRadius={90} innerRadius={48} paddingAngle={2} label={false}>
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="transparent" />
+                  {chartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} stroke="transparent" />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => money(v)} contentStyle={{ background: '#1C2436', border: 'none', borderRadius: 12, color: '#F3F6FA' }} />
-                <Legend wrapperStyle={{ color: '#8B98AD' }} />
+                <Tooltip content={<SpendTooltip />} />
+                <Legend
+                  wrapperStyle={{ color: '#C2CAD8' }}
+                  formatter={(value) => <span style={{ color: '#C2CAD8' }}>{value}</span>}
+                />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -168,16 +194,21 @@ export default function Dashboard() {
           ) : (
             <ul className="divide-y divide-slate-100 -mx-4 -mb-4">
               {unwantedExpenses.map((u) => {
-                const brand = brandFromTxnText(u.description, u.categoryName)
+                const row = buildTxnRowDisplay({
+                  description: u.description,
+                  categoryName: u.categoryName,
+                  type: 'EXPENSE',
+                  t,
+                })
                 return (
                   <MoneyRow
                     key={u.transactionId}
-                    title={u.description || u.categoryName}
-                    meta={u.categoryName}
+                    title={row.title}
+                    meta={row.meta}
                     amount={u.amount}
                     type="EXPENSE"
-                    icon={brand ? <MerchantLogo brand={brand} size={40} /> : null}
-                    iconText={brand ? undefined : `${u.description || ''} ${u.categoryName || ''}`}
+                    icon={row.brand ? <MerchantLogo brand={row.brand} size={40} /> : null}
+                    iconText={row.iconText}
                   />
                 )
               })}

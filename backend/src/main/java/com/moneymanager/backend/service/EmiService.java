@@ -75,11 +75,34 @@ public class EmiService {
         Emi emi = get(user, id);
         LocalDate today = LocalDate.now();
         String currentMonth = YearMonth.from(today).toString();
+        // Idempotent: already confirmed → success so UI / notifications clear
         if (currentMonth.equals(emi.getLastLoggedMonth())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already confirmed for this month");
+            pushService.resolveRelated(PushService.RELATED_EMI, emi.getId());
+            return toResponse(emi);
         }
-        if (today.getDayOfMonth() < Math.min(emi.getDueDay(), today.lengthOfMonth())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EMI is not due yet");
+
+        // QR / SMS already logged this EMI amount this month → mark paid, no double expense
+        LocalDate monthStart = YearMonth.from(today).atDay(1);
+        var hits = transactionRepository.findExpensesByAmountInRange(
+                user.getId(), emi.getEmiAmount(), monthStart, today);
+        String loan = emi.getLoanName() == null ? "" : emi.getLoanName().toLowerCase();
+        boolean nameHit = hits.stream().anyMatch(t -> {
+            String d = t.getDescription() == null ? "" : t.getDescription().toLowerCase();
+            if (d.contains("emi") && (loan.isBlank() || d.contains(loan))) return true;
+            return !loan.isBlank() && d.contains(loan);
+        });
+        long sameAmountOpen = emiRepository.findByUserIdOrderByStartDateDesc(user.getId()).stream()
+                .filter(Emi::isActive)
+                .filter(e -> !currentMonth.equals(e.getLastLoggedMonth()))
+                .filter(e -> e.getEmiAmount().compareTo(emi.getEmiAmount()) == 0)
+                .count();
+        boolean uniqueUpiHit = sameAmountOpen == 1 && hits.stream()
+                .anyMatch(t -> t.getPaymentId() != null && !t.getPaymentId().isBlank());
+        if (nameHit || uniqueUpiHit) {
+            emi.setLastLoggedMonth(currentMonth);
+            Emi saved = emiRepository.save(emi);
+            pushService.resolveRelated(PushService.RELATED_EMI, saved.getId());
+            return toResponse(saved);
         }
 
         Category emiCategory = categoryRepository.findByNameAndIsDefaultTrue("EMI").orElse(null);
@@ -120,7 +143,15 @@ public class EmiService {
     }
 
     private EmiResponse toResponse(Emi e) {
-        return new EmiResponse(e.getId(), e.getAccount().getId(), e.getLoanName(), e.getPrincipal(),
-                e.getInterestRate(), e.getTenureMonths(), e.getEmiAmount(), e.getStartDate(), e.getDueDay(), e.isActive());
+        LocalDate today = LocalDate.now();
+        String currentMonth = YearMonth.from(today).toString();
+        boolean paid = currentMonth.equals(e.getLastLoggedMonth());
+        boolean dueDayReached = today.getDayOfMonth() >= Math.min(e.getDueDay(), today.lengthOfMonth());
+        boolean due = e.isActive() && !paid && dueDayReached;
+        boolean canMarkPaid = e.isActive() && !paid;
+        return new EmiResponse(
+                e.getId(), e.getAccount().getId(), e.getLoanName(), e.getPrincipal(),
+                e.getInterestRate(), e.getTenureMonths(), e.getEmiAmount(), e.getStartDate(),
+                e.getDueDay(), e.isActive(), e.getLastLoggedMonth(), due, canMarkPaid);
     }
 }

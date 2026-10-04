@@ -7,11 +7,12 @@ import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import TransactionEditSheet from '../components/TransactionEditSheet.jsx'
 import TransactionDetailSheet from '../components/TransactionDetailSheet.jsx'
+import CategoryPicker from '../components/CategoryPicker.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { waitingP2pPays, countWaitingP2pPays, listPendingP2pPays } from '../utils/pendingP2pPays.js'
 import { syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
-import { formatTxnDisplay } from '../utils/txnDisplay.js'
+import { buildTxnRowDisplay } from '../utils/txnDisplay.js'
 import { localDateYmd } from '../utils/localDate.js'
 import {
   groupTransactionsByDate,
@@ -244,9 +245,12 @@ export default function Transactions() {
             window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
             await loadAll()
           },
-          addCategory: async (name) => {
-            const { data } = await client.post('/categories', { name, essential: false })
-            setCategories((prev) => [...prev, data])
+          addCategory: async (name, opts = {}) => {
+            const { data } = await client.post('/categories', {
+              name,
+              essential: opts.essential != null ? !!opts.essential : false,
+            })
+            setCategories((prev) => (prev.some((c) => c.id === data.id) ? prev : [...prev, data]))
             return data
           },
         }}
@@ -359,25 +363,21 @@ export default function Transactions() {
             </>
           ) : (
             <>
-              <input
-                list="expense-category-options"
-                placeholder={t('Search or type a new category')}
-                value={categoryQuery}
-                onChange={(e) => handleCategoryInput(e.target.value)}
-                onBlur={handleCategoryBlur}
-                className="w-full"
+              <CategoryPicker
+                categories={categories}
+                value={form.categoryId}
+                onChange={(id, cat) => {
+                  setForm((f) => ({ ...f, categoryId: id }))
+                  setCategoryQuery(cat?.name || '')
+                }}
+                placeholder={t('Search categories…')}
               />
-              <datalist id="expense-category-options">
-                {sortCategories(categories.filter((c) => c.name !== 'Other')).map((c) => (
-                  <option key={c.id} value={c.name} />
-                ))}
-              </datalist>
               <button
                 type="button"
                 onClick={() => setAddingCategory(true)}
                 className="mt-2 text-sm text-brand-500 hover:text-brand-400 font-medium"
               >
-                {t('Other (add new)')}
+                {t('+ New category')}
               </button>
             </>
           )}
@@ -454,39 +454,25 @@ export default function Transactions() {
             {formatTxnDayLabel(group.date, t)}
           </li>,
           ...group.items.map((txn) => {
-            const desc = String(txn.description || '')
-            const isAutopay = /^Autopay:/i.test(desc)
-            const isSavings = /^Savings/i.test(desc)
-            const isTransfer = /^Transfer\s*:/i.test(desc)
-            const brand = isTransfer ? null : brandFromTxnText(txn.description, txn.categoryName)
-            const display = formatTxnDisplay(txn.description, txn.categoryName)
-            const title = isTransfer || isAutopay || isSavings
-              ? (txn.description || txn.categoryName || t('Transaction'))
-              : display.title
-            const isIncome = txn.type === 'INCOME'
-            const timeLabel = formatTxnTime(txn.createdAt)
-            const meta = [
-              timeLabel,
-              txn.accountName,
-              ...(isTransfer || isAutopay || isSavings ? [] : display.details),
-              brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
-                ? brand.name
-                : null,
-              isTransfer && t('Transfer · own accounts'),
-              isAutopay && t('Autopay · SMS'),
-              isSavings && t('Savings · SMS'),
-              txn.categoryName && txn.description && !isAutopay && !isSavings && !isTransfer ? txn.categoryName : null,
-            ].filter(Boolean).join(' · ')
+            const row = buildTxnRowDisplay({
+              description: txn.description,
+              categoryName: txn.categoryName,
+              accountName: txn.accountName,
+              createdAt: txn.createdAt,
+              type: txn.type,
+              t,
+              formatTime: formatTxnTime,
+            })
             return (
               <MoneyRow
                 key={txn.id}
-                title={title}
-                meta={meta}
+                title={row.title}
+                meta={row.meta}
                 amount={txn.amount}
-                income={isIncome}
+                income={row.isIncome}
                 type={txn.type}
-                icon={brand ? <MerchantLogo brand={brand} size={40} /> : null}
-                iconText={brand ? undefined : `${txn.description || ''} ${txn.categoryName || ''}`}
+                icon={row.brand ? <MerchantLogo brand={row.brand} size={40} /> : null}
+                iconText={row.iconText}
                 onClick={() => openTxnDetail(txn)}
                 actions={(
                   <>

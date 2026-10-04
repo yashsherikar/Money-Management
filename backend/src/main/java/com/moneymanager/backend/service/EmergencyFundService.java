@@ -75,8 +75,10 @@ public class EmergencyFundService {
     public EmergencyFundResponse confirmContribution(User user, Long id) {
         EmergencyFundPlan plan = get(user, id);
         String currentMonth = YearMonth.from(LocalDate.now()).toString();
+        // Idempotent: already confirmed → success so reminders / UI clear
         if (currentMonth.equals(plan.getLastLoggedMonth())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "already confirmed for this month");
+            pushService.resolveRelated(PushService.RELATED_EMERGENCY_FUND, plan.getId());
+            return toResponse(plan);
         }
 
         Account source = plan.getSourceAccount();

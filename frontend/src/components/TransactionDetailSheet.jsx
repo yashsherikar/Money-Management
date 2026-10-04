@@ -2,6 +2,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import { formatTxnDisplay } from '../utils/txnDisplay.js'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import ModalPortal from '../utils/ModalPortal.jsx'
 
 function money(n, income) {
   const sign = income ? '+' : '−'
@@ -16,6 +17,12 @@ function Row({ label, value }) {
       <div className="app-modal-row-value">{value}</div>
     </div>
   )
+}
+
+/** Pull a VPA out of older descriptions that mixed payment id into the text. */
+function legacyPaymentId(description) {
+  const m = String(description || '').match(/([a-zA-Z0-9.\-_]{2,}@[a-zA-Z0-9.\-_]+)/)
+  return m ? m[1] : ''
 }
 
 /**
@@ -47,6 +54,7 @@ export default function TransactionDetailSheet({
   const detailLine = display.details.join(' · ')
 
   return (
+    <ModalPortal>
     <div className="app-modal" role="dialog" aria-modal="true" aria-labelledby="txn-detail-title">
       <div className="app-modal-backdrop" onClick={onClose} />
       <div className="app-modal-panel">
@@ -83,7 +91,11 @@ export default function TransactionDetailSheet({
             <Row label={t('Account')} value={txn.accountName} />
             <Row label={t('Category')} value={txn.categoryName || t('No category')} />
             <Row label={t('Name')} value={headline} />
-            <Row label={t('Description')} value={detailLine || txn.description || '—'} />
+            <Row label={t('Description')} value={txn.description || detailLine || '—'} />
+            <Row
+              label={t('Payment ID')}
+              value={txn.paymentId || legacyPaymentId(txn.description) || ''}
+            />
             {brand && <Row label={t('Brand')} value={brand.name} />}
             {isAutopay && <Row label={t('Source')} value={t('Autopay · SMS')} />}
             {isSavings && <Row label={t('Source')} value={t('Savings · SMS')} />}
@@ -131,5 +143,6 @@ export default function TransactionDetailSheet({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

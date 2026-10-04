@@ -1,16 +1,46 @@
 import { useEffect } from 'react'
 
+let lockCount = 0
+let savedScrollY = 0
+
+function applyLock() {
+  savedScrollY = window.scrollY || window.pageYOffset || 0
+  const html = document.documentElement
+  const body = document.body
+  html.style.overflow = 'hidden'
+  body.style.overflow = 'hidden'
+  body.style.position = 'fixed'
+  body.style.top = `-${savedScrollY}px`
+  body.style.left = '0'
+  body.style.right = '0'
+  body.style.width = '100%'
+}
+
+function releaseLock() {
+  const html = document.documentElement
+  const body = document.body
+  html.style.overflow = ''
+  body.style.overflow = ''
+  body.style.position = ''
+  body.style.top = ''
+  body.style.left = ''
+  body.style.right = ''
+  body.style.width = ''
+  window.scrollTo(0, savedScrollY)
+}
+
 /**
- * Lock page scroll while a modal/sheet is open so the background
- * doesn't scroll under the popup on mobile.
+ * Lock page scroll while a modal/sheet is open.
+ * Uses position:fixed so mobile WebViews don't keep scrolling under the popup.
  */
 export function useBodyScrollLock(locked) {
   useEffect(() => {
     if (!locked) return undefined
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    if (lockCount === 0) applyLock()
+    lockCount += 1
     return () => {
-      document.body.style.overflow = prev
+      lockCount = Math.max(0, lockCount - 1)
+      if (lockCount === 0) releaseLock()
     }
   }, [locked])
 }

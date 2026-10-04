@@ -37,13 +37,21 @@ function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
     <div className="history-tooltip">
-      <div className="history-tooltip-label">{label}</div>
-      {payload.map((p) => (
-        <div key={p.dataKey} className="history-tooltip-row">
-          <span style={{ color: p.color || p.fill }}>{p.name}</span>
-          <strong>{moneyExact(p.value)}</strong>
-        </div>
-      ))}
+      {label != null && label !== '' && (
+        <div className="history-tooltip-label">{label}</div>
+      )}
+      {payload.map((p) => {
+        const color = p.payload?.fill || p.color || p.fill || '#F3F6FA'
+        return (
+          <div key={p.dataKey || p.name} className="history-tooltip-row">
+            <span className="inline-flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+              <span style={{ color }}>{p.name}</span>
+            </span>
+            <strong>{moneyExact(p.value)}</strong>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -111,7 +119,11 @@ export default function History() {
   const pieData = useMemo(() => (data?.byCategory || [])
     .filter((c) => Number(c.amount) > 0)
     .slice(0, 8)
-    .map((c) => ({ name: c.categoryName, value: Number(c.amount) })), [data])
+    .map((c, i) => ({
+      name: c.categoryName,
+      value: Number(c.amount),
+      fill: CAT_COLORS[i % CAT_COLORS.length],
+    })), [data])
 
   const topMerchants = data?.topMerchants || []
   const maxMerchant = Math.max(...topMerchants.map((m) => Number(m.amount || 0)), 1)
@@ -243,11 +255,11 @@ export default function History() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={84} paddingAngle={2.5} stroke="none">
-                        {pieData.map((_, i) => (
-                          <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v) => moneyExact(v)} contentStyle={{ background: '#1C2436', border: 'none', borderRadius: 12, color: '#F3F6FA' }} />
+                      <Tooltip content={<ChartTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>

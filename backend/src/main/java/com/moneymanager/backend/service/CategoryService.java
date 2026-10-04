@@ -8,7 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class CategoryService {
@@ -20,13 +24,47 @@ public class CategoryService {
     }
 
     public List<CategoryResponse> list(User user) {
-        return categoryRepository.findVisibleToUser(user.getId()).stream().map(this::toResponse).toList();
+        // One row per name (A–Z). Prefer default over user clone so Cashback isn't listed twice.
+        Map<String, Category> unique = new LinkedHashMap<>();
+        for (Category c : categoryRepository.findVisibleToUser(user.getId())) {
+            String key = c.getName() == null ? "" : c.getName().trim().toLowerCase(Locale.ROOT);
+            if (key.isEmpty()) continue;
+            Category existing = unique.get(key);
+            if (existing == null) {
+                unique.put(key, c);
+                continue;
+            }
+            if (!existing.isDefault() && c.isDefault()) {
+                unique.put(key, c);
+            }
+        }
+        List<Category> ordered = new ArrayList<>(unique.values());
+        ordered.sort((a, b) -> {
+            boolean aOther = "Other".equalsIgnoreCase(a.getName());
+            boolean bOther = "Other".equalsIgnoreCase(b.getName());
+            if (aOther != bOther) return aOther ? 1 : -1;
+            return String.valueOf(a.getName()).compareToIgnoreCase(String.valueOf(b.getName()));
+        });
+        return ordered.stream().map(this::toResponse).toList();
     }
 
     public CategoryResponse create(User user, CategoryRequest request) {
+        String name = request.name() == null ? "" : request.name().trim();
+        if (name.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "category name required");
+        }
+        // Never create a second Cashback / Dining Out / etc.
+        List<Category> existing = categoryRepository.findVisibleByNameIgnoreCase(user.getId(), name);
+        if (!existing.isEmpty()) {
+            Category prefer = existing.stream()
+                    .filter(Category::isDefault)
+                    .findFirst()
+                    .orElse(existing.get(0));
+            return toResponse(prefer);
+        }
         Category category = new Category();
         category.setUser(user);
-        category.setName(request.name());
+        category.setName(name);
         category.setEssential(request.essential());
         return toResponse(categoryRepository.save(category));
     }

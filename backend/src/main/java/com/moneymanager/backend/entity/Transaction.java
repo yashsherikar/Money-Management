@@ -41,6 +41,10 @@ public class Transaction {
 
     private String description;
 
+    /** UPI VPA / payment reference — not part of the human description. */
+    @Column(name = "payment_id", length = 120)
+    private String paymentId;
+
     @Column(name = "txn_date", nullable = false)
     private LocalDate txnDate;
 

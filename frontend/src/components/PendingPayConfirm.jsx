@@ -8,6 +8,7 @@ import {
 } from '../appLock.js'
 import { clearNotificationPayAction } from '../utils/confirmDuePaid.js'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import ModalPortal from '../utils/ModalPortal.jsx'
 
 /**
  * GPay/PhonePe never tell us if a P2P payment succeeded.
@@ -52,22 +53,24 @@ export default function PendingPayConfirm() {
       if (pending.notificationId) {
         await clearNotificationPayAction(pending.notificationId)
       }
-      try {
-        const { handleDetectedUpiPayment, closePendingAfterUpiLog } = await import('../utils/paymentNotify.js')
-        const parsed = {
-          amount: Number(pending.am || pending.amount),
-          pa: pending.pa,
-          payeeName: pending.pn || pending.name,
-          source: 'manual',
-          personal: true,
-          kind: pending.kind === 'scan_pay' ? 'scan_pay' : 'p2p',
-          forceLog: true,
-          categoryId: pending.categoryId || null,
-          description: pending.description || null,
-        }
-        const logResult = await handleDetectedUpiPayment(parsed)
-        await closePendingAfterUpiLog(parsed, logResult)
-      } catch { /* ignore log failure */ }
+      const { handleDetectedUpiPayment, closePendingAfterUpiLog } = await import('../utils/paymentNotify.js')
+      const parsed = {
+        amount: Number(pending.am || pending.amount),
+        pa: pending.pa,
+        payeeName: pending.pn || pending.name,
+        source: 'manual',
+        personal: pending.kind !== 'scan_pay',
+        kind: pending.kind === 'scan_pay' ? 'scan_pay' : 'p2p',
+        forceLog: true,
+        categoryId: pending.categoryId || null,
+        description: pending.description || null,
+      }
+      const logResult = await handleDetectedUpiPayment(parsed)
+      if (!(logResult?.logged || logResult?.duplicate)) {
+        setError(logResult?.error || t('Could not log payment — try again'))
+        return
+      }
+      await closePendingAfterUpiLog(parsed, logResult)
       clearPendingUpiConfirm()
       setPending(null)
       try {
@@ -96,7 +99,8 @@ export default function PendingPayConfirm() {
   const label = pending.name || pending.pn || pending.pa || t('this payment')
 
   return (
-    <div className="app-modal z-[60]" role="dialog" aria-modal="true" aria-labelledby="pending-pay-title">
+    <ModalPortal>
+    <div className="app-modal" role="dialog" aria-modal="true" aria-labelledby="pending-pay-title">
       <div className="app-modal-backdrop" onClick={confirmNo} />
       <div className="app-modal-panel">
         <div className="app-modal-body">
@@ -124,5 +128,6 @@ export default function PendingPayConfirm() {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

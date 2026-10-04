@@ -13,6 +13,7 @@ import { confirmSelfTransferFromReview } from '../utils/selfTransferDetect.js'
 import { confirmDuePaid } from '../utils/confirmDuePaid.js'
 import { detectMerchantBrand, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
+import ModalPortal from '../utils/ModalPortal.jsx'
 import { localDateYmd } from '../utils/localDate.js'
 
 function money(n) {
@@ -180,6 +181,17 @@ export default function SmsMoneyReviewPrompt() {
         txnDate: localDateYmd(item.date || Date.now()),
       })
       markSmsMoneyReviewSaved(item.id, data?.id)
+      if (!isCredit) {
+        try {
+          const { tryConfirmMatchingDues } = await import('../utils/matchDueSms.js')
+          await tryConfirmMatchingDues({
+            amount: item.amount,
+            merchant: item.merchant || who,
+            raw: item.raw || desc,
+            allowUniqueAmount: true,
+          })
+        } catch { /* ignore */ }
+      }
       window.dispatchEvent(new Event('mm-transactions-changed'))
       showNext()
     } catch (err) {
@@ -223,7 +235,8 @@ export default function SmsMoneyReviewPrompt() {
   const otherAccounts = accounts.filter((a) => String(a.id) !== String(accountId))
 
   return (
-    <div className="app-modal z-[66]" role="dialog" aria-modal="true">
+    <ModalPortal>
+    <div className="app-modal" role="dialog" aria-modal="true">
       <div className="app-modal-backdrop" />
       <div className="app-modal-panel">
         <div className="app-modal-body">
@@ -472,5 +485,6 @@ export default function SmsMoneyReviewPrompt() {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

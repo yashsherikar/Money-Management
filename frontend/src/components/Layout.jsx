@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
 import { countWaitingP2pPays } from '../utils/pendingP2pPays.js'
+import ModalPortal from '../utils/ModalPortal.jsx'
+import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 
 const qrIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -131,6 +133,7 @@ export default function Layout({ children }) {
   const closeTimer = useRef(null)
   const [pendingCount, setPendingCount] = useState(() => countWaitingP2pPays())
   const moreActive = moreOpen || moreLinks.some((l) => location.pathname === l.to)
+  useBodyScrollLock(moreOpen)
 
   useEffect(() => {
     const refresh = () => setPendingCount(countWaitingP2pPays())
@@ -208,7 +211,8 @@ export default function Layout({ children }) {
       </main>
 
       {moreOpen && (
-        <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true" aria-label={t('More')}>
+        <ModalPortal>
+        <div className="fixed inset-0 z-[80] flex items-end" role="dialog" aria-modal="true" aria-label={t('More')}>
           <div
             className={`absolute inset-0 bg-black/55 backdrop-blur-[1px] ${moreClosing ? '' : 'animate-backdrop-in'}`}
             style={moreClosing ? { opacity: 0, transition: 'opacity 0.2s ease-in' } : undefined}
@@ -235,6 +239,7 @@ export default function Layout({ children }) {
             <div className="mt-3 pt-3 border-t border-slate-200 text-sm text-slate-500 truncate">{user?.name}</div>
           </nav>
         </div>
+        </ModalPortal>
       )}
 
       <nav className="app-bottom-nav" aria-label="Main">

@@ -113,7 +113,13 @@ export async function scheduleSubscriptionReminders(item) {
             title: titleForLead(item, lead),
             body: `${name} (₹${amt}) ${whenLabel(lead)}. Tap to mark paid.`,
             schedule: { at, allowWhileIdle: true },
-            extra: { url: `/recurring?confirm=${item.id}`, recurringId: item.id },
+            extra: {
+              url: `/recurring?confirm=${item.id}`,
+              recurringId: item.id,
+              relatedType: 'RECURRING_TRANSACTION',
+              relatedId: item.id,
+              paid: true,
+            },
             channelId: CHANNEL,
           })
         }
@@ -124,7 +130,9 @@ export async function scheduleSubscriptionReminders(item) {
     } catch { /* ignore */ }
   }
 
-  // In-app bell: if due within 2 days, surface now (not for daily)
+  // In-app bell only when this cycle still needs payment (not after Mark paid)
+  if (item.due === false || item.canMarkPaid === false) return
+
   const msUntil = due.getTime() - Date.now()
   const twoDays = 2 * 24 * 60 * 60_000
   if (msUntil >= 0 && msUntil <= twoDays) {
@@ -136,6 +144,7 @@ export async function scheduleSubscriptionReminders(item) {
         url: `/recurring?confirm=${item.id}`,
         kind: isSubscriptionRecurring(item) ? 'subscription' : 'recurring',
         relatedId: String(item.id),
+        relatedType: 'RECURRING_TRANSACTION',
       })
     }
   }

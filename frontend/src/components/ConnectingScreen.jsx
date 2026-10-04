@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 
 /**
  * Full-bleed “connecting to server” while Render cold-starts (10–90s).
- * Deliberately delayed ~700ms so warm opens never flash.
+ * Only shown after 5s so warm opens never flash a progress screen.
  */
 export default function ConnectingScreen() {
   const { t } = useLanguage()
@@ -19,7 +19,7 @@ export default function ConnectingScreen() {
       setElapsed(0)
       return undefined
     }
-    const showTimer = setTimeout(() => setVisible(true), 700)
+    const showTimer = setTimeout(() => setVisible(true), 5000)
     const tick = setInterval(() => {
       const meta = getWakeMeta()
       if (meta.startedAt) setElapsed(Math.floor((Date.now() - meta.startedAt) / 1000))

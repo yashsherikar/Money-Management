@@ -147,3 +147,51 @@ export function splitTitleFromTxnDescription(description, fallback = 'Split bill
   const { title } = formatTxnDisplay(description, fallback)
   return title || fallback
 }
+
+/**
+ * Shared MoneyRow title / meta / brand — keep Home and Transactions identical.
+ * @param {{ description?: string, categoryName?: string, accountName?: string, createdAt?: string|number|Date, type?: string, t?: (s:string)=>string, formatTime?: (v:any)=>string|null }} opts
+ */
+export function buildTxnRowDisplay({
+  description = '',
+  categoryName = '',
+  accountName = '',
+  createdAt,
+  type,
+  t = (s) => s,
+  formatTime,
+} = {}) {
+  const desc = String(description || '')
+  const isAutopay = /^Autopay:/i.test(desc)
+  const isSavings = /^Savings/i.test(desc)
+  const isTransfer = /^Transfer\s*:/i.test(desc)
+  const brand = isTransfer ? null : brandFromTxnText(description, categoryName)
+  const display = formatTxnDisplay(description, categoryName)
+  const title = isTransfer || isAutopay || isSavings
+    ? (description || categoryName || t('Transaction'))
+    : display.title
+  const timeLabel = typeof formatTime === 'function' ? formatTime(createdAt) : null
+  const meta = [
+    timeLabel,
+    accountName,
+    ...(isTransfer || isAutopay || isSavings ? [] : display.details),
+    brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
+      ? brand.name
+      : null,
+    isTransfer && t('Transfer · own accounts'),
+    isAutopay && t('Autopay · SMS'),
+    isSavings && t('Savings · SMS'),
+    categoryName && description && !isAutopay && !isSavings && !isTransfer ? categoryName : null,
+  ].filter(Boolean).join(' · ')
+
+  return {
+    title,
+    meta: meta || undefined,
+    brand,
+    isIncome: type === 'INCOME',
+    isAutopay,
+    isSavings,
+    isTransfer,
+    iconText: brand ? undefined : `${description || ''} ${categoryName || ''}`.trim(),
+  }
+}

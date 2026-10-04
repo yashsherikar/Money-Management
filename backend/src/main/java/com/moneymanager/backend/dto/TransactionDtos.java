@@ -16,6 +16,7 @@ public class TransactionDtos {
             @NotNull TransactionType type,
             @NotNull @DecimalMin(value = "0.01") BigDecimal amount,
             String description,
+            String paymentId,
             @NotNull LocalDate txnDate
     ) {}
 
@@ -28,6 +29,7 @@ public class TransactionDtos {
             TransactionType type,
             BigDecimal amount,
             String description,
+            String paymentId,
             LocalDate txnDate,
             /** When the row was logged — used to order same-day txns by time. */
             Instant createdAt,
