@@ -29,7 +29,7 @@ import { useNavigate } from 'react-router-dom'
 import { suppressResumeLock, savePendingUpiConfirm } from '../appLock.js'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 import { detectMerchantBrand } from '../utils/subscriptionBrands.jsx'
-import { suggestFoodCategoryName } from '../utils/foodCategory.js'
+import { findFoodCategoryId, suggestFoodCategoryName } from '../utils/foodCategory.js'
 
 /** Payment apps. GPay hidden for P2P (unreliable); PhonePe / Paytm / BHIM work. */
 const APPS = [
@@ -183,14 +183,12 @@ export default function Pay() {
         personal: isP2p,
       })
     }
-    // Brand → sensible default when MCC unknown (coffee/drinks/breakfast → Snacks)
-    if (!nextCat && brand && !isP2p) {
+    // Brand → coffee/chai → Drinks (overrides generic QSR MCC); burger → Snacks if empty
+    if (brand && !isP2p) {
       const brandText = `${brand.id} ${brand.name} ${(brand.keywords || []).join(' ')}`
       const want = suggestFoodCategoryName(brandText)
-      if (want) {
-        const hit = categories.find((c) => String(c.name).toLowerCase() === want.toLowerCase())
-        if (hit) nextCat = String(hit.id)
-      }
+      const foodId = findFoodCategoryId(categories, brandText)
+      if (foodId && (!nextCat || want === 'Drinks')) nextCat = foodId
     }
     if (nextCat) {
       setCategoryId(nextCat)
@@ -590,7 +588,7 @@ export default function Pay() {
             {t('Category')} <span className="text-red-500">*</span>
           </label>
           <p className="text-xs text-slate-500 mb-1.5">
-            {t('Food tip: Snacks = coffee, drinks, breakfast, burger, chai · Dining Out = lunch/dinner/restaurant · Groceries = home cooking.')}
+            {t('Food tip: Drinks = coffee, chai, juice · Snacks = breakfast, burger, chaat · Dining Out = lunch/dinner/restaurant · Groceries = home cooking.')}
           </p>
           {addingCategory ? (
             <div className="flex gap-2">
@@ -621,7 +619,7 @@ export default function Pay() {
                     setError(err.response?.data?.message || err.message || t('Could not add category'))
                   }
                 }}
-                placeholder={t('e.g. Snacks, Dining Out')}
+                placeholder={t('e.g. Drinks, Snacks, Dining Out')}
                 className="flex-1 px-3 py-2 border border-slate-300 rounded-md"
               />
               <button

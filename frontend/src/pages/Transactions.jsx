@@ -351,7 +351,7 @@ export default function Transactions() {
                 {/* Custom income categories the user already created */}
                 {categories
                   .filter((c) => !INCOME_SOURCES.includes(c.name) && c.name !== 'Salary')
-                  .filter((c) => !['Dining Out', 'Groceries', 'Rent', 'Transport', 'Shopping', 'Entertainment', 'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks'].includes(c.name))
+                  .filter((c) => !['Dining Out', 'Groceries', 'Rent', 'Transport', 'Shopping', 'Entertainment', 'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks', 'Drinks'].includes(c.name))
                   .map((c) => (
                     <option key={c.id} value={c.name}>{c.name}</option>
                   ))}

@@ -24,7 +24,7 @@ import { findDueMatches, pickConfidentDueMatch } from './matchDueSms.js'
 import { confirmDuePaid } from './confirmDuePaid.js'
 import { namesLookSame } from './smsPayParse.js'
 import { localDateYmd } from './localDate.js'
-import { suggestFoodCategoryName } from './foodCategory.js'
+import { findFoodCategoryId, suggestFoodCategoryName } from './foodCategory.js'
 
 const HISTORY_KEY = 'mm_autopay_history'
 const SEEN_KEY = 'mm_autopay_seen'
@@ -251,12 +251,14 @@ function resolveCategory(categories, parsed) {
     }
   }
 
-  // Coffee / drinks / breakfast / snacks / dining from merchant + SMS text
+  // Coffee / drinks / snacks / dining from merchant + SMS text
   if (parsed.direction === 'DEBIT') {
-    const foodWant = suggestFoodCategoryName(`${parsed.merchant || ''} ${parsed.raw || ''}`)
-    if (foodWant) {
-      const foodHit = categories.find((c) => String(c.name).toLowerCase() === foodWant.toLowerCase())
+    const foodText = `${parsed.merchant || ''} ${parsed.raw || ''}`
+    const foodId = findFoodCategoryId(categories, foodText)
+    if (foodId) {
+      const foodHit = categories.find((c) => String(c.id) === String(foodId))
       if (foodHit) return { id: foodHit.id, confident: true, name: foodHit.name }
+      return { id: foodId, confident: true, name: suggestFoodCategoryName(foodText) }
     }
   }
 
