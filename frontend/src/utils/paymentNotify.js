@@ -74,19 +74,26 @@ function resolveOtherCategory(categories) {
   return expense || categories[0]
 }
 
+/**
+ * Store a list-friendly description: payee/merchant name first.
+ * Extra bits (source + VPA) after " · " so the Transactions row can show
+ * "SHOTDINE" as the headline and the rest in the subtitle.
+ */
 function buildDescription({ pn, pa, source, kind }) {
   const name = String(pn || '').trim()
   const vpa = String(pa || '').trim()
-  const base = name || vpa || 'UPI payment'
+  const headline = name || vpa || 'UPI payment'
+  const bits = [headline]
   let tag = 'UPI'
   if (source === 'sms') tag = 'UPI SMS'
   else if (source === 'manual') tag = 'UPI'
   else if (kind === 'merchant') tag = 'UPI Merchant'
   else if (kind === 'request') tag = 'UPI Request'
+  bits.push(tag)
   if (name && vpa && name.toLowerCase() !== vpa.toLowerCase()) {
-    return `${tag}: ${name} (${vpa})`
+    bits.push(vpa)
   }
-  return `${tag}: ${base}`
+  return bits.join(' · ')
 }
 
 async function loadAccountsAndCategories() {

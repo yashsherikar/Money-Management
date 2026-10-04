@@ -31,6 +31,7 @@ import Settings from './pages/Settings.jsx'
 import Onboarding from './pages/Onboarding.jsx'
 import Pay from './pages/Pay.jsx'
 import PendingPays from './pages/PendingPays.jsx'
+import History from './pages/History.jsx'
 import PaymentCategoryPrompt from './components/PaymentCategoryPrompt.jsx'
 import SmsMoneyReviewPrompt from './components/SmsMoneyReviewPrompt.jsx'
 
@@ -106,6 +107,7 @@ export default function App() {
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/" element={<Protected><Dashboard /></Protected>} />
       <Route path="/transactions" element={<Protected><Transactions /></Protected>} />
+      <Route path="/history" element={<Protected><History /></Protected>} />
       <Route path="/recurring" element={<Protected><Recurring /></Protected>} />
       <Route path="/obligations" element={<Protected><Obligations /></Protected>} />
       <Route path="/investments" element={<Protected><Investments /></Protected>} />

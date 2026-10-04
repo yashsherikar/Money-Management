@@ -371,8 +371,16 @@ export default function Pay() {
           type="button"
           onClick={handleScan}
           disabled={scanBusy || scanning || !isNativePlatform()}
-          className="bg-brand-600 hover:bg-brand-700 text-white rounded-md px-4 py-3 text-sm font-semibold disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-md px-4 py-3 text-sm font-semibold disabled:opacity-60 min-h-[2.75rem]"
         >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect width="5" height="5" x="3" y="3" rx="1" />
+            <rect width="5" height="5" x="16" y="3" rx="1" />
+            <rect width="5" height="5" x="3" y="16" rx="1" />
+            <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+            <path d="M21 21v.01" />
+            <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+          </svg>
           {scanBusy || scanning ? t('Scanning…') : t('Scan QR')}
         </button>
         {isBillOcrSupported() && (
@@ -380,7 +388,7 @@ export default function Pay() {
             type="button"
             onClick={() => setBillScanOpen(true)}
             disabled={scanning}
-            className="inline-flex items-center gap-1.5 bg-white border border-slate-300 hover:border-brand-400 text-slate-800 rounded-md px-4 py-3 text-sm font-semibold disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-md px-4 py-3 text-sm font-semibold disabled:opacity-60 min-h-[2.75rem]"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />

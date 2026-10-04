@@ -11,6 +11,7 @@ import {
 } from '../utils/smsMoneyReview.js'
 import { confirmSelfTransferFromReview } from '../utils/selfTransferDetect.js'
 import { detectMerchantBrand, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 
 function money(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -32,6 +33,7 @@ function formatWhen(ts) {
 export default function SmsMoneyReviewPrompt() {
   const { t } = useLanguage()
   const [item, setItem] = useState(null)
+  useBodyScrollLock(!!item)
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [accountId, setAccountId] = useState('')
@@ -200,13 +202,14 @@ export default function SmsMoneyReviewPrompt() {
   const otherAccounts = accounts.filter((a) => String(a.id) !== String(accountId))
 
   return (
-    <div className="fixed inset-0 z-[66] flex items-center justify-center p-4 pb-20">
-      <div className="absolute inset-0 bg-black/45" />
-      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 min-w-0">
+    <div className="app-modal z-[66]" role="dialog" aria-modal="true">
+      <div className="app-modal-backdrop" />
+      <div className="app-modal-panel">
+        <div className="app-modal-body">
+        <div className="flex items-start justify-between gap-2 mb-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
             {brand && !isSelfTransfer && <MerchantLogo brand={brand} size={36} />}
-            <h2 className="font-bold text-lg leading-tight">{headline}</h2>
+            <h2 className="font-bold text-lg leading-tight break-words min-w-0" style={{ overflowWrap: 'anywhere' }}>{headline}</h2>
           </div>
           {pendingCount > 1 && (
             <span className="text-xs font-semibold text-slate-500 shrink-0">
@@ -388,6 +391,7 @@ export default function SmsMoneyReviewPrompt() {
             {t('More SMS waiting after this one.')}
           </p>
         )}
+        </div>
       </div>
     </div>
   )

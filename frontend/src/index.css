@@ -619,6 +619,199 @@ button.rounded-md {
   border-color: rgba(47, 123, 255, 0.45) !important;
 }
 
+/* History / insights */
+.history-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: clamp(1.1rem, 3vw, 1.45rem);
+  background:
+    linear-gradient(135deg, rgba(47, 123, 255, 0.18) 0%, rgba(20, 27, 40, 0.92) 48%, rgba(20, 27, 40, 1) 100%);
+  border: 1px solid rgba(91, 155, 255, 0.2);
+  box-shadow: var(--shadow-card);
+}
+.history-hero::after {
+  content: '';
+  position: absolute;
+  right: -20%;
+  top: -50%;
+  width: 55%;
+  height: 160%;
+  background: radial-gradient(circle, rgba(46, 230, 200, 0.12) 0%, transparent 68%);
+  pointer-events: none;
+}
+.history-range-btn {
+  min-height: 2.15rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s var(--ease-out);
+}
+.history-range-btn-on {
+  color: #0B0F16;
+  background: linear-gradient(135deg, #6AA6FF, #2EE6C8);
+  border-color: transparent;
+}
+.history-stat {
+  background: linear-gradient(165deg, var(--card-hi), var(--card));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 0.85rem 0.95rem;
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+.history-stat-label {
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.history-stat-value {
+  margin-top: 0.35rem;
+  font-size: clamp(1.15rem, 0.95rem + 1.2vw, 1.45rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.history-insight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  background: rgba(47, 123, 255, 0.1);
+  border: 1px solid rgba(47, 123, 255, 0.22);
+  font-size: 0.8125rem;
+  color: var(--text-soft);
+}
+.history-insight strong {
+  color: var(--text);
+  font-weight: 650;
+}
+.history-chart-wrap {
+  width: 100%;
+  min-height: 220px;
+}
+.history-tooltip {
+  background: #1C2436;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  min-width: 8.5rem;
+}
+.history-tooltip-label {
+  font-size: 0.7rem;
+  color: #8B98AD;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+}
+.history-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: #F3F6FA;
+}
+.history-rank {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 750;
+  color: #8FB6FF;
+  background: rgba(47, 123, 255, 0.14);
+  flex-shrink: 0;
+}
+.history-bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.history-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2F7BFF 0%, #2EE6C8 100%);
+  transition: width 0.45s var(--ease-out);
+}
+
+/* Centered app modals — keep content inside the card; scroll inside, not the page */
+.app-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 64;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px) + 4.5rem);
+  overscroll-behavior: contain;
+}
+.app-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+.app-modal-panel {
+  position: relative;
+  width: 100%;
+  max-width: 28rem;
+  max-height: min(86dvh, 86vh);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: linear-gradient(165deg, var(--card-hi) 0%, var(--card) 100%);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.65);
+}
+.app-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.25rem;
+}
+.app-modal-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.app-modal-row:last-child {
+  border-bottom: none;
+}
+.app-modal-row-label {
+  font-size: 0.875rem;
+  color: var(--muted);
+  padding-top: 0.05rem;
+}
+.app-modal-row-value {
+  font-size: 0.875rem;
+  font-weight: 550;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
 /* Recharts renders text via SVG fill, not Tailwind classes — needs an explicit dark-theme color. */
 .recharts-text,
 .recharts-legend-item-text {

@@ -11,6 +11,7 @@ import {
 import { requestSmsPermission, isSmsPaySupported } from '../utils/smsPayWatch.js'
 import { suppressResumeLock } from '../appLock.js'
 import Field from './Field.jsx'
+import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 
 /**
  * Native camera / gallery bill upload → OCR fields → SMS paid check → save callback.
@@ -23,6 +24,7 @@ export default function BillScanSheet({
   defaultAccountId = '',
   onSave,
 }) {
+  useBodyScrollLock(!!open)
   const { t } = useLanguage()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -247,9 +249,10 @@ export default function BillScanSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[67] flex items-center justify-center p-4 pb-20">
-      <div className="absolute inset-0 bg-black/45" onClick={() => !busy && onClose?.()} />
-      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
+    <div className="app-modal z-[67]" role="dialog" aria-modal="true">
+      <div className="app-modal-backdrop" onClick={() => !busy && onClose?.()} />
+      <div className="app-modal-panel">
+        <div className="app-modal-body">
         <h2 className="font-bold text-lg mb-1">{t('Scan bill')}</h2>
         <p className="text-sm text-slate-600 mb-4">
           {t('Photo or upload a bill — we read amount, category, payment mode, then check SMS before save.')}
@@ -352,6 +355,7 @@ export default function BillScanSheet({
         )}
 
         {error && step === 'pick' && <div className="text-sm text-red-600 mt-3">{error}</div>}
+        </div>
       </div>
     </div>
   )

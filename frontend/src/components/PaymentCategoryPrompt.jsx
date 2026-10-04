@@ -12,6 +12,7 @@ import {
   updateLoggedUpiCategory,
   isPaymentNotifySupported,
 } from '../utils/paymentNotify.js'
+import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 
 function sortCategories(categories) {
   return [...categories].sort((a, b) => {
@@ -30,6 +31,7 @@ function sortCategories(categories) {
 export default function PaymentCategoryPrompt() {
   const { t } = useLanguage()
   const [prompt, setPrompt] = useState(null)
+  useBodyScrollLock(!!prompt)
   const [categories, setCategories] = useState([])
   const [accounts, setAccounts] = useState([])
   const [categoryId, setCategoryId] = useState('')
@@ -162,13 +164,14 @@ export default function PaymentCategoryPrompt() {
         </div>
       )}
       {prompt && (
-        <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 pb-20">
-          <div className="absolute inset-0 bg-black/40" onClick={skip} />
-          <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl">
+        <div className="app-modal z-[65]" role="dialog" aria-modal="true">
+          <div className="app-modal-backdrop" onClick={skip} />
+          <div className="app-modal-panel">
+            <div className="app-modal-body">
             <h2 className="font-bold text-lg mb-1">
               {prompt.refineOnly ? t('Update category') : t('Choose a category')}
             </h2>
-            <p className="text-sm text-slate-600 mb-3">
+            <p className="text-sm text-slate-600 mb-3 break-words min-w-0" style={{ overflowWrap: 'anywhere' }}>
               {prompt.refineOnly
                 ? t('Already saved in Transactions as Other. Pick the right category for next time.')
                 : (
@@ -203,6 +206,7 @@ export default function PaymentCategoryPrompt() {
               <button type="button" onClick={skip} className="flex-1 border border-slate-300 rounded-md py-2.5">
                 {prompt.refineOnly ? t('Keep Other') : t('Skip')}
               </button>
+            </div>
             </div>
           </div>
         </div>

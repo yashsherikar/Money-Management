@@ -78,4 +78,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                                                           @Param("accountId") Long accountId,
                                                           @Param("from") LocalDate from,
                                                           @Param("to") LocalDate to);
+
+    /** History insights: expenses across all accounts (exclude self-transfers). */
+    @Query("select t from Transaction t left join fetch t.category " +
+            "where t.user.id = :userId and t.type = 'EXPENSE' and t.txnDate between :from and :to " +
+            "and (t.description is null or lower(t.description) not like 'transfer:%') " +
+            "order by t.txnDate desc")
+    List<Transaction> findExpensesForHistory(@Param("userId") Long userId,
+                                              @Param("from") LocalDate from,
+                                              @Param("to") LocalDate to);
+
+    @Query("select min(t.txnDate) from Transaction t where t.user.id = :userId")
+    LocalDate findEarliestTxnDate(@Param("userId") Long userId);
 }

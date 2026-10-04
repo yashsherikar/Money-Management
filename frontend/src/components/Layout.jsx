@@ -77,6 +77,7 @@ const rightTabs = [
 ]
 
 const moreLinks = [
+  { to: '/history', label: 'History' },
   { to: '/obligations', label: 'Obligations' },
   { to: '/recurring', label: 'Recurring' },
   { to: '/investments', label: 'Investments' },

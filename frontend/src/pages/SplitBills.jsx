@@ -8,6 +8,7 @@ import ContactSuggest from '../components/ContactSuggest.jsx'
 import { parseUpiQr, formatUpiAmount } from '../utils/upiQr.js'
 import { startRequestPayWatch } from '../utils/requestPayWatch.js'
 import { upsertSavedContact, syncContactsFromServer, ingestContactsFromHistory } from '../utils/savedContacts.js'
+import { splitTitleFromTxnDescription } from '../utils/txnDisplay.js'
 
 function money(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -155,7 +156,7 @@ export default function SplitBills() {
         }
         setForm({
           ...emptyForm,
-          title: (txn.description || txn.categoryName || t('Split bill')).replace(/^Split:\s*/i, ''),
+          title: splitTitleFromTxnDescription(txn.description, txn.categoryName || t('Split bill')),
           totalAmount: String(txn.amount),
           accountId: String(txn.accountId),
           categoryId: txn.categoryId ? String(txn.categoryId) : '',

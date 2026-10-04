@@ -239,10 +239,49 @@ public class SplitBillService {
         return categoryRepository.findByNameAndIsDefaultTrue("Other").orElse(null);
     }
 
+    /**
+     * Headline stays the payee/merchant name; split share + leftover tags go after " · ".
+     * e.g. "SHOTDINE · Split · my share ₹284.00 of ₹568.00 · UPI SMS · shop@ibl"
+     */
     private String buildMyShareDescription(String title, BigDecimal yourShare, BigDecimal total) {
-        return "Split: " + title + " (my share ₹"
+        String share = "my share ₹"
                 + yourShare.setScale(2, RoundingMode.HALF_UP).toPlainString()
-                + " of ₹" + total.setScale(2, RoundingMode.HALF_UP).toPlainString() + ")";
+                + " of ₹" + total.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        String cleaned = title == null ? "" : title.trim();
+        cleaned = cleaned.replaceFirst("(?i)^Split:\\s*", "");
+        String headline = cleaned;
+        String extras = "";
+        // "UPI SMS: NAME (vpa)" or "NAME · UPI SMS · vpa"
+        java.util.regex.Matcher upi = java.util.regex.Pattern
+                .compile("(?i)^(UPI(?:\\s+SMS|\\s+Merchant|\\s+Request)?):\\s*(.+)$")
+                .matcher(cleaned);
+        if (upi.matches()) {
+            extras = upi.group(1).trim();
+            headline = upi.group(2).trim();
+        }
+        java.util.regex.Matcher paren = java.util.regex.Pattern
+                .compile("^(.+?)\\s+\\(([^)\\s]+@[^)]+)\\)\\s*$")
+                .matcher(headline);
+        if (paren.matches()) {
+            headline = paren.group(1).trim();
+            String vpa = paren.group(2).trim();
+            extras = extras.isBlank() ? vpa : extras + " · " + vpa;
+        } else if (headline.contains(" · ")) {
+            String[] parts = headline.split("\\s·\\s", 2);
+            headline = parts[0].trim();
+            if (parts.length > 1 && !parts[1].isBlank()) {
+                extras = extras.isBlank() ? parts[1].trim() : extras + " · " + parts[1].trim();
+            }
+        }
+        if (headline.isBlank()) {
+            headline = cleaned.isBlank() ? "Split" : cleaned;
+        }
+        StringBuilder sb = new StringBuilder(headline);
+        sb.append(" · Split · ").append(share);
+        if (!extras.isBlank()) {
+            sb.append(" · ").append(extras);
+        }
+        return sb.toString();
     }
 
     @Transactional
@@ -278,7 +317,8 @@ public class SplitBillService {
             Transaction src = bill.getSourceTransaction();
             src.setAmount(bill.getTotalAmount());
             String title = bill.getTitle();
-            if (src.getDescription() != null && src.getDescription().startsWith("Split: ")) {
+            String srcDesc = src.getDescription() == null ? "" : src.getDescription();
+            if (srcDesc.startsWith("Split: ") || srcDesc.contains(" · Split · ")) {
                 src.setDescription(title);
             }
             transactionRepository.save(src);

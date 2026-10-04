@@ -5,14 +5,13 @@ import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
-import BillScanSheet from '../components/BillScanSheet.jsx'
 import TransactionEditSheet from '../components/TransactionEditSheet.jsx'
 import TransactionDetailSheet from '../components/TransactionDetailSheet.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { waitingP2pPays, countWaitingP2pPays, listPendingP2pPays } from '../utils/pendingP2pPays.js'
 import { syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
-import { isBillOcrSupported } from '../utils/billScan.js'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { formatTxnDisplay } from '../utils/txnDisplay.js'
 
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
@@ -40,7 +39,6 @@ export default function Transactions() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [categoryQuery, setCategoryQuery] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [billScanOpen, setBillScanOpen] = useState(false)
   const [waitingPays, setWaitingPays] = useState(() => waitingP2pPays())
   const [unloggedPays, setUnloggedPays] = useState([])
 
@@ -151,48 +149,9 @@ export default function Transactions() {
     }
   }
 
-  async function saveBillScan(data) {
-    const payload = {
-      accountId: data.accountId,
-      categoryId: data.categoryId || null,
-      type: 'EXPENSE',
-      amount: data.amount,
-      description: data.description,
-      txnDate: data.txnDate,
-    }
-    await client.post('/transactions', payload)
-    window.dispatchEvent(new CustomEvent('mm-transactions-changed'))
-    await loadAll()
-  }
-
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 mb-5 sm:mb-6">
-        <h1 className="text-2xl font-bold">{t('Transactions (this month)')}</h1>
-        {isBillOcrSupported() && (
-          <button
-            type="button"
-            onClick={() => setBillScanOpen(true)}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold"
-            title={t('Scan bill')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-              <circle cx="12" cy="13" r="4" />
-            </svg>
-            {t('Scan bill')}
-          </button>
-        )}
-      </div>
-
-      <BillScanSheet
-        open={billScanOpen}
-        onClose={() => setBillScanOpen(false)}
-        accounts={accounts}
-        categories={categories}
-        defaultAccountId={form.accountId}
-        onSave={saveBillScan}
-      />
+      <h1 className="text-2xl font-bold mb-5 sm:mb-6">{t('Transactions (this month)')}</h1>
 
       <TransactionDetailSheet
         open={!!viewingTxn}
@@ -412,12 +371,16 @@ export default function Transactions() {
           const isSavings = /^Savings/i.test(desc)
           const isTransfer = /^Transfer\s*:/i.test(desc)
           const brand = isTransfer ? null : brandFromTxnText(txn.description, txn.categoryName)
-          // Always keep the real description as the title (logo is separate)
-          const title = txn.description || txn.categoryName || t('Transaction')
+          // Headline = merchant/payee name; UPI/split/share details go in subtitle
+          const display = formatTxnDisplay(txn.description, txn.categoryName)
+          const title = isTransfer || isAutopay || isSavings
+            ? (txn.description || txn.categoryName || t('Transaction'))
+            : display.title
           const isIncome = txn.type === 'INCOME'
           const meta = [
             txn.txnDate,
             txn.accountName,
+            ...(isTransfer || isAutopay || isSavings ? [] : display.details),
             brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
               ? brand.name
               : null,
