@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import Field from './Field.jsx'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
 
@@ -25,6 +26,7 @@ export default function TransactionEditSheet({
   onSave,
 }) {
   const { t } = useLanguage()
+  useBodyScrollLock(!!open && !!txn)
   const [form, setForm] = useState(null)
   const [categoryQuery, setCategoryQuery] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
@@ -110,18 +112,19 @@ export default function TransactionEditSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 pb-20">
-      <div className="absolute inset-0 bg-black/45" onClick={() => !busy && onClose?.()} />
-      <div className="relative bg-white w-full max-w-md rounded-2xl p-5 shadow-xl max-h-[min(88vh,100%)] overflow-y-auto">
-        <div className="flex items-center gap-2 mb-1">
+    <div className="app-modal z-[65]" role="dialog" aria-modal="true">
+      <div className="app-modal-backdrop" onClick={() => !busy && onClose?.()} />
+      <div className="app-modal-panel">
+        <div className="app-modal-body">
+        <div className="flex items-center gap-2 mb-1 min-w-0">
           {brand && <MerchantLogo brand={brand} size={36} />}
-          <h2 className="font-bold text-lg">{t('Edit transaction')}</h2>
+          <h2 className="font-bold text-lg min-w-0 break-words">{t('Edit transaction')}</h2>
         </div>
         <p className="text-sm text-slate-500 mb-4">
           {t('Update details for this transaction.')}
         </p>
 
-        <form onSubmit={submit} className="flex flex-col gap-3">
+        <form onSubmit={submit} className="flex flex-col gap-3 min-w-0">
           <Field label={t('Account')}>
             <select
               required
@@ -261,6 +264,7 @@ export default function TransactionEditSheet({
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   )

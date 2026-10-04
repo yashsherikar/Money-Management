@@ -39,7 +39,13 @@ export const SUBSCRIPTION_BRANDS = [
   { id: 'dunzo', name: 'Dunzo', color: '#00D26A', letter: 'D', keywords: ['dunzo'] },
 
   // Ride / travel
-  { id: 'uber', name: 'Uber', color: '#000000', letter: 'U', keywords: ['uber eats', 'ubereats', 'uberindia', 'uber'] },
+  {
+    id: 'uber',
+    name: 'Uber',
+    color: '#000000',
+    letter: 'U',
+    keywords: ['uber eats', 'ubereats', 'uberindia', 'uber trip', 'uber ride', 'uber'],
+  },
   { id: 'ola', name: 'Ola', color: '#CDDC39', letter: 'O', keywords: ['ola cabs', 'olacabs', 'ola money', 'ola'] },
   { id: 'rapido', name: 'Rapido', color: '#F9A825', letter: 'R', keywords: ['rapido'] },
   { id: 'irctc', name: 'IRCTC', color: '#213D77', letter: 'I', keywords: ['irctc'] },
@@ -94,7 +100,7 @@ export const MERCHANT_BRANDS = SUBSCRIPTION_BRANDS
 function keywordMatches(hay, keyword) {
   const k = String(keyword || '').toLowerCase()
   if (!k || !hay) return false
-  if (k.includes('.*')) {
+  if (k.includes('.*') || k.startsWith('\\b')) {
     try {
       return new RegExp(k, 'i').test(hay)
     } catch {
@@ -102,7 +108,14 @@ function keywordMatches(hay, keyword) {
     }
   }
   const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, 'i').test(hay)
+  // Exact token: "uber" in "paid via uber today"
+  if (new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, 'i').test(hay)) return true
+  // Merchant codes / VPAs: "uber" in "uberindia", "ubereats", "uber@ybl"
+  // Only for longer keywords so short ones ("ola", "jio", "vi") stay exact.
+  if (k.length >= 4 && !k.includes(' ') && !k.includes('@')) {
+    return new RegExp(`(?:^|[^a-z0-9])${escaped}[a-z0-9]{0,24}(?:[^a-z0-9]|$)`, 'i').test(hay)
+  }
+  return false
 }
 
 /**
