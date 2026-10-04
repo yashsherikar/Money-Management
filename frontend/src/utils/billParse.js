@@ -11,9 +11,10 @@ const PAYMENT_MODES = [
 ]
 
 const CATEGORY_HINTS = [
-  // Coffee / drinks / breakfast / QSR → Snacks (before Dining Out)
-  { name: 'Snacks', re: /\bsnack|\bchaat|\bpani\s*puri|\bvada\s*pav|\bstreet\s*food|\btea\b|\bchai|\bburger|\bsamosa|\bnasta|\bnashta|\bcoffee|\bcafe|\bstarbucks|\bcold\s*coffee|\bjuice|\bshake|\bbreakfast|\bkfc|\bdomino|\bmcdonald|\bpizza\s*hut|\bsubway/i },
-  { name: 'Dining Out', re: /\brestaurant\b|\bdining\b|\bswiggy\b|\bzomato\b|\bhotel\b|\blunch\b|\bdinner\b|\bthali\b|\bbuffet\b|\bbiryani\b/i },
+  // Coffee / chai / juice → Drinks (before Snacks / Dining Out)
+  { name: 'Drinks', re: /\bcoffee|\bcafe|\bstarbucks|\bcold\s*coffee|\btea\b|\bchai|\bjuice|\bshake|\bsmoothie|\blassi|\blimbu\s*pani|\bnimbu\s*pani|\blemonade|\bsoft\s*drink|\bcold\s*drink|\bsoda|\bpepsi|\bcoca\s*cola|\bdrink\b|\bdrinks\b/i },
+  { name: 'Snacks', re: /\bsnack|\bchaat|\bpani\s*puri|\bvada\s*pav|\bstreet\s*food|\bburger|\bsamosa|\bnasta|\bnashta|\bbreakfast|\bkfc|\bdomino|\bmcdonald|\bpizza\s*hut|\bsubway/i },
+  { name: 'Dining Out', re: /\brestaurant\b|\bdining\b|\bswiggy\b|\bzomato\b|\bhotel\b|\blunch\b|\bdinner\b|\bthali\b|\bbuffet\b|\bbiryani\b|\bdosa\b|\bchinese\b/i },
   { name: 'Groceries', re: /\bgrocery\b|\bsupermarket\b|\bdmart\b|\bbig bazaar\b|\breliance fresh\b|\bmore\b|\bvegetables?\b/i },
   { name: 'Fuel', re: /\bpetrol\b|\bdiesel\b|\bfuel\b|\bpump\b|\biocl\b|\bbpcl\b|\bhpcl\b/i },
   { name: 'Travel', re: /\btaxi\b|\buber\b|\bola\b|\brailway\b|\birctc\b|\bflight\b|\bindigo\b|\bcab\b|\bfare\b/i },

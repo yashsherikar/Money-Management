@@ -321,8 +321,8 @@ export async function updateLoggedUpiCategory({
 } = {}) {
   const cat = categories?.find((c) => String(c.id) === String(categoryId))
   if (!cat) throw new Error('Category missing')
+  if (accountId == null || accountId === '') throw new Error('Account missing')
   const date = txnDate || localDateYmd()
-
   const desc = description || buildDescription({ pn, note: description, source: 'upi' })
   const body = {
     accountId: Number(accountId),
@@ -330,14 +330,17 @@ export async function updateLoggedUpiCategory({
     type: 'EXPENSE',
     amount: Number(amount),
     description: desc,
-    paymentId: pa || null,
+    // null preserves existing Payment ID when refining category only
+    paymentId: pa != null && String(pa).trim() !== '' ? String(pa).trim() : null,
     txnDate: date,
   }
   if (transactionId) {
-    await client.put(`/transactions/${transactionId}`, body)
-  } else {
-    await client.post('/transactions', body)
+    const { data: saved } = await client.put(`/transactions/${transactionId}`, body)
+    if (pa) rememberPayeeCategory(pa, categoryId, cat.name)
+    window.dispatchEvent(new Event('mm-transactions-changed'))
+    return { categoryName: saved?.categoryName || cat.name }
   }
+  await client.post('/transactions', body)
   if (pa) rememberPayeeCategory(pa, categoryId, cat.name)
   window.dispatchEvent(new Event('mm-transactions-changed'))
   return { categoryName: cat.name }

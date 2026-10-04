@@ -502,16 +502,20 @@ export const mr = {
   'e.g. Burger King, pani puri, lunch with friends': 'उदा. बर्गर किंग, पाणीपुरी, मित्रांसोबत जेवण',
   'e.g. Lunch alone, dinner with partner, Burger King': 'उदा. एकटे लंच, पार्टनरसोबत डिनर, बर्गर किंग',
   'e.g. Snacks, Dining Out': 'उदा. स्नॅक्स, बाहेरचे जेवण',
+  'e.g. Drinks, Snacks, Dining Out': 'उदा. ड्रिंक्स, स्नॅक्स, बाहेरचे जेवण',
   'Food tip: Dining Out = full meal · Snacks = burger, chai, chaat · Groceries = home cooking':
-    'जेवण टिप: Dining Out = पूर्ण जेवण · Snacks = बर्गर, चहा, चाट · Groceries = घरचे साहित्य',
+    'जेवण टिप: Dining Out = पूर्ण जेवण · Snacks = बर्गर, चाट · Drinks = चहा, कॉफी · Groceries = घरचे साहित्य',
   'Food tip: Dining Out = lunch/dinner · Snacks = burger, chai · Groceries = home. Alone or with partner? Put that in Description.':
-    'जेवण टिप: Dining Out = लंच/डिनर · Snacks = बर्गर, चहा · Groceries = घरचे. एकटे किंवा पार्टनरसोबत? Description मध्ये लिहा.',
+    'जेवण टिप: Dining Out = लंच/डिनर · Snacks = बर्गर · Drinks = चहा · Groceries = घरचे. एकटे किंवा पार्टनरसोबत? Description मध्ये लिहा.',
   'Food tip: Snacks = coffee, drinks, breakfast, burger, chai · Dining Out = lunch/dinner/restaurant · Groceries = home cooking.':
-    'जेवण टिप: Snacks = कॉफी, ड्रिंक्स, नाश्ता, बर्गर, चहा · Dining Out = लंच/डिनर/रेस्टॉरंट · Groceries = घरचे साहित्य.',
+    'जेवण टिप: Drinks = कॉफी, चहा, ज्यूस · Snacks = नाश्ता, बर्गर · Dining Out = लंच/डिनर · Groceries = घरचे.',
+  'Food tip: Drinks = coffee, chai, juice · Snacks = breakfast, burger, chaat · Dining Out = lunch/dinner/restaurant · Groceries = home cooking.':
+    'जेवण टिप: Drinks = कॉफी, चहा, ज्यूस · Snacks = नाश्ता, बर्गर, चाट · Dining Out = लंच/डिनर/रेस्टॉरंट · Groceries = घरचे साहित्य.',
   '+ New category': '+ नवीन श्रेणी',
   'Could not add category': 'श्रेणी जोडता आली नाही',
   Account: 'खाते',
   Category: 'श्रेणी',
+  Drinks: 'ड्रिंक्स',
   Snacks: 'स्नॅक्स',
   'Dining Out': 'बाहेरचे जेवण',
   Groceries: 'किराणा',

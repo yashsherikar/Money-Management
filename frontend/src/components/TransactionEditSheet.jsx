@@ -11,7 +11,7 @@ const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market', 'Cashback', 'Refu
 
 const EXPENSE_DEFAULTS = [
   'Dining Out', 'Groceries', 'Rent', 'Transport', 'Shopping', 'Entertainment',
-  'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks',
+  'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks', 'Drinks',
 ]
 
 function sortCategories(categories) {
@@ -53,6 +53,8 @@ export default function TransactionEditSheet({
     setLocalCategories(categories)
   }, [categories])
 
+  // Init form only when opening / switching txn — NOT when categories list refreshes
+  // (a categories reload used to wipe the category the user just picked).
   useEffect(() => {
     if (!open || !txn) {
       setForm(null)
@@ -60,22 +62,42 @@ export default function TransactionEditSheet({
     }
     setForm({
       accountId: String(txn.accountId),
-      categoryId: txn.categoryId ? String(txn.categoryId) : '',
+      categoryId: txn.categoryId != null && txn.categoryId !== '' ? String(txn.categoryId) : '',
       type: txn.type,
       amount: String(txn.amount),
       description: txn.description || '',
       txnDate: txn.txnDate,
     })
-    setCategoryQuery(
-      txn.categoryId
-        ? categories.find((c) => c.id === txn.categoryId)?.name || ''
-        : '',
-    )
     setAddingCategory(false)
     setNewCategoryName('')
     setError('')
     setBusy(false)
-  }, [open, txn, categories])
+  }, [open, txn?.id])
+
+  // Remap stale clone category ids → visible default id (same name). Never wipe a user pick.
+  useEffect(() => {
+    if (!open || !form) return
+    if (form.categoryId) {
+      const byId = localCategories.find((c) => String(c.id) === String(form.categoryId))
+      if (byId) {
+        setCategoryQuery(byId.name)
+        return
+      }
+      const byName = findCategoryByName(localCategories, txn?.categoryName)
+      if (byName) {
+        setForm((f) => (f ? { ...f, categoryId: String(byName.id) } : f))
+        setCategoryQuery(byName.name)
+      }
+      return
+    }
+    if (txn?.categoryName) {
+      const byName = findCategoryByName(localCategories, txn.categoryName)
+      if (byName) {
+        setForm((f) => (f ? { ...f, categoryId: String(byName.id) } : f))
+        setCategoryQuery(byName.name)
+      }
+    }
+  }, [open, localCategories, form?.categoryId, txn?.categoryName])
 
   if (!open || !form || !txn) return null
 
@@ -270,7 +292,7 @@ export default function TransactionEditSheet({
                   categories={localCategories}
                   value={form.categoryId}
                   onChange={(id, cat) => {
-                    setForm((f) => ({ ...f, categoryId: id }))
+                    setForm((f) => ({ ...f, categoryId: String(id) }))
                     setCategoryQuery(cat?.name || '')
                   }}
                   placeholder={t('Search categories…')}

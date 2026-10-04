@@ -2,6 +2,7 @@
 // a broad one (e.g. "food") when both would match the same text.
 const ICONS = [
   // Food — specific cuisines/items before the generic fallback
+  { keywords: ['drinks', 'drink'], icon: '🥤' },
   { keywords: ['limbu pani', 'limbupani', 'nimbu pani', 'nimbupani', 'lemonade', 'lemon soda', 'shikanji'], icon: '🍋' },
   { keywords: ['dosa', 'dhosa', 'dhosha', 'uttapam', 'idli', 'vada'], icon: '🥞' },
   { keywords: ['chinese', 'noodle', 'noodles', 'manchurian', 'momo', 'momos', 'hakka', 'schezwan', 'chowmein', 'fried rice'], icon: '🥡' },
