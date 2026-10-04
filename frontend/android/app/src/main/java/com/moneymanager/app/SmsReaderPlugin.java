@@ -420,7 +420,11 @@ public class SmsReaderPlugin extends Plugin {
         JSObject data = new JSObject();
         data.put("address", address == null ? "" : address);
         data.put("body", body == null ? "" : body);
-        data.put("date", date);
+        // Prefer delivery time — PDU stamps are often minutes early and broke the listen gate
+        long now = System.currentTimeMillis();
+        long ts = (date > 0 && date > now - 6L * 60 * 60 * 1000 && date <= now + 60_000L) ? date : now;
+        data.put("date", ts);
+        data.put("live", true);
         plugin.notifyListeners("bankSms", data);
     }
 }

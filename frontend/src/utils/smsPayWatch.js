@@ -16,7 +16,7 @@ import { shouldIgnoreMoneySms } from './smsScamFilter.js'
 import {
   ensureSmsListenFrom,
   getSmsListenFrom,
-  markSmsListenFromNow,
+  markSmsListenFromNowIfUnset,
   isSmsFromPresent,
 } from './smsListenGate.js'
 import client from '../api/client'
@@ -167,8 +167,9 @@ export async function requestSmsPermission() {
     const ret = await SmsReader.requestPermissions()
     const granted = !!(ret?.granted || ret?.sms === 'granted' || ret?.sms === 'GRANTED')
     if (granted) {
-      // Arm from this moment — no past SMS
-      markSmsListenFromNow()
+      // Arm once — do NOT reset listen window on every Pay/Settings permission check
+      // (resetting was dropping delayed bank SMS stamped before "now")
+      markSmsListenFromNowIfUnset()
       await SmsReader.startWatch({ sinceMs: getSmsListenFrom() }).catch(() => {})
       // Only live SMS queued while granting (not inbox history)
       drainLiveSmsQueue().catch(() => {})

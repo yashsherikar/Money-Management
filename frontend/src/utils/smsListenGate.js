@@ -41,12 +41,31 @@ export function markSmsListenFromNow() {
   return now
 }
 
+/**
+ * Only move listen-from forward on a real first grant.
+ * Re-requesting SMS permission must NOT reset the window (was dropping delayed bank SMS).
+ */
+export function markSmsListenFromNowIfUnset() {
+  try {
+    const existing = Number(localStorage.getItem(LISTEN_FROM_KEY) || 0)
+    if (existing > 0) {
+      syncNativeListenFrom(existing)
+      return existing
+    }
+  } catch { /* ignore */ }
+  return markSmsListenFromNow()
+}
+
 export function getSmsListenFrom() {
   return ensureSmsListenFrom()
 }
 
-/** True if this SMS timestamp is at/after our listen window (with 30s skew). */
+/**
+ * True if this SMS should be processed as "live".
+ * Live RECEIVE_SMS (flagged) always passes — bank PDU timestamps are often minutes old.
+ */
 export function isSmsFromPresent(msgOrDate) {
+  if (msgOrDate && typeof msgOrDate === 'object' && msgOrDate.live) return true
   const listenFrom = getSmsListenFrom()
   const date = typeof msgOrDate === 'number'
     ? msgOrDate
@@ -55,5 +74,6 @@ export function isSmsFromPresent(msgOrDate) {
     // Live RECEIVE_SMS often has "now" — allow
     return true
   }
-  return date >= listenFrom - 30_000
+  // 6h skew: delayed bank/UPI SMS delivery is common
+  return date >= listenFrom - 6 * 60 * 60 * 1000
 }

@@ -47,18 +47,33 @@ public final class SmsLiveStore {
         }
     }
 
+    /**
+     * Queue a live RECEIVE_SMS message.
+     * Does NOT reject on SMS PDU timestamp vs listen-from — carriers often stamp
+     * bank SMS minutes earlier than delivery, which previously dropped real money SMS.
+     * Only requires that listening is armed (user granted SMS).
+     */
     public static void enqueue(Context ctx, String address, String body, long date) {
         if (ctx == null || body == null || body.isBlank()) return;
         synchronized (LOCK) {
             long listen = prefs(ctx).getLong(KEY_LISTEN, 0L);
             // Not armed yet — ignore (avoids queuing before user allows SMS)
-            if (listen <= 0) return;
-            long ts = date > 0 ? date : System.currentTimeMillis();
-            if (ts < listen - 30_000L) return;
+            if (listen <= 0) {
+                // Auto-arm on first live SMS after install/update if permission exists
+                // (JS may not have synced yet). Still only RECEIVE_SMS path calls this.
+                long now = System.currentTimeMillis();
+                prefs(ctx).edit().putLong(KEY_LISTEN, now).commit();
+                listen = now;
+            }
+            // Prefer wall-clock delivery time so delayed PDU stamps don't look "old"
+            long ts = System.currentTimeMillis();
+            if (date > 0 && date <= ts + 60_000L) {
+                // Use PDU time only if it's sane (not far future); else delivery now
+                ts = date > ts - 6 * 60 * 60_000L ? date : ts;
+            }
 
             try {
                 JSONArray arr = readArrayUnlocked(ctx);
-                // Exact dedupe: same sender + body + second (keeps distinct debit/credit)
                 String key = dedupeKey(address, body, ts);
                 for (int i = 0; i < arr.length(); i++) {
                     JSONObject o = arr.optJSONObject(i);
@@ -66,16 +81,23 @@ public final class SmsLiveStore {
                     if (key.equals(dedupeKey(o.optString("address", ""), o.optString("body", ""), o.optLong("date", 0L)))) {
                         return;
                     }
+                    // Also drop exact same body+address already queued (any second)
+                    String a = address == null ? "" : address.trim();
+                    String b = body.trim();
+                    if (a.equals(o.optString("address", "").trim())
+                            && b.equals(o.optString("body", "").trim())) {
+                        return;
+                    }
                 }
                 JSONObject row = new JSONObject();
                 row.put("address", address == null ? "" : address);
                 row.put("body", body);
                 row.put("date", ts);
+                row.put("live", true);
                 arr.put(row);
                 while (arr.length() > MAX) {
                     arr.remove(0);
                 }
-                // commit() so a process kill right after SMS still persists the queue
                 prefs(ctx).edit().putString(KEY_QUEUE, arr.toString()).commit();
             } catch (Exception ignored) { }
         }
@@ -89,16 +111,15 @@ public final class SmsLiveStore {
             try {
                 JSONArray arr = readArrayUnlocked(ctx);
                 prefs(ctx).edit().putString(KEY_QUEUE, "[]").commit();
-                long listen = prefs(ctx).getLong(KEY_LISTEN, 0L);
                 for (int i = 0; i < arr.length(); i++) {
                     JSONObject o = arr.optJSONObject(i);
                     if (o == null) continue;
                     long date = o.optLong("date", 0L);
-                    if (listen > 0 && date > 0 && date < listen - 30_000L) continue;
                     JSObject row = new JSObject();
                     row.put("address", o.optString("address", ""));
                     row.put("body", o.optString("body", ""));
                     row.put("date", date > 0 ? date : System.currentTimeMillis());
+                    row.put("live", true);
                     out.put(row);
                 }
             } catch (Exception ignored) { }
