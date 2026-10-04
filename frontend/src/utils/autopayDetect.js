@@ -156,6 +156,14 @@ function buildDescription(parsed, accountName, brand) {
     const bank = formatBankLabel(parsed.bankLabel || parsed.bank?.id)
     return [`Cashback: ${who}`, bank].filter(Boolean).join(' · ').slice(0, 220)
   }
+  if (parsed.kind === 'refund') {
+    const bank = formatBankLabel(parsed.bankLabel || parsed.bank?.id)
+    return [`Refund: ${who}`, bank].filter(Boolean).join(' · ').slice(0, 220)
+  }
+  if (parsed.kind === 'interest') {
+    const bank = formatBankLabel(parsed.bankLabel || parsed.bank?.id)
+    return [`Interest: ${who === 'Bank' ? 'Savings' : who}`, bank].filter(Boolean).join(' · ').slice(0, 220)
+  }
 
   const prefix = parsed.direction === 'CREDIT'
     ? 'Credit'
@@ -185,22 +193,27 @@ function resolveCategory(categories, parsed) {
   if (!categories?.length) return { id: null, confident: false, name: null }
   const preferred = parsed.kind === 'cashback'
     ? ['Cashback', 'Freelance', 'Other']
-    : parsed.kind === 'savings'
-      ? ['Savings', 'Investment']
-      : parsed.kind === 'autopay'
-        ? ['Subscription', 'Bills']
-        : parsed.direction === 'CREDIT'
-          ? (/\bsalary\b/i.test(String(parsed.raw || ''))
-            ? ['Salary', 'Freelance', 'Other']
-            : ['Freelance', 'Other', 'Salary'])
-          : ['Bills', 'Food', 'Shopping', 'Travel']
+    : parsed.kind === 'refund'
+      ? ['Refund', 'Cashback', 'Other', 'Freelance']
+      : parsed.kind === 'interest'
+        ? ['Interest', 'Savings', 'Investment', 'Other']
+        : parsed.kind === 'savings'
+          ? ['Savings', 'Investment']
+          : parsed.kind === 'autopay'
+            ? ['Subscription', 'Bills']
+            : parsed.direction === 'CREDIT'
+              ? (/\bsalary\b/i.test(String(parsed.raw || ''))
+                ? ['Salary', 'Freelance', 'Other']
+                : ['Freelance', 'Other', 'Salary'])
+              : ['Bills', 'Food', 'Shopping', 'Travel']
 
+  const autoOtherKinds = new Set(['cashback', 'refund', 'interest'])
   for (const name of preferred) {
     const hit = categories.find((c) => String(c.name).toLowerCase() === name.toLowerCase())
     if (!hit) continue
     const isOther = String(hit.name).toLowerCase() === 'other'
-    // Cashback may only have Other — still auto-save to Transactions
-    if (!isOther || parsed.kind === 'cashback') {
+    // Cashback / refund / interest may only have Other — still auto-save
+    if (!isOther || autoOtherKinds.has(parsed.kind)) {
       return { id: hit.id, confident: true, name: hit.name }
     }
   }
@@ -228,7 +241,7 @@ async function alreadyLoggedSimilar(accountId, amount, direction, txnDate) {
       && Number(t.amount) === Number(amount)
       && t.type === type
       && t.txnDate === txnDate
-      && /^(Cashback|Credit|Autopay|Savings|Transfer|Bank SMS|Subscription)/i.test(String(t.description || '')),
+      && /^(Cashback|Refund|Interest|Credit|Autopay|Savings|Transfer|Bank SMS|Subscription)/i.test(String(t.description || '')),
     )
   } catch {
     return false
@@ -362,15 +375,16 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
     const bankMatched = !!(parsed.bank && account && parsed.bank.keywords.some((k) =>
       String(account.name || '').toLowerCase().includes(k),
     ))
-    // Cashback credits: prefer auto-post to Transactions (INCOME) when we have account+category
-    if (parsed.kind === 'cashback' && account && cat.id) {
+    // Wallet / refund / interest credits: prefer auto-post when we have account+category
+    const easyCredit = parsed.kind === 'cashback' || parsed.kind === 'refund' || parsed.kind === 'interest'
+    if (easyCredit && account && cat.id) {
       cat = { ...cat, confident: true }
     }
     const canAuto = !!(account && cat.confident && (
       bankMatched
       || accs.length === 1
       || account.isPrimary
-      || parsed.kind === 'cashback'
+      || easyCredit
     ))
 
     if (!canAuto) {

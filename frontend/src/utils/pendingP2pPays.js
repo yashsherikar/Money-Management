@@ -135,6 +135,21 @@ export function markPendingP2pNotPaid(id) {
   return updated
 }
 
+/** Bank SMS says UPI/payment failed — stop waiting for debit confirmation. */
+export function markPendingP2pFailed(id, { smsRaw, reason = 'payment_failed' } = {}) {
+  const updated = updatePendingP2pPay(id, {
+    status: 'failed',
+    failedAt: Date.now(),
+    failReason: reason,
+    smsRaw: smsRaw || null,
+    source: 'sms_failed',
+  })
+  import('./pendingPayReminders.js')
+    .then((m) => m.cancelPendingPayReminder(id))
+    .catch(() => {})
+  return updated
+}
+
 export function removePendingP2pPay(id) {
   const list = listPendingP2pPays().filter((x) => x.id !== id)
   saveAll(list)

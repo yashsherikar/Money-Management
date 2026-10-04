@@ -1,8 +1,9 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { parseBankPaymentSms, pickBestPendingMatch } from './smsPayParse.js'
+import { parseBankPaymentSms, parseUpiPaymentFailedSms, pickBestPendingMatch } from './smsPayParse.js'
 import {
   waitingP2pPays,
   markPendingP2pConfirmed,
+  markPendingP2pFailed,
   listPendingP2pPays,
   updatePendingP2pPay,
   getPendingP2pPay,
@@ -10,6 +11,7 @@ import {
 import { handleDetectedUpiPayment } from './paymentNotify.js'
 import { processAutopaySms, markSmsConsumedByPayConfirm } from './autopayDetect.js'
 import { processAutopayStopSms, isAutopayStopSms } from './autopayStopDetect.js'
+import { parseBankMoneySms } from './smsBankParse.js'
 import { shouldIgnoreMoneySms } from './smsScamFilter.js'
 import {
   ensureSmsListenFrom,
@@ -95,8 +97,48 @@ export async function processIncomingSms(msg, { accounts, categories } = {}) {
     }
   } catch { /* ignore */ }
 
+  // UPI / payment failed while waiting for QR confirm — stop hanging on "waiting SMS"
+  try {
+    const failed = parseUpiPaymentFailedSms({
+      body,
+      address,
+      date: msg?.date || Date.now(),
+    })
+    if (failed) {
+      const waiting = waitingP2pPays()
+      const match = pickBestPendingMatch(failed, waiting)
+      if (match) {
+        markPendingP2pFailed(match.id, { smsRaw: failed.raw, reason: 'payment_failed' })
+        return { payFailed: true, pendingId: match.id }
+      }
+    }
+  } catch { /* ignore */ }
+
   // Ads / scam / spam / no real debit or credit → ignore
+  // (failed-pay SMS often lacks credit/debit verbs — handled above first)
   if (shouldIgnoreMoneySms({ body, address })) return null
+
+  // Credits that arrive while QR pay is waiting (cashback / refund / interest / salary)
+  // — never block behind debit-only QR matching
+  try {
+    const money = parseBankMoneySms({
+      body,
+      address,
+      date: msg?.date || Date.now(),
+      includeUpiPayment: true,
+    })
+    const creditKinds = new Set(['cashback', 'refund', 'interest'])
+    if (money?.direction === 'CREDIT' && (creditKinds.has(money.kind) || money.kind === 'payment')) {
+      const ap = await processAutopaySms(msg, { accounts, categories })
+      if (ap) {
+        return {
+          credit: ap,
+          cashback: money.kind === 'cashback' ? ap : undefined,
+          autopay: ap,
+        }
+      }
+    }
+  } catch { /* fall through to QR / other bank SMS */ }
 
   const parsed = parseBankPaymentSms({
     body,
