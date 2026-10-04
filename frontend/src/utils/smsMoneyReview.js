@@ -16,7 +16,8 @@ import {
 } from './userStorage.js'
 
 const KEY = 'mm_sms_money_review'
-const MAX = 25
+/** Several debit/credit/cashback SMS can land in one burst — keep room for all. */
+const MAX = 40
 const NOTIF_ID_BASE = 76000
 
 function uid() {

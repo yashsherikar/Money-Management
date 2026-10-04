@@ -13,7 +13,9 @@ import java.util.Optional;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
-    List<Transaction> findByUserIdAndTxnDateBetweenOrderByTxnDateDesc(Long userId, LocalDate from, LocalDate to);
+    /** Newest calendar day first; within a day, newest by create time. */
+    List<Transaction> findByUserIdAndTxnDateBetweenOrderByTxnDateDescCreatedAtDesc(
+            Long userId, LocalDate from, LocalDate to);
 
     Optional<Transaction> findByIdAndUserId(Long id, Long userId);
 
@@ -83,7 +85,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("select t from Transaction t left join fetch t.category " +
             "where t.user.id = :userId and t.type = 'EXPENSE' and t.txnDate between :from and :to " +
             "and (t.description is null or lower(t.description) not like 'transfer:%') " +
-            "order by t.txnDate desc")
+            "order by t.txnDate desc, t.createdAt desc")
     List<Transaction> findExpensesForHistory(@Param("userId") Long userId,
                                               @Param("from") LocalDate from,
                                               @Param("to") LocalDate to);

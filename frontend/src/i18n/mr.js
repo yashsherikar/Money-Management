@@ -513,6 +513,16 @@ export const mr = {
   Snacks: 'स्नॅक्स',
   'Dining Out': 'बाहेरचे जेवण',
   Groceries: 'किराणा',
+  Today: 'आज',
+  Yesterday: 'काल',
+  'Select income category…': 'उत्पन्न श्रेणी निवडा…',
+  '+ New income category': '+ नवीन उत्पन्न श्रेणी',
+  'Select an income category': 'उत्पन्न श्रेणी निवडा',
+  'Other = gift, reimbursement, or anything else. Cashback = BHIM/Paytm rewards.':
+    'Other = भेट, परतफेड इ. Cashback = BHIM/Paytm रिवॉर्ड.',
+  Cashback: 'कॅशबॅक',
+  Refund: 'रिफंड',
+  Interest: 'व्याज',
   'Select…': 'निवडा…',
   'Pay with UPI': 'UPI ने पैसे द्या',
   'Already paid? Log expense': 'आधीच दिले? खर्च नोंदवा',
@@ -591,6 +601,19 @@ export const mr = {
     'फक्त नवीन डेबिट/क्रेडिट SMS (SMS परवानगी दिल्यापासून). अॅप उघडल्यावर अलीकडील inbox तपासते. जाहिरात, स्कॅम, स्पॅम दुर्लक्षित.',
   'Live debit/credit SMS only — works even if the app was closed. Past inbox is never imported. Ads, scam, and spam are ignored.':
     'फक्त लाइव्ह डेबिट/क्रेडिट SMS — अॅप बंद असले तरी चालते. जुना inbox कधीही आणत नाही. जाहिरात, स्कॅम, स्पॅम दुर्लक्षित.',
+  'SMS permission on': 'SMS परवानगी चालू',
+  'SMS permission off': 'SMS परवानगी बंद',
+  'Background: Unrestricted (SMS works when app is killed)':
+    'बॅकग्राउंड: Unrestricted (अॅप बंद असतानाही SMS येते)',
+  'Background restricted — Battery Saver may block SMS when app is closed':
+    'बॅकग्राउंड मर्यादित — Battery Saver अॅप बंद असताना SMS थांबवू शकते',
+  'Turn off Battery Saver for Money Manager (set Battery → Unrestricted). Otherwise Android may not deliver bank SMS when the app is killed.':
+    'Money Manager साठी Battery Saver बंद करा (Battery → Unrestricted). नाहीतर अॅप बंद असताना बँक SMS येणार नाही.',
+  'Allow background': 'बॅकग्राउंड परवानगी द्या',
+  'Autostart / OEM settings': 'Autostart / फोन सेटिंग्ज',
+  'Battery settings': 'बॅटरी सेटिंग्ज',
+  'Pending pays': 'प्रलंबित पे',
+  waiting: 'प्रलंबित',
   'Check SMS again': 'पुन्हा SMS तपासा',
   'SMS found — bill amount matches a bank debit.': 'SMS सापडला — बिल रक्कम बँक डेबिटशी जुळते.',
   'merchant match': 'दुकान जुळले',

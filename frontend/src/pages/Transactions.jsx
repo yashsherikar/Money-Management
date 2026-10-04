@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
@@ -12,9 +12,16 @@ import { waitingP2pPays, countWaitingP2pPays, listPendingP2pPays } from '../util
 import { syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import { formatTxnDisplay } from '../utils/txnDisplay.js'
+import { localDateYmd } from '../utils/localDate.js'
+import {
+  groupTransactionsByDate,
+  formatTxnDayLabel,
+  formatTxnTime,
+} from '../utils/txnSort.js'
 
-const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: new Date().toISOString().slice(0, 10) }
-const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market']
+const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: localDateYmd() }
+/** Income picker options — "Other" is a real category, not "add new". */
+const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market', 'Cashback', 'Refund', 'Interest', 'Other']
 
 /** Alphabetical, but "Other" always last regardless of where it sorts. */
 function sortCategories(categories) {
@@ -23,6 +30,12 @@ function sortCategories(categories) {
     if (b.name === 'Other') return -1
     return a.name.localeCompare(b.name)
   })
+}
+
+function findCategoryByName(categories, name) {
+  const n = String(name || '').trim().toLowerCase()
+  if (!n) return null
+  return categories.find((c) => String(c.name || '').toLowerCase() === n) || null
 }
 
 export default function Transactions() {
@@ -48,7 +61,7 @@ export default function Transactions() {
       client.get('/accounts'),
       client.get('/categories'),
     ])
-    setTransactions(txnRes.data)
+    setTransactions(Array.isArray(txnRes.data) ? txnRes.data : [])
     setAccounts(accRes.data)
     setCategories(catRes.data)
     setWaitingPays(waitingP2pPays())
@@ -75,6 +88,8 @@ export default function Transactions() {
     }
   }, [])
 
+  const txnGroups = useMemo(() => groupTransactionsByDate(transactions), [transactions])
+
   function resetForm() {
     setForm(emptyForm)
     setFormOpen(false)
@@ -82,13 +97,58 @@ export default function Transactions() {
     setAddingCategory(false)
   }
 
+  async function ensureIncomeCategoryId(rawId) {
+    if (rawId) return Number(rawId)
+    // UI may show Other while categoryId was never set — resolve real Other
+    const other = findCategoryByName(categories, 'Other')
+    if (other?.id != null) return Number(other.id)
+    try {
+      const { data } = await client.post('/categories', { name: 'Other', essential: false })
+      setCategories((prev) => [...prev, data])
+      return Number(data.id)
+    } catch {
+      return null
+    }
+  }
+
+  async function pickIncomeSource(name) {
+    if (name === '__new__') {
+      setAddingCategory(true)
+      setNewCategoryName('')
+      return
+    }
+    let match = findCategoryByName(categories, name)
+    if (!match) {
+      try {
+        const { data } = await client.post('/categories', {
+          name,
+          essential: name !== 'Other',
+        })
+        match = data
+        setCategories((prev) => [...prev, data])
+      } catch (err) {
+        setError(err.response?.data?.message || t('Could not add category'))
+        return
+      }
+    }
+    setForm((f) => ({ ...f, categoryId: String(match.id) }))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     try {
+      let categoryId = form.categoryId ? Number(form.categoryId) : null
+      if (form.type === 'INCOME' && categoryId == null) {
+        categoryId = await ensureIncomeCategoryId(form.categoryId)
+      }
+      if (form.type === 'INCOME' && categoryId == null) {
+        setError(t('Select an income category'))
+        return
+      }
       const payload = {
         accountId: Number(form.accountId),
-        categoryId: form.categoryId ? Number(form.categoryId) : null,
+        categoryId,
         type: form.type,
         amount: Number(form.amount),
         description: form.description,
@@ -268,21 +328,35 @@ export default function Transactions() {
               <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
             </div>
           ) : form.type === 'INCOME' ? (
-            <select
-              value={categories.find((c) => String(c.id) === form.categoryId && INCOME_SOURCES.includes(c.name))?.name || 'Other'}
-              onChange={(e) => {
-                if (e.target.value === 'Other') {
-                  setAddingCategory(true)
-                  return
-                }
-                const match = categories.find((c) => c.name === e.target.value)
-                setForm({ ...form, categoryId: match ? String(match.id) : '' })
-              }}
-              className="w-full"
-            >
-              {INCOME_SOURCES.map((name) => <option key={name} value={name}>{t(name)}</option>)}
-              <option value="Other">{t('Other (add new)')}</option>
-            </select>
+            <>
+              <select
+                required
+                value={(() => {
+                  const cat = categories.find((c) => String(c.id) === String(form.categoryId))
+                  if (!cat) return ''
+                  if (INCOME_SOURCES.includes(cat.name)) return cat.name
+                  return cat.name
+                })()}
+                onChange={(e) => pickIncomeSource(e.target.value)}
+                className="w-full"
+              >
+                <option value="">{t('Select income category…')}</option>
+                {INCOME_SOURCES.map((name) => (
+                  <option key={name} value={name}>{t(name)}</option>
+                ))}
+                {/* Custom income categories the user already created */}
+                {categories
+                  .filter((c) => !INCOME_SOURCES.includes(c.name) && c.name !== 'Salary')
+                  .filter((c) => !['Dining Out', 'Groceries', 'Rent', 'Transport', 'Shopping', 'Entertainment', 'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks'].includes(c.name))
+                  .map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                <option value="__new__">{t('+ New income category')}</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-500">
+                {t('Other = gift, reimbursement, or anything else. Cashback = BHIM/Paytm rewards.')}
+              </p>
+            </>
           ) : (
             <>
               <input
@@ -316,7 +390,14 @@ export default function Transactions() {
               setAddingCategory(false)
               setNewCategoryName('')
               setCategoryQuery('')
-              setForm({ ...form, type: e.target.value, categoryId: '' })
+              const nextType = e.target.value
+              // Default income to Other so Add works immediately
+              const other = nextType === 'INCOME' ? findCategoryByName(categories, 'Other') : null
+              setForm({
+                ...form,
+                type: nextType,
+                categoryId: other?.id != null ? String(other.id) : '',
+              })
             }}
             className="w-full"
           >
@@ -340,7 +421,7 @@ export default function Transactions() {
                 {liveBrand && <MerchantLogo brand={liveBrand} size={36} />}
                 <input
                   placeholder={t('Description')}
-                  required={form.type === 'INCOME' && !form.categoryId}
+                  required={false}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   className="w-full"
@@ -365,66 +446,74 @@ export default function Transactions() {
       </CollapsibleSection>
 
       <MoneyList empty={t('No transactions this month.')}>
-        {transactions.map((txn) => {
-          const desc = String(txn.description || '')
-          const isAutopay = /^Autopay:/i.test(desc)
-          const isSavings = /^Savings/i.test(desc)
-          const isTransfer = /^Transfer\s*:/i.test(desc)
-          const brand = isTransfer ? null : brandFromTxnText(txn.description, txn.categoryName)
-          // Headline = merchant/payee name; UPI/split/share details go in subtitle
-          const display = formatTxnDisplay(txn.description, txn.categoryName)
-          const title = isTransfer || isAutopay || isSavings
-            ? (txn.description || txn.categoryName || t('Transaction'))
-            : display.title
-          const isIncome = txn.type === 'INCOME'
-          const meta = [
-            txn.txnDate,
-            txn.accountName,
-            ...(isTransfer || isAutopay || isSavings ? [] : display.details),
-            brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
-              ? brand.name
-              : null,
-            isTransfer && t('Transfer · own accounts'),
-            isAutopay && t('Autopay · SMS'),
-            isSavings && t('Savings · SMS'),
-            txn.categoryName && txn.description && !isAutopay && !isSavings && !isTransfer ? txn.categoryName : null,
-          ].filter(Boolean).join(' · ')
-          return (
-            <MoneyRow
-              key={txn.id}
-              title={title}
-              meta={meta}
-              amount={txn.amount}
-              income={isIncome}
-              type={txn.type}
-              icon={brand ? <MerchantLogo brand={brand} size={40} /> : null}
-              iconText={brand ? undefined : `${txn.description || ''} ${txn.categoryName || ''}`}
-              onClick={() => openTxnDetail(txn)}
-              actions={(
-                <>
-                  {txn.canSplit && (
-                    <RowAction onClick={() => navigate(`/split-bills?txnId=${txn.id}`)} tone="brand">
-                      <span>{t('Split')}</span>
+        {txnGroups.flatMap((group) => [
+          <li
+            key={`day-${group.date || 'unknown'}`}
+            className="px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-500 bg-slate-50 sticky top-0 z-[1]"
+          >
+            {formatTxnDayLabel(group.date, t)}
+          </li>,
+          ...group.items.map((txn) => {
+            const desc = String(txn.description || '')
+            const isAutopay = /^Autopay:/i.test(desc)
+            const isSavings = /^Savings/i.test(desc)
+            const isTransfer = /^Transfer\s*:/i.test(desc)
+            const brand = isTransfer ? null : brandFromTxnText(txn.description, txn.categoryName)
+            const display = formatTxnDisplay(txn.description, txn.categoryName)
+            const title = isTransfer || isAutopay || isSavings
+              ? (txn.description || txn.categoryName || t('Transaction'))
+              : display.title
+            const isIncome = txn.type === 'INCOME'
+            const timeLabel = formatTxnTime(txn.createdAt)
+            const meta = [
+              timeLabel,
+              txn.accountName,
+              ...(isTransfer || isAutopay || isSavings ? [] : display.details),
+              brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
+                ? brand.name
+                : null,
+              isTransfer && t('Transfer · own accounts'),
+              isAutopay && t('Autopay · SMS'),
+              isSavings && t('Savings · SMS'),
+              txn.categoryName && txn.description && !isAutopay && !isSavings && !isTransfer ? txn.categoryName : null,
+            ].filter(Boolean).join(' · ')
+            return (
+              <MoneyRow
+                key={txn.id}
+                title={title}
+                meta={meta}
+                amount={txn.amount}
+                income={isIncome}
+                type={txn.type}
+                icon={brand ? <MerchantLogo brand={brand} size={40} /> : null}
+                iconText={brand ? undefined : `${txn.description || ''} ${txn.categoryName || ''}`}
+                onClick={() => openTxnDetail(txn)}
+                actions={(
+                  <>
+                    {txn.canSplit && (
+                      <RowAction onClick={() => navigate(`/split-bills?txnId=${txn.id}`)} tone="brand">
+                        <span>{t('Split')}</span>
+                      </RowAction>
+                    )}
+                    {txn.splitBillId && (
+                      <RowAction onClick={() => navigate('/split-bills')} tone="brand">
+                        <span>{t('Split ✓')}</span>
+                      </RowAction>
+                    )}
+                    <RowAction onClick={() => startEdit(txn)} tone="brand">
+                      <EditIcon />
+                      <span>{t('Edit')}</span>
                     </RowAction>
-                  )}
-                  {txn.splitBillId && (
-                    <RowAction onClick={() => navigate('/split-bills')} tone="brand">
-                      <span>{t('Split ✓')}</span>
+                    <RowAction onClick={() => handleDelete(txn.id)} tone="danger">
+                      <DeleteIcon />
+                      <span>{t('Delete')}</span>
                     </RowAction>
-                  )}
-                  <RowAction onClick={() => startEdit(txn)} tone="brand">
-                    <EditIcon />
-                    <span>{t('Edit')}</span>
-                  </RowAction>
-                  <RowAction onClick={() => handleDelete(txn.id)} tone="danger">
-                    <DeleteIcon />
-                    <span>{t('Delete')}</span>
-                  </RowAction>
-                </>
-              )}
-            />
-          )
-        })}
+                  </>
+                )}
+              />
+            )
+          }),
+        ])}
       </MoneyList>
     </div>
   )

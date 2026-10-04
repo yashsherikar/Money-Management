@@ -59,9 +59,21 @@
         <receiver
             android:name=".SmsReceivedReceiver"
             android:exported="true"
+            android:enabled="true"
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="999">
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Re-arm listen window after reboot (queue was cleared; permission still granted). -->
+        <receiver
+            android:name=".SmsBootReceiver"
+            android:exported="false"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
@@ -120,6 +132,9 @@
     <!-- Bank SMS: live RECEIVE only for new debit/credit (no past-inbox money import) -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- Let SMS arrive while app is killed — Battery Saver / Doze often blocks RECEIVE_SMS otherwise -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 </manifest>
