@@ -127,6 +127,8 @@ export default function Pay() {
   const [defaultAccountId, setDefaultAccountId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [note, setNote] = useState('')
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
 
   useEffect(() => {
     setPayees(listSavedPayees())
@@ -514,22 +516,88 @@ export default function Pay() {
           <label className="block text-sm font-medium text-slate-700 mb-1">
             {t('Category')} <span className="text-red-500">*</span>
           </label>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-md"
-          >
-            <option value="">{t('Select category…')}</option>
-            {[...categories]
-              .sort((a, b) => {
-                if (a.name === 'Other') return 1
-                if (b.name === 'Other') return -1
-                return a.name.localeCompare(b.name)
-              })
-              .map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-          </select>
+          <p className="text-xs text-slate-500 mb-1.5">
+            {t('Food tip: Dining Out = lunch/dinner · Snacks = burger, chai · Groceries = home. Alone or with partner? Put that in Description.')}
+          </p>
+          {addingCategory ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                autoFocus
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  const nameTrim = newCategoryName.trim()
+                  if (!nameTrim) return
+                  try {
+                    const { data } = await client.post('/categories', { name: nameTrim, essential: false })
+                    setCategories((prev) => [...prev, data])
+                    setCategoryId(String(data.id))
+                    setNewCategoryName('')
+                    setAddingCategory(false)
+                  } catch (err) {
+                    setError(err.response?.data?.message || err.message || t('Could not add category'))
+                  }
+                }}
+                placeholder={t('e.g. Snacks, Dining Out')}
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-md"
+              />
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md bg-brand-600 text-white text-sm font-medium"
+                onClick={async () => {
+                  const nameTrim = newCategoryName.trim()
+                  if (!nameTrim) return
+                  try {
+                    const { data } = await client.post('/categories', { name: nameTrim, essential: false })
+                    setCategories((prev) => [...prev, data])
+                    setCategoryId(String(data.id))
+                    setNewCategoryName('')
+                    setAddingCategory(false)
+                  } catch (err) {
+                    setError(err.response?.data?.message || err.message || t('Could not add category'))
+                  }
+                }}
+              >
+                {t('Add')}
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md border border-slate-300 text-sm"
+                onClick={() => { setAddingCategory(false); setNewCategoryName('') }}
+              >
+                {t('Cancel')}
+              </button>
+            </div>
+          ) : (
+            <>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md"
+              >
+                <option value="">{t('Select category…')}</option>
+                {[...categories]
+                  .sort((a, b) => {
+                    if (a.name === 'Other') return 1
+                    if (b.name === 'Other') return -1
+                    return a.name.localeCompare(b.name)
+                  })
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                className="mt-1.5 text-xs text-brand-600 font-medium"
+                onClick={() => setAddingCategory(true)}
+              >
+                {t('+ New category')}
+              </button>
+            </>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">{t('Description')}</label>
@@ -537,7 +605,7 @@ export default function Pay() {
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={t('e.g. Lunch, grocery, rent')}
+            placeholder={t('e.g. Lunch alone, dinner with partner, Burger King')}
             className="w-full px-3 py-2 border border-slate-300 rounded-md"
           />
         </div>

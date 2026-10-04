@@ -12,6 +12,7 @@ const ICONS = [
   { keywords: ['ice cream', 'dessert', 'sweet', 'mithai'], icon: '🍨' },
   { keywords: ['cake', 'bakery', 'pastry'], icon: '🎂' },
   { keywords: ['pani puri', 'chaat', 'street food', 'vada pav'], icon: '🌮' },
+  { keywords: ['snack', 'snacks', 'chai nashta', 'nashta', 'farsan', 'biscuit', 'namkeen'], icon: '🍿' },
   { keywords: ['juice', 'smoothie'], icon: '🥤' },
   { keywords: ['blinkit', 'zepto', 'instamart', 'jiomart'], icon: '⚡' },
   { keywords: ['grocery', 'groceries', 'vegetable', 'kirana', 'supermarket', 'bigbasket', 'dmart'], icon: '🛒' },
