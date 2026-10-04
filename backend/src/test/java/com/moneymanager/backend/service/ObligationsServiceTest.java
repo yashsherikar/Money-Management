@@ -37,7 +37,8 @@ class ObligationsServiceTest {
         user.setId(1L);
 
         EmiResponse activeEmi = new EmiResponse(1L, 1L, "Car Loan", BigDecimal.valueOf(500000),
-                BigDecimal.valueOf(9), 60, BigDecimal.valueOf(45000), LocalDate.now(), 5, true);
+                BigDecimal.valueOf(9), 60, BigDecimal.valueOf(45000), LocalDate.now(), 5, true,
+                null, true, true);
         when(emiService.list(user)).thenReturn(List.of(activeEmi));
         when(fixedDepositService.list(user)).thenReturn(List.of());
         when(insuranceService.list(user)).thenReturn(List.of());
@@ -56,7 +57,8 @@ class ObligationsServiceTest {
         user.setId(1L);
 
         EmiResponse activeEmi = new EmiResponse(1L, 1L, "Bike Loan", BigDecimal.valueOf(100000),
-                BigDecimal.valueOf(9), 24, BigDecimal.valueOf(20000), LocalDate.now(), 5, true);
+                BigDecimal.valueOf(9), 24, BigDecimal.valueOf(20000), LocalDate.now(), 5, true,
+                null, true, true);
         when(emiService.list(user)).thenReturn(List.of(activeEmi));
         when(fixedDepositService.list(user)).thenReturn(List.of());
         when(insuranceService.list(user)).thenReturn(List.of());
