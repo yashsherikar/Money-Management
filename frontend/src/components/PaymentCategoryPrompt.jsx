@@ -15,14 +15,7 @@ import {
 } from '../utils/paymentNotify.js'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
-
-function sortCategories(categories) {
-  return [...categories].sort((a, b) => {
-    if (a.name === 'Other') return 1
-    if (b.name === 'Other') return -1
-    return a.name.localeCompare(b.name)
-  })
-}
+import CategoryPicker from './CategoryPicker.jsx'
 
 /**
  * After SMS / notify confirms a payment:
@@ -189,8 +182,6 @@ export default function PaymentCategoryPrompt() {
     setPrompt(null)
   }
 
-  const expenseCategories = sortCategories(categories.filter((c) => c.name !== 'Salary'))
-
   return (
     <ModalPortal>
       {toast && (
@@ -219,16 +210,13 @@ export default function PaymentCategoryPrompt() {
             <div className="text-sm font-medium mb-3">
               ₹{Number(prompt.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <select
+            <CategoryPicker
+              categories={categories}
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md mb-4"
-            >
-              <option value="">{t('Select…')}</option>
-              {expenseCategories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              onChange={(id) => setCategoryId(id)}
+              excludeNames={['Salary']}
+              className="mb-4"
+            />
             <div className="flex gap-2">
               <button
                 type="button"

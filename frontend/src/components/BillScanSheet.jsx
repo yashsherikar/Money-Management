@@ -11,6 +11,7 @@ import {
 import { requestSmsPermission, isSmsPaySupported } from '../utils/smsPayWatch.js'
 import { suppressResumeLock } from '../appLock.js'
 import Field from './Field.jsx'
+import CategoryPicker from './CategoryPicker.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
 
@@ -348,10 +349,12 @@ export default function BillScanSheet({
               </select>
             </Field>
             <Field label={t('Category')}>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full">
-                <option value="">{t('No category')}</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <CategoryPicker
+                categories={categories}
+                value={categoryId}
+                onChange={(id) => setCategoryId(id)}
+                placeholder={t('No category')}
+              />
             </Field>
             <Field label={t('Date')}>
               <input type="date" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} className="w-full" />

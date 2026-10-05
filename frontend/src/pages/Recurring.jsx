@@ -6,6 +6,7 @@ import { EditIcon, DeleteIcon } from '../components/icons.jsx'
 import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
+import CategoryPicker from '../components/CategoryPicker.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import { listAutopayHistory } from '../utils/autopayDetect.js'
@@ -350,22 +351,19 @@ export default function Recurring() {
               <button type="button" onClick={() => { setAddingCategory(false); setNewCategoryName('') }} className="px-3 py-2 rounded-md border border-slate-300 text-sm">{t('Cancel')}</button>
             </div>
           ) : (
-            <select
+            <CategoryPicker
+              categories={categories}
               value={form.categoryId}
-              onChange={(e) => {
-                const picked = categories.find((c) => String(c.id) === e.target.value)
+              onChange={(id, picked) => {
                 if (picked?.name === 'Other') {
                   setAddingCategory(true)
                   setForm({ ...form, categoryId: '' })
                 } else {
-                  setForm({ ...form, categoryId: e.target.value })
+                  setForm({ ...form, categoryId: id })
                 }
               }}
-              className="w-full"
-            >
-              <option value="">{t('No category')}</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name === 'Other' ? t('Other (add new)') : c.name}</option>)}
-            </select>
+              placeholder={t('No category')}
+            />
           )}
         </Field>
 

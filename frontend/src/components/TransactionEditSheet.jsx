@@ -14,14 +14,6 @@ const EXPENSE_DEFAULTS = [
   'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks', 'Drinks',
 ]
 
-function sortCategories(categories) {
-  return [...categories].sort((a, b) => {
-    if (a.name === 'Other') return 1
-    if (b.name === 'Other') return -1
-    return a.name.localeCompare(b.name)
-  })
-}
-
 function findCategoryByName(categories, name) {
   const n = String(name || '').trim().toLowerCase()
   if (!n) return null

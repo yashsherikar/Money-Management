@@ -10,6 +10,7 @@ import {
   listActiveSmsMoneyReviews,
 } from '../utils/smsMoneyReview.js'
 import { confirmSelfTransferFromReview } from '../utils/selfTransferDetect.js'
+import CategoryPicker from './CategoryPicker.jsx'
 import { confirmDuePaid } from '../utils/confirmDuePaid.js'
 import { detectMerchantBrand, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
@@ -423,16 +424,12 @@ export default function SmsMoneyReviewPrompt() {
                 <label className="block text-[13px] font-bold text-muted mb-1">
                   {t('Category')} <span className="text-red-500">*</span>
                 </label>
-                <select
+                <CategoryPicker
+                  categories={catList}
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full mb-3"
-                >
-                  <option value="">{t('Select category…')}</option>
-                  {catList.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  onChange={(id) => setCategoryId(id)}
+                  className="mb-3"
+                />
 
                 <label className="block text-[13px] font-bold text-muted mb-1">
                   {t('Description')} <span className="text-red-500">*</span>
