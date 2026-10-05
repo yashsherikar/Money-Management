@@ -147,22 +147,16 @@ public class UpiLauncherPlugin extends Plugin {
 
             Intent launch;
             if (GPAY.equals(pkg)) {
-                // No am= — avoids fake bank-limit; GPay opens this UPI ID for amount entry
-                String query = "pa=" + pa + "&cu=INR";
-                if (pn != null) query += "&pn=" + pn;
-                launch = new Intent(Intent.ACTION_VIEW);
-                launch.setData(Uri.parse("tez://upi/pay?" + query));
-                launch.setPackage(GPAY);
-                if (launch.resolveActivity(pm) == null) {
-                    launch = new Intent(Intent.ACTION_VIEW, opaqueUpiUri(query));
-                    launch.setPackage(GPAY);
-                }
-                if (launch.resolveActivity(pm) == null) {
-                    // Last resort: home + clipboard (paste is flaky in GPay)
-                    launch = pm.getLaunchIntentForPackage(GPAY);
-                    toast("UPI ID copied\nGPay → New payment → paste, enter ₹" + am);
+                // Confirmed by real-device testing: ANY tez://upi/pay?pa=... deep link targeting
+                // a specific payee — even with no am= — trips GPay's "exceeded bank limit" /
+                // "Payment failed" block on third-party-initiated P2P payments. There is no deep
+                // link variant that avoids this; only a plain, undirected app launch does.
+                launch = pm.getLaunchIntentForPackage(GPAY);
+                if (launch == null) {
+                    call.reject("Could not open GPay");
+                    return;
                 } else {
-                    toast("GPay opened for " + pa + "\nEnter ₹" + am + " there");
+                    toast("UPI ID copied\nGPay → New payment → paste, enter ₹" + am);
                 }
             } else {
                 launch = pm.getLaunchIntentForPackage(pkg);
@@ -264,7 +258,11 @@ public class UpiLauncherPlugin extends Plugin {
             cm.setPrimaryClip(ClipData.newPlainText("UPI", upiUrl));
         } catch (Exception ignored) { }
 
-        Uri opaqueUpi = opaqueUpiUri(query);
+        // Standard hierarchical URI (upi://pay?...), NOT the opaque form below — an opaque
+        // Uri.fromParts has no host component, so it can never match a UPI app's registered
+        // intent-filter (which NPCI's spec has every app declare as scheme=upi, host=pay).
+        // This is almost certainly why resolution/launch was failing across every app.
+        Uri opaqueUpi = Uri.parse(upiUrl);
         String pkg = resolvePackage(app);
         PackageManager pm = getContext().getPackageManager();
 
@@ -322,21 +320,11 @@ public class UpiLauncherPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    static Uri opaqueUpiUri(String query) {
-        return Uri.fromParts("upi", "//pay?" + query, null);
-    }
-
     static String buildMinimalPayUrl(String paRaw, String amRaw) {
         String pa = sanitizePa(paRaw);
         String am = normalizeAmount(amRaw);
         if (am == null) throw new IllegalArgumentException("Bad amount");
         return "upi://pay?pa=" + pa + "&am=" + am + "&cu=INR";
-    }
-
-    static Uri uriFromCleanUpi(String cleanUrl) {
-        int q = cleanUrl.indexOf('?');
-        if (q < 0) throw new IllegalArgumentException("Invalid UPI link");
-        return opaqueUpiUri(cleanUrl.substring(q + 1));
     }
 
     static String rebuildCleanUpiUrl(String url) {
