@@ -268,7 +268,7 @@ export default function Transactions() {
                   <li key={p.id} className="text-xs text-slate-500 truncate">
                     ₹{Number(p.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     {' · '}
-                    {p.pn || p.pa}
+                    {p.pn || t('UPI pay')}
                     {!p.reminded ? ` · ${t('reminder in ~15 min if no SMS')}` : ` · ${t('reminder sent')}`}
                   </li>
                 ))}

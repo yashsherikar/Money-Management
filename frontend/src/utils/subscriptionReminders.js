@@ -33,13 +33,13 @@ function nextDueDate(item) {
   const now = new Date()
   let y = now.getFullYear()
   let m = now.getMonth()
-  let candidate = new Date(y, m, day, 9, 0, 0)
+  let candidate = new Date(y, m, day, 10, 0, 0)
   // If already past this month's due (or paid this cycle), next month
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   if (candidate < todayStart || !item.canMarkPaid && item.due === false) {
     m += 1
     if (m > 11) { m = 0; y += 1 }
-    candidate = new Date(y, m, day, 9, 0, 0)
+    candidate = new Date(y, m, day, 10, 0, 0)
   }
   return candidate
 }

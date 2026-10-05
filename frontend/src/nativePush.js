@@ -32,14 +32,17 @@ export async function isNativePushEnabled() {
  *  the first time. FCM tokens can rotate (reinstalls, cleared app data, periodic Google
  *  rotation) — re-registering on every login is what keeps the backend's copy fresh, and
  *  is a no-op cost-wise since it skips the OS permission dialog once already granted. */
+/** @returns {Promise<boolean>} true only if a token was actually registered with the backend. */
 export async function promptNativePushIfNeeded(client) {
-  if (!isNativePlatform()) return
+  if (!isNativePlatform()) return false
   const status = await PushNotifications.checkPermissions()
-  if (status.receive === 'denied') return
+  if (status.receive === 'denied') return false
   try {
     await enableNativePush(client)
+    return true
   } catch {
-    // user declined or registration failed — they can retry from Settings
+    // user declined or registration failed — caller decides how to surface this
+    return false
   }
 }
 

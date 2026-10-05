@@ -21,7 +21,7 @@ import {
   categoryNameForMcc,
   rememberMerchantCategoryId,
 } from '../utils/upiQr.js'
-import { listSavedPayees, upsertSavedPayee, findPayeeByPa, rememberPayeeCategory } from '../utils/savedPayees.js'
+import { upsertSavedPayee, findPayeeByPa, rememberPayeeCategory } from '../utils/savedPayees.js'
 import { rememberLastPayAttempt } from '../utils/paymentNotify.js'
 import { addPendingP2pPay } from '../utils/pendingP2pPays.js'
 import { requestSmsPermission, isSmsPaySupported, checkSmsPermission } from '../utils/smsPayWatch.js'
@@ -120,7 +120,6 @@ export default function Pay() {
   const [hint, setHint] = useState('')
   const [paying, setPaying] = useState(null)
   const [qrBusy, setQrBusy] = useState(false)
-  const [payees, setPayees] = useState(() => listSavedPayees())
   const [scanning, setScanning] = useState(false)
   const [scanBusy, setScanBusy] = useState(false)
   const [cameraReady, setCameraReady] = useState(false)
@@ -135,10 +134,6 @@ export default function Pay() {
   const [note, setNote] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
-
-  useEffect(() => {
-    setPayees(listSavedPayees())
-  }, [])
 
   useEffect(() => {
     Promise.all([client.get('/accounts'), client.get('/categories')])
@@ -206,19 +201,6 @@ export default function Pay() {
             : t('Merchant QR scanned. Name & type filled — confirm category + amount, then pay.')
         ),
     )
-  }
-
-  function pickPayee(p) {
-    setPa(p.pa || '')
-    setName(p.pn || '')
-    setMc('')
-    setTn('')
-    setNote('')
-    setCategoryId(p.categoryId ? String(p.categoryId) : '')
-    setPersonal(true)
-    setScanned(false)
-    setError('')
-    setHint('')
   }
 
   async function handleScan() {
@@ -302,7 +284,6 @@ export default function Pay() {
       upsertSavedPayee({ pa: cleanPa, pn: name, categoryId, categoryName: cat?.name })
       rememberPayeeCategory(cleanPa, categoryId, cat?.name)
       if (!personal) rememberMerchantCategoryId(cleanPa, categoryId)
-      setPayees(listSavedPayees())
       rememberLastPayAttempt({
         pa: cleanPa,
         pn: name,
@@ -514,25 +495,6 @@ export default function Pay() {
           {t('Parse')}
         </button>
       </form>
-
-      {payees.length > 0 && (
-        <div className="mb-4">
-          <div className="text-sm font-medium text-slate-700 mb-2">{t('Saved payees')}</div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {payees.slice(0, 12).map((p) => (
-              <button
-                key={p.pa}
-                type="button"
-                onClick={() => pickPayee(p)}
-                className="shrink-0 max-w-[9.5rem] text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:border-brand-400"
-              >
-                <div className="text-sm font-medium truncate">{p.pn || p.pa.split('@')[0]}</div>
-                <div className="text-[10px] text-slate-500 font-mono truncate">{p.pa}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 mb-5">
         <div className="flex items-center justify-between gap-2">

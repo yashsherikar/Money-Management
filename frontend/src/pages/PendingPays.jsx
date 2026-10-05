@@ -283,8 +283,7 @@ export default function PendingPays() {
               <div key={item.id} className="app-card">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-semibold truncate">{item.pn || item.pa || t('UPI pay')}</div>
-                    <div className="text-xs text-slate-500 font-mono truncate">{item.pa}</div>
+                    <div className="font-semibold truncate">{item.pn || t('UPI pay')}</div>
                     <div className="text-lg font-bold mt-1">{money(item.amount)}</div>
                     <div className="text-xs text-slate-500 mt-1">{ago(item.createdAt)} · {t('SMS can arrive late')}</div>
                   </div>
@@ -329,8 +328,7 @@ export default function PendingPays() {
               <div key={item.id} className="app-card">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-medium truncate">{item.pn || item.pa}</div>
-                    <div className="text-xs text-slate-500 font-mono truncate">{item.pa}</div>
+                    <div className="font-medium truncate">{item.pn || t('UPI pay')}</div>
                     <div className="text-sm mt-0.5">
                       {money(item.amount)} · {ago(item.updatedAt || item.createdAt)}
                       {' · '}
