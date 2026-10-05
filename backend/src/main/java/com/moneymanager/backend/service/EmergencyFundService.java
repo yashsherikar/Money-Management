@@ -4,9 +4,12 @@ import com.moneymanager.backend.dto.EmergencyFundDtos.*;
 import com.moneymanager.backend.entity.Account;
 import com.moneymanager.backend.entity.AccountType;
 import com.moneymanager.backend.entity.EmergencyFundPlan;
+import com.moneymanager.backend.entity.Transaction;
+import com.moneymanager.backend.entity.TransactionType;
 import com.moneymanager.backend.entity.User;
 import com.moneymanager.backend.repository.AccountRepository;
 import com.moneymanager.backend.repository.EmergencyFundPlanRepository;
+import com.moneymanager.backend.repository.TransactionRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +24,16 @@ public class EmergencyFundService {
 
     private final EmergencyFundPlanRepository emergencyFundPlanRepository;
     private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
     private final PushService pushService;
 
     public EmergencyFundService(EmergencyFundPlanRepository emergencyFundPlanRepository,
                                  AccountRepository accountRepository,
+                                 TransactionRepository transactionRepository,
                                  PushService pushService) {
         this.emergencyFundPlanRepository = emergencyFundPlanRepository;
         this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
         this.pushService = pushService;
     }
 
@@ -83,6 +89,25 @@ public class EmergencyFundService {
 
         Account source = plan.getSourceAccount();
         Account target = plan.getTargetAccount();
+
+        Transaction out = new Transaction();
+        out.setUser(user);
+        out.setAccount(source);
+        out.setType(TransactionType.EXPENSE);
+        out.setAmount(plan.getAmount());
+        out.setDescription("Emergency fund → " + target.getName());
+        out.setTxnDate(LocalDate.now());
+        transactionRepository.save(out);
+
+        Transaction in = new Transaction();
+        in.setUser(user);
+        in.setAccount(target);
+        in.setType(TransactionType.INCOME);
+        in.setAmount(plan.getAmount());
+        in.setDescription("Emergency fund from " + source.getName());
+        in.setTxnDate(LocalDate.now());
+        transactionRepository.save(in);
+
         source.setBalance(source.getBalance().subtract(plan.getAmount()));
         target.setBalance(target.getBalance().add(plan.getAmount()));
         accountRepository.save(source);
