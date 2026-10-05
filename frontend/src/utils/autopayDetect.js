@@ -23,6 +23,7 @@ import { shouldIgnoreMoneySms } from './smsScamFilter.js'
 import { findDueMatches, pickConfidentDueMatch } from './matchDueSms.js'
 import { confirmDuePaid } from './confirmDuePaid.js'
 import { namesLookSame } from './smsPayParse.js'
+import { findCategoryByMerchantName } from './savedPayees.js'
 import { localDateYmd } from './localDate.js'
 import { findFoodCategoryId, suggestFoodCategoryName } from './foodCategory.js'
 
@@ -224,6 +225,17 @@ function buildDescription(parsed, accountName, brand) {
 /** Confident category = named match, not bare Other / first fallback. */
 function resolveCategory(categories, parsed) {
   if (!categories?.length) return { id: null, confident: false, name: null }
+
+  // User already picked a category for this exact merchant before — use it again,
+  // silently, same as a known UPI payee. Outranks every other heuristic below.
+  if (parsed.merchant) {
+    const remembered = findCategoryByMerchantName(parsed.merchant)
+    if (remembered?.categoryId) {
+      const hit = categories.find((c) => String(c.id) === String(remembered.categoryId))
+      if (hit) return { id: hit.id, confident: true, name: hit.name }
+    }
+  }
+
   const preferred = parsed.kind === 'cashback'
     ? ['Cashback', 'Freelance', 'Other']
     : parsed.kind === 'refund'

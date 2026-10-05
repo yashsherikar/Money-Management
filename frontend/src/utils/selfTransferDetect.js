@@ -47,6 +47,33 @@ async function alreadyHasTransferLeg(accountId, amount, type, txnDate) {
 }
 
 /**
+ * A self-transfer that matches an active, not-yet-confirmed Emergency Fund plan's
+ * source/target/amount IS that plan's monthly contribution — confirm the plan
+ * directly instead of logging a generic "Transfer: A → B" pair. One correctly
+ * labeled pair ("Emergency fund → X" / "Emergency fund from Y"), no duplicate,
+ * no guessing direction from SMS text (the plan already knows it).
+ */
+async function tryMatchEmergencyFundPlan(fromAccount, toAccount, amount) {
+  try {
+    const { data: plans } = await client.get('/emergency-fund')
+    const now = new Date()
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const plan = (plans || []).find((p) =>
+      p.active
+      && p.lastLoggedMonth !== ym
+      && String(p.sourceAccountId) === String(fromAccount.id)
+      && String(p.targetAccountId) === String(toAccount.id)
+      && Math.abs(Number(p.amount) - Number(amount)) < 0.01,
+    )
+    if (!plan) return null
+    await client.post(`/emergency-fund/${plan.id}/confirm`)
+    return plan.id
+  } catch {
+    return null
+  }
+}
+
+/**
  * Post both legs (or the missing one) for a self-transfer.
  */
 export async function postSelfTransferPair({
@@ -57,6 +84,7 @@ export async function postSelfTransferPair({
   categoryId,
   existingDebitTxnId = null,
   existingCreditTxnId = null,
+  allowEmergencyFundMatch = true,
 } = {}) {
   if (!fromAccount?.id || !toAccount?.id) {
     return { ok: false, error: 'need_both_accounts' }
@@ -64,6 +92,17 @@ export async function postSelfTransferPair({
   if (String(fromAccount.id) === String(toAccount.id)) {
     return { ok: false, error: 'same_account' }
   }
+
+  if (allowEmergencyFundMatch && !existingDebitTxnId && !existingCreditTxnId) {
+    const matchedPlanId = await tryMatchEmergencyFundPlan(fromAccount, toAccount, amount)
+    if (matchedPlanId) {
+      try {
+        window.dispatchEvent(new Event('mm-transactions-changed'))
+      } catch { /* ignore */ }
+      return { ok: true, matchedEmergencyFundPlanId: matchedPlanId }
+    }
+  }
+
   const desc = transferDescription(fromAccount.name, toAccount.name)
   const amt = Number(amount)
   const results = []
@@ -139,6 +178,7 @@ export async function tryProcessSelfTransferSms(parsed, {
         txnDate,
         categoryId: cat?.id,
         existingDebitTxnId: pair?.debitTxnId || null,
+        allowEmergencyFundMatch: !classified.inferred,
       })
       if (pair) {
         markSelfTransferCompleted(pair.id, {
@@ -215,6 +255,7 @@ export async function tryProcessSelfTransferSms(parsed, {
       txnDate,
       categoryId: cat?.id,
       existingCreditTxnId: pair?.creditTxnId || null,
+      allowEmergencyFundMatch: !classified.inferred,
     })
     if (pair) {
       markSelfTransferCompleted(pair.id, {

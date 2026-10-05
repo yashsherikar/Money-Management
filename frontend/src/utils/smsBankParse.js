@@ -351,13 +351,18 @@ export function classifySelfTransfer(parsed, accounts) {
   if (!smsAccount) return null
 
   let other = findLinkedAccountInSms(parsed, accounts, smsAccount.id)
+  let inferred = false
 
   // Plain UPI without transfer wording: only if another of our banks is named
   if (!explicit && !other) return null
 
-  // Exactly two accounts + transfer wording → counterpart is the other account
+  // Exactly two accounts + transfer wording, counterpart not named in the SMS →
+  // guess it's the other account. Good enough to log a generic transfer pair, but
+  // NOT a safe enough signal to silently auto-confirm an Emergency Fund plan on
+  // (an unrelated IMPS/NEFT to someone else could otherwise get misattributed).
   if (!other && explicit && accounts.length === 2) {
     other = accounts.find((a) => String(a.id) !== String(smsAccount.id)) || null
+    inferred = !!other
   }
 
   if (parsed.direction === 'DEBIT') {
@@ -366,6 +371,7 @@ export function classifySelfTransfer(parsed, accounts) {
       toAccount: other || null,
       smsAccount,
       needsDestination: !other,
+      inferred,
     }
   }
   return {
@@ -373,6 +379,7 @@ export function classifySelfTransfer(parsed, accounts) {
     toAccount: smsAccount,
     smsAccount,
     needsDestination: !other,
+    inferred,
   }
 }
 
