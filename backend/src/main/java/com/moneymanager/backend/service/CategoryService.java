@@ -53,20 +53,26 @@ public class CategoryService {
         if (name.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "category name required");
         }
-        // Never create a second Cashback / Dining Out / etc.
-        List<Category> existing = categoryRepository.findVisibleByNameIgnoreCase(user.getId(), name);
-        if (!existing.isEmpty()) {
-            Category prefer = existing.stream()
-                    .filter(Category::isDefault)
-                    .findFirst()
-                    .orElse(existing.get(0));
-            return toResponse(prefer);
+        // Never create a second Cashback / Dining Out / etc. "Fast Food", "fast-food", "fast_food"
+        // and "fastfood" must all resolve to the same category, not separate entries.
+        String normalized = normalize(name);
+        Category match = categoryRepository.findVisibleToUser(user.getId()).stream()
+                .filter(c -> normalize(c.getName()).equals(normalized))
+                .reduce((a, b) -> a.isDefault() ? a : b)
+                .orElse(null);
+        if (match != null) {
+            return toResponse(match);
         }
         Category category = new Category();
         category.setUser(user);
         category.setName(name);
         category.setEssential(request.essential());
         return toResponse(categoryRepository.save(category));
+    }
+
+    /** Lowercase, letters/digits only — "Fast Food" / "fast-food" / "fast_food" / "fastfood" all match. */
+    private static String normalize(String s) {
+        return s == null ? "" : s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     public void delete(User user, Long id) {

@@ -63,7 +63,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             "and (t.description is null or lower(t.description) not like 'transfer:%') " +
             "and not exists (select 1 from RecurringTransaction r where r.user.id = :userId " +
             "  and r.description = t.description and r.amount = t.amount) " +
-            "order by t.amount desc")
+            "order by t.txnDate desc, t.createdAt desc")
     List<Transaction> findNonEssentialExpenses(@Param("userId") Long userId,
                                                 @Param("from") LocalDate from,
                                                 @Param("to") LocalDate to);
@@ -75,7 +75,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             "and (t.description is null or lower(t.description) not like 'transfer:%') " +
             "and not exists (select 1 from RecurringTransaction r where r.user.id = :userId " +
             "  and r.description = t.description and r.amount = t.amount) " +
-            "order by t.amount desc")
+            "order by t.txnDate desc, t.createdAt desc")
     List<Transaction> findNonEssentialExpensesForAccount(@Param("userId") Long userId,
                                                           @Param("accountId") Long accountId,
                                                           @Param("from") LocalDate from,

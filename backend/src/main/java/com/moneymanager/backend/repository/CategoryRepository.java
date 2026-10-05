@@ -20,9 +20,4 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     Optional<Category> findVisibleById(@Param("id") Long id, @Param("userId") Long userId);
 
     Optional<Category> findByNameAndIsDefaultTrue(String name);
-
-    @Query("select c from Category c left join c.user u where lower(c.name) = lower(:name) "
-            + "and (c.isDefault = true or u.id = :userId) "
-            + "order by case when c.isDefault = true then 0 else 1 end, c.id")
-    List<Category> findVisibleByNameIgnoreCase(@Param("userId") Long userId, @Param("name") String name);
 }

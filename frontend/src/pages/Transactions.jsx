@@ -24,15 +24,6 @@ const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', 
 /** Income picker options — "Other" is a real category, not "add new". */
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market', 'Cashback', 'Refund', 'Interest', 'Other']
 
-/** Alphabetical, but "Other" always last regardless of where it sorts. */
-function sortCategories(categories) {
-  return [...categories].sort((a, b) => {
-    if (a.name === 'Other') return 1
-    if (b.name === 'Other') return -1
-    return a.name.localeCompare(b.name)
-  })
-}
-
 function findCategoryByName(categories, name) {
   const n = String(name || '').trim().toLowerCase()
   if (!n) return null
