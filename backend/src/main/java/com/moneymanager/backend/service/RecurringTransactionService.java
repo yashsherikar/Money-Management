@@ -223,18 +223,23 @@ public class RecurringTransactionService {
         LocalDate today = LocalDate.now();
         String currentMonth = YearMonth.from(today).toString();
 
+        // Interval: reject confirming before the cycle is due. Must run BEFORE the generic
+        // idempotent guard below — for INTERVAL_DAYS, isDue/canMarkPaid are the same condition,
+        // so "not due yet" would otherwise be indistinguishable from "already confirmed" and
+        // silently return fake success (clears reminders, logs nothing, moves no money).
+        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS && today.isBefore(nextDueDate(rt))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not due yet");
+        }
+
         // Idempotent: already confirmed this cycle → success so UI clears on reopen
         if (!isDue(rt, today) && !canMarkPaid(rt, today)) {
             pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, rt.getId());
             return toResponse(rt);
         }
+        // Monthly may be confirmed early; once logged this month, re-confirming is a no-op success.
         if (rt.getRecurrenceType() == RecurrenceType.MONTHLY && currentMonth.equals(rt.getLastLoggedMonth())) {
             pushService.resolveRelated(PushService.RELATED_RECURRING_TRANSACTION, rt.getId());
             return toResponse(rt);
-        }
-        // Interval: allow confirm once due (or overdue). Monthly may be confirmed early.
-        if (rt.getRecurrenceType() == RecurrenceType.INTERVAL_DAYS && today.isBefore(nextDueDate(rt))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not due yet");
         }
 
         // QR / SMS already logged this amount → mark paid without double expense

@@ -211,7 +211,7 @@ export default function PaymentCategoryPrompt() {
                 ? t('Already saved in Transactions as Other. Pick the right category for next time.')
                 : (
                   <>
-                    {t('New payee')}{prompt.pn || prompt.pa ? `: ${prompt.pn || prompt.pa}` : ''}.{' '}
+                    {t('New payee')}{prompt.pn ? `: ${prompt.pn}` : ''}.{' '}
                     {t('We will remember this category for next time.')}
                   </>
                 )}

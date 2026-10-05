@@ -28,13 +28,13 @@ function nextDueDate(plan) {
   const now = new Date()
   let y = now.getFullYear()
   let m = now.getMonth()
-  let candidate = new Date(y, m, day, 9, 0, 0)
+  let candidate = new Date(y, m, day, 10, 0, 0)
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`
   if (candidate < todayStart || plan.lastLoggedMonth === monthKey) {
     m += 1
     if (m > 11) { m = 0; y += 1 }
-    candidate = new Date(y, m, day, 9, 0, 0)
+    candidate = new Date(y, m, day, 10, 0, 0)
   }
   return candidate
 }

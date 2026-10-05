@@ -82,14 +82,19 @@ export async function ensureNotificationPermissions({ refreshPush = false } = {}
     refreshPush ||
     !localStorage.getItem('fcmToken') ||
     Date.now() - lastPushRegisterAt > PUSH_REREGISTER_MS
+  // Honest default: if we skip (already registered recently), report the real cached state,
+  // not a blind "true" — a prior failed attempt must still show as failed, not silently "on".
+  let pushOk = !!localStorage.getItem('fcmToken')
   if (needPush) {
     try {
-      await promptNativePushIfNeeded(client)
+      pushOk = await promptNativePushIfNeeded(client)
       lastPushRegisterAt = Date.now()
-    } catch { /* ignore */ }
+    } catch {
+      pushOk = false
+    }
   }
 
-  return { local: localOk, push: true }
+  return { local: localOk, push: pushOk }
 }
 
 /** Wire local-notification taps once (navigate via mm-notification-tap). */

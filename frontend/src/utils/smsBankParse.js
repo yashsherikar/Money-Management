@@ -80,9 +80,13 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   if (/\botp\b|one[- ]time|verification code|do not share|avail limit/i.test(lower)) return null
   if (shouldIgnoreMoneySms({ body: text, address })) return null
 
+  // Verb-anchored first: tied to the actual debit/credit action, so it can't accidentally grab
+  // an "Avl Bal Rs.X" mention elsewhere in the SMS. The bare currency-symbol pattern used to run
+  // first and matched whichever ₹/Rs/INR number appeared earliest in the text — including a
+  // balance figure, if the bank's template mentions balance before the transaction amount.
   const amount =
-    matchAmount(text, /(?:₹|rs\.?\s*|inr\s*)(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
-    || matchAmount(text, /(?:debited|credited|spent|paid|sent|received|deposited|won)\s+(?:for\s+)?(?:by\s+)?(?:with\s+)?(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
+    matchAmount(text, /(?:debited|credited|spent|paid|sent|received|deposited|won)\s+(?:for\s+)?(?:by\s+)?(?:with\s+)?(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
+    || matchAmountAvoidingBalance(text, /(?:₹|rs\.?\s*|inr\s*)(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
     || matchAmount(text, /(?:by|of|for)\s+(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]*(?:\.\d{1,2})?)/i, 0.01)
   if (!amount || Number(amount) < 0.01) return null
 
@@ -256,6 +260,25 @@ function matchAmount(text, re, min = 1) {
   const n = Number(String(m[1]).replace(/,/g, ''))
   if (!Number.isFinite(n) || n < min) return null
   return n.toFixed(2)
+}
+
+/** Same as matchAmount, but walks every occurrence and skips any that sit right after a
+ *  balance-ish word ("Avl Bal Rs.12,345", "Available balance is Rs 500") so a bank template
+ *  that mentions balance before (or instead of alongside) the transaction amount can't
+ *  accidentally have its balance figure picked up as the transaction amount. */
+function matchAmountAvoidingBalance(text, re, min = 1) {
+  const global = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`)
+  let m
+  while ((m = global.exec(text)) !== null) {
+    const start = Math.max(0, m.index - 20)
+    const context = text.slice(start, m.index)
+    if (!/\bbal(?:ance)?\b|\bavl\b|\bavail(?:able)?\b/i.test(context)) {
+      const n = Number(String(m[1]).replace(/,/g, ''))
+      if (Number.isFinite(n) && n >= min) return n.toFixed(2)
+    }
+    if (m.index === global.lastIndex) global.lastIndex++ // avoid infinite loop on zero-width match
+  }
+  return null
 }
 
 function capture(text, re) {

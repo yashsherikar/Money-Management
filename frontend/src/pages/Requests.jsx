@@ -6,7 +6,6 @@ import { parseUpiQr, formatUpiAmount } from '../utils/upiQr.js'
 import { startRequestPayWatch } from '../utils/requestPayWatch.js'
 import {
   upsertSavedContact,
-  listSavedContacts,
   syncContactsFromServer,
   ingestContactsFromHistory,
 } from '../utils/savedContacts.js'
@@ -36,7 +35,6 @@ export default function Requests() {
   const [asking, setAsking] = useState(false)
   const [payingId, setPayingId] = useState(null)
   const [loadError, setLoadError] = useState('')
-  const [recentFriends, setRecentFriends] = useState(() => listSavedContacts().slice(0, 8))
 
   function pickFriend(c) {
     setAsk((f) => ({
@@ -97,7 +95,6 @@ export default function Requests() {
       ]
       ingestContactsFromHistory(fromHistory)
       await syncContactsFromServer(client, fromHistory)
-      setRecentFriends(listSavedContacts().slice(0, 8))
     } catch (err) {
       setLoadError(err.response?.data?.message || t('Could not load requests'))
     }
@@ -105,9 +102,6 @@ export default function Requests() {
 
   useEffect(() => {
     load()
-    const onContacts = () => setRecentFriends(listSavedContacts().slice(0, 8))
-    window.addEventListener('mm-contacts-changed', onContacts)
-    return () => window.removeEventListener('mm-contacts-changed', onContacts)
   }, [])
 
   async function accept(id) { try { await client.patch(`/contribution-requests/${id}/accept`); load() } catch { /* ignore */ } }
@@ -215,28 +209,6 @@ export default function Requests() {
         {askError && <div className="mb-3 text-sm text-red-600 bg-red-50 p-2 rounded">{askError}</div>}
         {askOk && <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 p-2 rounded">{t('Request sent.')}</div>}
         <form onSubmit={handleAsk} className="space-y-3 max-w-md">
-          {recentFriends.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 mb-1.5">{t('Recent friends')}</div>
-              <div className="flex flex-wrap gap-2">
-                {recentFriends.map((c) => (
-                  <button
-                    key={c.id || c.email || c.phone || c.name}
-                    type="button"
-                    onClick={() => pickFriend(c)}
-                    className="friend-chip text-left px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-brand-50 text-sm"
-                  >
-                    <div className="font-medium text-slate-800 leading-tight">{c.name || c.email || c.phone}</div>
-                    {(c.email || c.phone) && (
-                      <div className="text-[11px] text-slate-500 truncate max-w-[10rem]">
-                        {[c.email, c.phone].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               {t('Friend name / email / phone')}

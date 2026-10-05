@@ -98,7 +98,10 @@ export default function Settings() {
         setPushOn(false)
       } else {
         if (native) {
-          await ensureNotificationPermissions({ refreshPush: true })
+          const result = await ensureNotificationPermissions({ refreshPush: true })
+          if (!result.push) {
+            throw new Error(t('Notification permission was denied, or registration failed. Check Android Settings → Apps → Money Manager → Notifications, then try again.'))
+          }
         } else {
           await enablePush(client)
         }

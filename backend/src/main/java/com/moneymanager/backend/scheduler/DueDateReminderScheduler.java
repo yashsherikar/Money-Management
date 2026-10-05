@@ -55,7 +55,7 @@ public class DueDateReminderScheduler {
     }
 
     /** Morning pass: 2-days-before and 1-day-before reminders. */
-    @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Kolkata")
+    @Scheduled(cron = "0 0 10 * * *", zone = "Asia/Kolkata")
     @Transactional
     public void sendMorningReminders() {
         sendRemindersForLeadDays(2);
