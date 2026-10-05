@@ -695,6 +695,17 @@ export function LogoDosa({ size = 40, className }) {
   )
 }
 
+export function LogoIdli({ size = 40, className }) {
+  return (
+    <Wrap bg="#FDF6E9" size={size} pad={0.1} className={className} title="Idli">
+      <circle cx="8.3" cy="9.8" r="4.3" fill="#FFFFFF" stroke="#E8DCC4" strokeWidth="0.6" />
+      <circle cx="15.3" cy="9.8" r="4.3" fill="#FFFFFF" stroke="#E8DCC4" strokeWidth="0.6" />
+      <circle cx="11.8" cy="15.5" r="4.3" fill="#FFFFFF" stroke="#E8DCC4" strokeWidth="0.6" />
+      <ellipse cx="19" cy="18.5" rx="3.2" ry="2.4" fill="#D4731C" opacity="0.9" />
+    </Wrap>
+  )
+}
+
 export function LogoChinese({ size = 40, className }) {
   return (
     <Wrap bg="#C62828" size={size} pad={0.12} className={className} title="Chinese">
@@ -840,6 +851,7 @@ export const BRAND_LOGO_COMPONENTS = {
   juice: LogoJuice,
   softdrink: LogoSoftDrink,
   dosa: LogoDosa,
+  idli: LogoIdli,
   chinese: LogoChinese,
   panipuri: LogoPaniPuri,
   biryani: LogoBiryani,

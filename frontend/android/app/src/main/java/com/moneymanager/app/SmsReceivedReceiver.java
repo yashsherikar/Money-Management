@@ -37,8 +37,11 @@ public class SmsReceivedReceiver extends BroadcastReceiver {
             if (pdus == null || pdus.length == 0) return;
             String format = bundle.getString("format");
 
-            // Group PDU parts by originating address so multipart SMS stay one
-            // message, but two different bank SMS never get glued together.
+            // Group PDU parts by originating address + SMSC timestamp so true multipart
+            // fragments (which always share one identical submission timestamp) stay one
+            // message, while two distinct bank SMS from the same sender arriving in the
+            // same broadcast burst (different timestamps) are kept as separate messages
+            // instead of being concatenated into one unparseable blob.
             Map<String, Assembled> bySender = new LinkedHashMap<>();
             List<Assembled> order = new ArrayList<>();
 
@@ -56,10 +59,11 @@ public class SmsReceivedReceiver extends BroadcastReceiver {
                 if (part == null) part = "";
                 long ts = msg.getTimestampMillis() > 0 ? msg.getTimestampMillis() : System.currentTimeMillis();
 
-                Assembled row = bySender.get(address);
+                String key = address + "|" + ts;
+                Assembled row = bySender.get(key);
                 if (row == null) {
                     row = new Assembled(address, ts);
-                    bySender.put(address, row);
+                    bySender.put(key, row);
                     order.add(row);
                 }
                 row.body.append(part);

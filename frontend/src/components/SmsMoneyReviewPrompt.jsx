@@ -10,6 +10,7 @@ import {
   listActiveSmsMoneyReviews,
 } from '../utils/smsMoneyReview.js'
 import { confirmSelfTransferFromReview } from '../utils/selfTransferDetect.js'
+import { findCategoryByMerchantName, rememberMerchantCategory } from '../utils/savedPayees.js'
 import CategoryPicker from './CategoryPicker.jsx'
 import { confirmDuePaid } from '../utils/confirmDuePaid.js'
 import { detectMerchantBrand, MerchantLogo } from '../utils/subscriptionBrands.jsx'
@@ -59,7 +60,8 @@ export default function SmsMoneyReviewPrompt() {
     setItem(next)
     setAccountId(next.suggestedAccountId ? String(next.suggestedAccountId) : '')
     setToAccountId(next.suggestedToAccountId ? String(next.suggestedToAccountId) : '')
-    setCategoryId(next.suggestedCategoryId ? String(next.suggestedCategoryId) : '')
+    const remembered = findCategoryByMerchantName(next.merchant)
+    setCategoryId(remembered?.categoryId || (next.suggestedCategoryId ? String(next.suggestedCategoryId) : ''))
     const liveBrand = detectMerchantBrand(next.merchant, next.raw)
     let desc = next.suggestedDescription || next.merchant || ''
     if (/^cred$/i.test(String(desc).trim()) && !liveBrand) {
@@ -172,6 +174,11 @@ export default function SmsMoneyReviewPrompt() {
         String(description).trim(),
         who && !String(description).toLowerCase().includes(String(who).toLowerCase()) ? who : null,
       ].filter(Boolean).join(' · ').slice(0, 220)
+
+      if (!isCredit && item.merchant) {
+        const cat = categories.find((c) => String(c.id) === String(categoryId))
+        rememberMerchantCategory(item.merchant, categoryId, cat?.name)
+      }
 
       const { data } = await client.post('/transactions', {
         accountId: Number(accountId),

@@ -65,3 +65,33 @@ export function readPendingCategoryPrompt() {
 export function clearPendingCategoryPrompt() {
   localStorage.removeItem(PENDING_CAT_KEY)
 }
+
+/** Remembered category by merchant NAME (device-only) — for bank-SMS debits, which
+ *  only ever carry a merchant name ("PAYAL SUPER MAR"), never a UPI ID/VPA, so the
+ *  pa-keyed memory above can't apply to them. */
+const MERCHANT_CAT_KEY = 'mm_merchant_category'
+
+function normalizeMerchantName(name) {
+  return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function findCategoryByMerchantName(name) {
+  const key = normalizeMerchantName(name)
+  if (!key) return null
+  try {
+    const map = JSON.parse(localStorage.getItem(MERCHANT_CAT_KEY) || '{}')
+    return map[key] || null
+  } catch {
+    return null
+  }
+}
+
+export function rememberMerchantCategory(name, categoryId, categoryName) {
+  const key = normalizeMerchantName(name)
+  if (!key || !categoryId) return
+  try {
+    const map = JSON.parse(localStorage.getItem(MERCHANT_CAT_KEY) || '{}')
+    map[key] = { categoryId: String(categoryId), categoryName: categoryName || null, updatedAt: Date.now() }
+    localStorage.setItem(MERCHANT_CAT_KEY, JSON.stringify(map))
+  } catch { /* ignore */ }
+}

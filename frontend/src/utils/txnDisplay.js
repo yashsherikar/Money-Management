@@ -42,9 +42,12 @@ export function isWeakTxnTitle(title) {
   return false
 }
 
-/** Title is a compacted brand code (UBERINDIA, SwiggyInstamart, etc.). */
+/** Title is a compacted brand code (UBERINDIA, SwiggyInstamart, etc.) — a single
+ *  run-together token, never spaced-out text someone actually typed ("Idli sambhar"
+ *  must never become "Dosa" just because "idli" is one of Dosa's match keywords). */
 function isBrandCodeTitle(title, brand) {
   if (!brand || !title) return false
+  if (/\s/.test(String(title).trim())) return false
   const t = String(title).toLowerCase().replace(/[^a-z0-9]/g, '')
   if (!t) return false
   const id = String(brand.id || '').toLowerCase()
