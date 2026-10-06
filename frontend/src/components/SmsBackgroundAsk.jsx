@@ -103,18 +103,22 @@ export default function SmsBackgroundAsk() {
           return
         }
       }
+      // Fires the system "Unrestricted" dialog and returns immediately — Android has
+      // no synchronous result for it (it's a plain startActivity, not startActivityForResult).
+      // Checking the status right after would always read "still restricted", since the
+      // user hasn't answered yet. The visibilitychange/focus listener above re-evaluates
+      // and closes this modal for real once the user actually returns from the dialog.
       await requestIgnoreBatteryOptimizations()
-      const bat = await getSmsBatteryStatus()
-      if (!bat?.ignoringOptimizations) {
-        await openSmsAutostartSettings()
-      }
-      const again = await getSmsBatteryStatus()
-      const perm = await checkSmsPermission()
-      setSmsOk(!!perm?.granted)
-      setBatteryOk(!!again?.ignoringOptimizations)
-      if (perm?.granted && again?.ignoringOptimizations) {
-        setOpen(false)
-      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function allowAutostart() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await openSmsAutostartSettings()
     } finally {
       setBusy(false)
     }
@@ -170,6 +174,16 @@ export default function SmsBackgroundAsk() {
               >
                 {busy ? t('Opening…') : t('Allow')}
               </button>
+              {smsOk && !batteryOk ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={allowAutostart}
+                  className="w-full border border-slate-300 rounded-md py-2.5 text-sm font-medium disabled:opacity-60"
+                >
+                  {t('Still blocked? Open Autostart settings')}
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={busy}

@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** Sends push notifications: Web Push (VAPID) for browsers, FCM for the native Android app. */
 @Service
@@ -251,6 +254,24 @@ public class PushService {
         }
     }
 
+    /** FCM send duration budget. The SDK's synchronous send() has no configured timeout and
+     *  can hang far longer than this if Google's endpoint is slow to reach from the server's
+     *  network — which previously stalled whole confirm-paid requests (transaction already
+     *  committed, response just never came back) since this runs inline inside those calls. */
+    private static final long FCM_SEND_TIMEOUT_SECONDS = 8;
+
+    private String sendFcmBounded(Message message) throws FirebaseMessagingException, TimeoutException {
+        try {
+            return FirebaseMessaging.getInstance().sendAsync(message).get(FCM_SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof FirebaseMessagingException fme) throw fme;
+            throw new RuntimeException(e.getCause() != null ? e.getCause() : e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
+    }
+
     /** Data-only message (no .setNotification()) so the app's own FirebaseMessagingService always
      *  runs — even with the app killed — and can build a notification with action buttons itself.
      *  A "notification" message would get auto-displayed by the OS instead, with no way to add
@@ -282,7 +303,7 @@ public class PushService {
             if (relatedId != null) {
                 message.putData("relatedId", String.valueOf(relatedId));
             }
-            FirebaseMessaging.getInstance().send(message.build());
+            sendFcmBounded(message.build());
         } catch (FirebaseMessagingException e) {
             if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
                 subscriptionRepository.delete(sub);
@@ -307,7 +328,7 @@ public class PushService {
                             .setPriority(AndroidConfig.Priority.HIGH)
                             .build())
                     .build();
-            FirebaseMessaging.getInstance().send(message);
+            sendFcmBounded(message);
         } catch (FirebaseMessagingException e) {
             if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
                 subscriptionRepository.delete(sub);
@@ -343,7 +364,7 @@ public class PushService {
                                     .setPriority(AndroidConfig.Priority.HIGH)
                                     .build())
                             .build();
-                    String response = FirebaseMessaging.getInstance().send(message);
+                    String response = sendFcmBounded(message);
                     results.add("Subscription " + sub.getId() + " (native app): sent, id " + response);
                 } catch (FirebaseMessagingException e) {
                     if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {

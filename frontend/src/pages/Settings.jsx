@@ -313,9 +313,12 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={async () => {
+                      // Fires the system "Unrestricted" dialog and returns immediately —
+                      // Android gives no synchronous result for it. Re-checking the status
+                      // right after would always read "still restricted" since the user
+                      // hasn't answered yet; the visibilitychange listener above re-checks
+                      // for real once the user actually returns from the dialog.
                       await ensureSmsBackgroundAllowed({ force: true })
-                      const b = await getSmsBatteryStatus()
-                      setSmsBatteryOk(!!b?.ignoringOptimizations)
                     }}
                     className="bg-brand-500 hover:bg-brand-600 text-white rounded-md px-3 py-1.5 text-sm font-medium"
                   >
