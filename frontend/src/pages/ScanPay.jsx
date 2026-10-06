@@ -162,12 +162,14 @@ export default function ScanPay() {
     const personal = parsed.personal ?? isPersonalUpi(parsed.mc)
     let sharedCategoryName = ''
     let hintPersonal = personal
+    let hintDisplayName = ''
 
     try {
       const { data } = await client.get('/upi-hints', { params: { upiId: parsed.pa } })
       sharedCategoryName = data.categoryName || ''
       // DB may already know this VPA is personal even if MCC was weird
       if (typeof data.personal === 'boolean') hintPersonal = data.personal || personal
+      hintDisplayName = data.displayName || ''
     } catch {
       // 404 = first time seeing this UPI ID — fine
     }
@@ -181,7 +183,9 @@ export default function ScanPay() {
     })
 
     const brand = detectMerchantBrand(parsed.pn, parsed.pa, parsed.raw, parsed.tn)
-    const merchantName = brand?.name || parsed.pn || ''
+    // Prefer the remembered display name for this UPI ID over the QR's own embedded name —
+    // same UPI ID scanned again should fill in what we already know (or what was corrected).
+    const merchantName = brand?.name || hintDisplayName || parsed.pn || ''
     // Description = name/note only — Payment ID is form.pa (UPI VPA)
     const description = hintPersonal
       ? (parsed.tn || merchantName || '')
