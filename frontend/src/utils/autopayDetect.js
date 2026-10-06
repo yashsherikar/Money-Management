@@ -12,11 +12,7 @@ import {
   dismissSmsMoneyReviewsForSms,
 } from './smsMoneyReview.js'
 import { listPendingP2pPays } from './pendingP2pPays.js'
-import {
-  detectSubscriptionBrand,
-  subscriptionLabel,
-} from './subscriptionBrands.jsx'
-import { scheduleSubscriptionReminders } from './subscriptionReminders.js'
+import { detectSubscriptionBrand } from './subscriptionBrands.jsx'
 import { currentUserId, isLoggedIn, userGetItem, userSetItem } from './userStorage.js'
 import { isSmsFromPresent } from './smsListenGate.js'
 import { shouldIgnoreMoneySms } from './smsScamFilter.js'
@@ -558,19 +554,6 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
         } catch { /* ignore */ }
       }
 
-      if (!fromQrPay && parsed.kind === 'autopay' && parsed.direction === 'DEBIT') {
-        const rec = await upsertAutopaySubscription({
-          account,
-          amount: parsed.amount,
-          merchant: parsed.merchant || 'Autopay',
-          categoryId: cat.id,
-          parsed,
-          brand,
-        }).catch(() => null)
-        if (rec) {
-          await scheduleSubscriptionReminders(rec).catch(() => {})
-        }
-      }
     }
 
     if (!results.length) {
@@ -616,55 +599,6 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
   } finally {
     inFlight.delete(flightKey)
   }
-}
-
-async function findRecurringFor(merchant, amount, brand) {
-  const { data } = await client.get('/recurring-transactions')
-  const brandNeedle = brand?.name?.toLowerCase()
-  const needle = String(merchant || '').toLowerCase().slice(0, 24)
-  return (data || []).find((r) => {
-    const d = String(r.description || '').toLowerCase()
-    if (brandNeedle && d.includes(brandNeedle) && Number(r.amount) === Number(amount)) return true
-    return Number(r.amount) === Number(amount) && d.includes(needle)
-  }) || null
-}
-
-async function upsertAutopaySubscription({ account, amount, merchant, categoryId, parsed, brand }) {
-  const label = (brand
-    ? subscriptionLabel(brand)
-    : `Subscription: ${merchant || 'Autopay'}`).slice(0, 80)
-  const existing = await findRecurringFor(merchant, amount, brand)
-  const day = Math.min(28, Math.max(1, new Date(parsed.date || Date.now()).getDate()))
-  if (existing) {
-    if (!existing.active) {
-      await client.patch(`/recurring-transactions/${existing.id}/active?active=true`).catch(() => {})
-    }
-    // Refresh description to branded Subscription: if we now know the brand
-    if (brand && !String(existing.description || '').toLowerCase().includes(brand.name.toLowerCase())) {
-      try {
-        await client.put(`/recurring-transactions/${existing.id}`, {
-          accountId: Number(existing.accountId || account.id),
-          categoryId: existing.categoryId || categoryId || null,
-          type: 'EXPENSE',
-          amount: Number(existing.amount || amount),
-          description: label,
-          recurrenceType: existing.recurrenceType || 'MONTHLY',
-          dayOfMonth: existing.dayOfMonth || day,
-        })
-      } catch { /* ignore */ }
-    }
-    return { ...existing, description: label }
-  }
-  const { data } = await client.post('/recurring-transactions', {
-    accountId: Number(account.id),
-    categoryId: categoryId || null,
-    type: 'EXPENSE',
-    amount: Number(amount),
-    description: label,
-    recurrenceType: 'MONTHLY',
-    dayOfMonth: day,
-  })
-  return data
 }
 
 /**
