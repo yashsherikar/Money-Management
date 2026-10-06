@@ -40,44 +40,35 @@ function WrapCrop({ viewBox, children, bg = '#fff', size, className = '', title,
   )
 }
 
-/** Netflix classic red tile + white N */
-export function LogoNetflix({ size = 40, className }) {
+/** Real brand mark, bundled as a PNG asset (public/brand-logos/) rather than hand-drawn SVG. */
+function WrapImg({ src, size, pad = 0.14, bg = '#fff', className = '', title }) {
+  const p = Math.round(size * pad)
   return (
-    <Wrap bg="#E50914" size={size} pad={0.14} className={className} title="Netflix">
-      <path
-        fill="#fff"
-        d="M5 2.5h3.4l5.2 13.8V2.5H18.5V21.5h-3.5L9.7 7.4V21.5H5V2.5z"
-      />
-    </Wrap>
+    <span
+      className={`inline-flex items-center justify-center rounded-full shrink-0 shadow-sm overflow-hidden ${className}`}
+      style={{ width: size, height: size, background: bg, padding: p }}
+      title={title}
+      aria-hidden
+    >
+      <img src={src} alt="" width={size - p * 2} height={size - p * 2} style={{ objectFit: 'contain' }} />
+    </span>
   )
+}
+
+export function LogoNetflix({ size = 40, className }) {
+  return <WrapImg src="/brand-logos/netflix.png" size={size} pad={0.1} className={className} title="Netflix" />
 }
 
 export function LogoSpotify({ size = 40, className }) {
-  return (
-    <Wrap bg="#1DB954" size={size} pad={0.12} className={className} title="Spotify">
-      <circle cx="12" cy="12" r="11" fill="#1DB954" />
-      <path fill="#fff" d="M16.8 10.3c-2.3-1.4-6.1-1.5-8.3-.8-.4.1-.7-.1-.8-.4-.1-.4.1-.7.4-.8 2.5-.8 6.7-.6 9.4 1 .3.2.4.6.2.9-.2.3-.6.4-.9.1zm-.3 2.2c-.2.3-.5.4-.8.2-1.9-1.2-4.9-1.5-7.1-.8-.3.1-.7-.1-.8-.4-.1-.3.1-.7.4-.8 2.6-.8 5.9-.4 8.1 1 .3.1.4.5.2.8zm-.9 2.1c-.1.2-.4.3-.6.2-1.7-1-3.8-1.3-6.3-.7-.2.1-.5-.1-.5-.3-.1-.2.1-.5.3-.5 2.7-.6 5.1-.3 7 .8.3.1.3.4.1.5z" />
-    </Wrap>
-  )
+  return <WrapImg src="/brand-logos/spotify.png" size={size} pad={0.08} className={className} title="Spotify" />
 }
 
 export function LogoYoutube({ size = 40, className }) {
-  return (
-    <Wrap bg="#FF0000" size={size} pad={0.16} className={className} title="YouTube">
-      <path fill="#fff" d="M21.5 7.2c-.2-.9-.9-1.6-1.8-1.8C18 5 12 5 12 5s-6 0-7.7.4c-.9.2-1.6.9-1.8 1.8C2 9 2 12 2 12s0 3 .5 4.8c.2.9.9 1.6 1.8 1.8C6 19 12 19 12 19s6 0 7.7-.4c.9-.2 1.6-.9 1.8-1.8.5-1.8.5-4.8.5-4.8s0-3-.5-4.8z" />
-      <path fill="#FF0000" d="M10 15.2V8.8L15.5 12 10 15.2z" />
-    </Wrap>
-  )
+  return <WrapImg src="/brand-logos/youtube.png" size={size} pad={0.1} className={className} title="YouTube" />
 }
 
 export function LogoAmazon({ size = 40, className }) {
-  return (
-    <Wrap bg="#232F3E" size={size} pad={0.12} className={className} title="Amazon">
-      <text x="12" y="11" textAnchor="middle" fill="#fff" fontSize="7.5" fontWeight="700" fontFamily="Arial,sans-serif">amazon</text>
-      <path fill="none" stroke="#FF9900" strokeWidth="1.6" strokeLinecap="round" d="M5.5 14.5c2.2 1.8 5 2.7 7.8 2.7 2.2 0 4.3-.6 6.2-1.7" />
-      <path fill="#FF9900" d="M18.8 14.2l1.4 1.8-.2-2.3z" />
-    </Wrap>
-  )
+  return <WrapImg src="/brand-logos/amazon.png" size={size} pad={0.14} className={className} title="Amazon" />
 }
 
 export function LogoPrime({ size = 40, className }) {
@@ -323,11 +314,7 @@ export function LogoOla({ size = 40, className }) {
 }
 
 export function LogoApple({ size = 40, className }) {
-  return (
-    <Wrap bg="#111" size={size} pad={0.16} className={className} title="Apple">
-      <path fill="#fff" d="M16.2 12.6c0-2.1 1.7-3.1 1.8-3.2-1-1.4-2.5-1.6-3-1.7-1.3-.1-2.5.8-3.1.8-.6 0-1.6-.7-2.7-.7-1.4 0-2.6.8-3.3 2-.1.2-1.4 3.7.9 6.2.6.7 1.2 1.4 2.1 1.4.8 0 1.1-.5 2.1-.5s1.2.5 2.1.5c.9 0 1.4-.7 2-1.4.6-.8.9-1.6.9-1.6s-1.7-.7-1.8-2.8zM14.3 6.3c.5-.6.8-1.4.7-2.3-.7 0-1.6.5-2.1 1.1-.5.5-.9 1.4-.8 2.2.8.1 1.6-.4 2.2-1z" />
-    </Wrap>
-  )
+  return <WrapImg src="/brand-logos/apple.png" size={size} pad={0} className={className} title="Apple" />
 }
 
 function LogoText({
@@ -410,7 +397,7 @@ export function LogoVi({ size = 40, className }) {
 }
 
 export function LogoCred({ size = 40, className }) {
-  return <LogoText bg="#1A1A1A" title="CRED" text="CRED" size={size} fontSize={6.5} className={className} />
+  return <WrapImg src="/brand-logos/cred.png" size={size} pad={0.1} bg="#000" className={className} title="CRED" />
 }
 
 export function LogoTataPlay({ size = 40, className }) {
@@ -434,17 +421,18 @@ export function LogoWynk({ size = 40, className }) {
 }
 
 export function LogoLinkedIn({ size = 40, className }) {
-  return <LogoText bg="#0A66C2" title="LinkedIn" text="in" size={size} fontSize={10} className={className} />
+  return <WrapImg src="/brand-logos/linkedin.png" size={size} pad={0.1} bg="#0A66C2" className={className} title="LinkedIn" />
 }
 
 export function LogoMicrosoft({ size = 40, className }) {
   return (
-    <Wrap bg="#fff" size={size} pad={0.18} className={`ring-1 ring-slate-200 ${className || ''}`} title="Microsoft">
-      <rect x="2" y="2" width="9" height="9" fill="#F25022" />
-      <rect x="13" y="2" width="9" height="9" fill="#7FBA00" />
-      <rect x="2" y="13" width="9" height="9" fill="#00A4EF" />
-      <rect x="13" y="13" width="9" height="9" fill="#FFB900" />
-    </Wrap>
+    <WrapImg
+      src="/brand-logos/microsoft.png"
+      size={size}
+      pad={0.18}
+      className={`ring-1 ring-slate-200 ${className || ''}`}
+      title="Microsoft"
+    />
   )
 }
 
@@ -513,28 +501,23 @@ export function LogoZerodha({ size = 40, className }) {
 }
 
 export function LogoHdfc({ size = 40, className }) {
-  return <LogoText bg="#004C8F" title="HDFC Bank" text="HDFC" size={size} fontSize={5.5} className={className} />
+  return <WrapImg src="/brand-logos/hdfc.png" size={size} pad={0.1} className={className} title="HDFC Bank" />
 }
 
 export function LogoSbi({ size = 40, className }) {
-  return (
-    <Wrap bg="#22409A" size={size} pad={0.14} className={className} title="SBI">
-      <circle cx="12" cy="12" r="8" fill="none" stroke="#F7A81B" strokeWidth="2.2" />
-      <circle cx="12" cy="12" r="3.2" fill="#F7A81B" />
-    </Wrap>
-  )
+  return <WrapImg src="/brand-logos/sbi.png" size={size} pad={0} className={className} title="SBI" />
 }
 
 export function LogoIcici({ size = 40, className }) {
-  return <LogoText bg="#F58220" title="ICICI Bank" text="ICICI" size={size} fontSize={5} className={className} />
+  return <WrapImg src="/brand-logos/icici.png" size={size} pad={0.1} className={className} title="ICICI Bank" />
 }
 
 export function LogoAxis({ size = 40, className }) {
-  return <LogoText bg="#97144D" title="Axis Bank" text="AXIS" size={size} fontSize={6} className={className} />
+  return <WrapImg src="/brand-logos/axis.png" size={size} pad={0.12} className={className} title="Axis Bank" />
 }
 
 export function LogoKotak({ size = 40, className }) {
-  return <LogoText bg="#ED1C24" title="Kotak" text="Kotak" size={size} fontSize={5.5} className={className} />
+  return <WrapImg src="/brand-logos/kotak.png" size={size} pad={0.04} className={className} title="Kotak" />
 }
 
 export function LogoHaldiram({ size = 40, className }) {
