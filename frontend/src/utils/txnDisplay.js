@@ -17,6 +17,15 @@ function stripUpiPrefix(s) {
     .trim()
 }
 
+/** Strips the label buildDescription() prepends ("Cashback: Paytm" → "Paytm") so the
+ *  brand name alone becomes the title — the label itself is redundant with the category
+ *  badge already shown in the meta line (e.g. category "Cashback"). */
+function stripKindPrefix(s) {
+  return String(s || '')
+    .replace(/^(Cashback|Refund|Interest|Credit|Subscription|Savings|Autopay|Transfer|Bank SMS):\s*/i, '')
+    .trim()
+}
+
 const WEAK_TITLES = new Set([
   'transaction',
   'payment',
@@ -111,6 +120,9 @@ export function formatTxnDisplay(description, categoryName = '') {
       else if (p.includes('@') && !vpa) vpa = p
       else if (/^my share/i.test(p) && !shareText) shareText = p
       else if (/^Split$/i.test(p)) isSplit = true
+      // "A/c …043" and "via Bank Name" are internal bookkeeping bits, not useful to show —
+      // account name is already shown separately in the meta line.
+      else if (/^A\/c\s/i.test(p) || /^via\s/i.test(p)) { /* skip */ }
       else if (p && p.toLowerCase() !== String(title).toLowerCase()) details.push(p)
     }
   } else if (/^[^)\s]+@[^)\s]+$/.test(raw)) {
@@ -119,18 +131,18 @@ export function formatTxnDisplay(description, categoryName = '') {
     vpa = raw
   }
 
-  title = stripUpiPrefix(title)
+  title = stripKindPrefix(stripUpiPrefix(title))
   // If title still looks like "UPI SMS: SHOTDINE" after odd formats
   const again = title.match(/^(UPI(?:\s+SMS|\s+Merchant|\s+Request)?):\s*(.+)$/i)
   if (again) {
     if (!sourceTag) sourceTag = again[1]
-    title = again[2].trim()
+    title = stripKindPrefix(again[2].trim())
   }
 
   if (isSplit) details.push('Split')
   if (shareText) details.push(shareText)
-  if (sourceTag) details.push(sourceTag)
-  if (vpa) details.push(vpa)
+  // sourceTag (UPI ref number / "UPI SMS" label) and raw vpa are not shown — clutter the
+  // user doesn't need, and vpa is sensitive (UPI ID) besides.
 
   // No clear payee name (or brand code like UBERINDIA) → use known brand from description
   const brand = brandFromTxnText(description, title, vpa, raw)

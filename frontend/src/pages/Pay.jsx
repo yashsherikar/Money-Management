@@ -157,7 +157,11 @@ export default function Pay() {
   function applyParsed(parsed) {
     const isP2p = parsed.personal ?? isPersonalUpi(parsed.mc)
     const brand = detectMerchantBrand(parsed.pn, parsed.pa, parsed.raw, parsed.tn)
-    const merchantName = brand?.name || parsed.pn || ''
+    const known = findPayeeByPa(parsed.pa)
+    // Prefer this UPI ID's remembered name (what we last saved, or what the user corrected
+    // it to) over the QR's own embedded name — same UPI ID scanned again should fill in
+    // exactly what we already know about this merchant/person.
+    const merchantName = brand?.name || known?.pn || parsed.pn || ''
     setPa(parsed.pa || '')
     setName(merchantName)
     setMc(parsed.mc || '')
@@ -167,7 +171,6 @@ export default function Pay() {
     setPersonal(isP2p)
     if (parsed.am) setAmount(formatUpiAmount(parsed.am))
 
-    const known = findPayeeByPa(parsed.pa)
     let nextCat = ''
     if (known?.categoryId) {
       nextCat = String(known.categoryId)

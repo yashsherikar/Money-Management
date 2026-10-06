@@ -37,11 +37,12 @@ public class SmsReceivedReceiver extends BroadcastReceiver {
             if (pdus == null || pdus.length == 0) return;
             String format = bundle.getString("format");
 
-            // Group PDU parts by originating address + SMSC timestamp so true multipart
-            // fragments (which always share one identical submission timestamp) stay one
-            // message, while two distinct bank SMS from the same sender arriving in the
-            // same broadcast burst (different timestamps) are kept as separate messages
-            // instead of being concatenated into one unparseable blob.
+            // Group PDU parts by originating address so multipart SMS stay one message.
+            // (Previously keyed on address+timestamp to also split apart two distinct SMS
+            // batched in one broadcast, but that assumed true multipart fragments always
+            // share one identical SMSC timestamp — they don't reliably, so long bank SMS
+            // that legitimately split across multiple PDUs were getting wrongly broken into
+            // unparseable half-messages and silently dropped. Reverted.)
             Map<String, Assembled> bySender = new LinkedHashMap<>();
             List<Assembled> order = new ArrayList<>();
 
@@ -59,11 +60,10 @@ public class SmsReceivedReceiver extends BroadcastReceiver {
                 if (part == null) part = "";
                 long ts = msg.getTimestampMillis() > 0 ? msg.getTimestampMillis() : System.currentTimeMillis();
 
-                String key = address + "|" + ts;
-                Assembled row = bySender.get(key);
+                Assembled row = bySender.get(address);
                 if (row == null) {
                     row = new Assembled(address, ts);
-                    bySender.put(key, row);
+                    bySender.put(address, row);
                     order.add(row);
                 }
                 row.body.append(part);
