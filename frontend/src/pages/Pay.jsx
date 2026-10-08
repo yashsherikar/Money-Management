@@ -382,6 +382,7 @@ export default function Pay() {
       type: 'EXPENSE',
       amount: data.amount,
       description: data.description,
+      merchantName: data.merchant || null,
       txnDate: data.txnDate,
     })
     try {

@@ -17,7 +17,8 @@ public class TransactionDtos {
             @NotNull @DecimalMin(value = "0.01") BigDecimal amount,
             String description,
             String paymentId,
-            @NotNull LocalDate txnDate
+            @NotNull LocalDate txnDate,
+            String merchantName
     ) {}
 
     public record TransactionResponse(
@@ -36,6 +37,7 @@ public class TransactionDtos {
             /** True when this expense can still be opened as a split (≤ 2 days, not already split). */
             boolean canSplit,
             /** Set when this expense is already linked to a split bill. */
-            Long splitBillId
+            Long splitBillId,
+            String merchantName
     ) {}
 }

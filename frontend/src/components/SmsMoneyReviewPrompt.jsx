@@ -13,7 +13,8 @@ import { confirmSelfTransferFromReview } from '../utils/selfTransferDetect.js'
 import { findCategoryByMerchantName, rememberMerchantCategory } from '../utils/savedPayees.js'
 import CategoryPicker from './CategoryPicker.jsx'
 import { confirmDuePaid } from '../utils/confirmDuePaid.js'
-import { detectMerchantBrand, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { detectMerchantBrand } from '../utils/subscriptionBrands.jsx'
+import MerchantIcon from './MerchantIcon.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
 import { localDateYmd } from '../utils/localDate.js'
@@ -186,6 +187,7 @@ export default function SmsMoneyReviewPrompt() {
         type,
         amount: Number(item.amount),
         description: desc,
+        merchantName: who || null,
         txnDate: localDateYmd(item.date || Date.now()),
       })
       markSmsMoneyReviewSaved(item.id, data?.id)
@@ -250,7 +252,7 @@ export default function SmsMoneyReviewPrompt() {
         <div className="app-modal-body">
         <div className="flex items-start justify-between gap-2 mb-3 min-w-0">
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-            {brand && !isSelfTransfer && <MerchantLogo brand={brand} size={36} />}
+            {!isSelfTransfer && <MerchantIcon brand={brand} name={item.merchant || headline} size={36} />}
             <h2 className="font-bold text-lg leading-tight break-words min-w-0" style={{ overflowWrap: 'anywhere' }}>{headline}</h2>
           </div>
           {pendingCount > 1 && (

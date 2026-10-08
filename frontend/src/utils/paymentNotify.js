@@ -258,6 +258,7 @@ export async function handleDetectedUpiPayment(parsed, { accounts, categories } 
       amount,
       description,
       paymentId,
+      merchantName: pn || null,
       txnDate: localDateYmd(),
     })
     const transactionId = res?.data?.id ?? res?.data?.transactionId ?? null

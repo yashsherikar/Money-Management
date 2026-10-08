@@ -45,6 +45,10 @@ public class Transaction {
     @Column(name = "payment_id", length = 120)
     private String paymentId;
 
+    /** Merchant / payee (from SMS or QR) — separate from the user's own description. */
+    @Column(name = "merchant_name", length = 120)
+    private String merchantName;
+
     @Column(name = "txn_date", nullable = false)
     private LocalDate txnDate;
 

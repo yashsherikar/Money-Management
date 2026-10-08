@@ -169,6 +169,7 @@ export function splitTitleFromTxnDescription(description, fallback = 'Split bill
  */
 export function buildTxnRowDisplay({
   description = '',
+  merchantName = '',
   categoryName = '',
   accountName = '',
   createdAt,
@@ -177,27 +178,38 @@ export function buildTxnRowDisplay({
   formatTime,
 } = {}) {
   const desc = String(description || '')
+  const merchant = String(merchantName || '').trim()
   const isAutopay = /^Autopay:/i.test(desc)
   const isSavings = /^Savings/i.test(desc)
   const isTransfer = /^Transfer\s*:/i.test(desc)
-  const brand = isTransfer ? null : brandFromTxnText(description, categoryName)
   const display = formatTxnDisplay(description, categoryName)
-  const title = isTransfer || isAutopay || isSavings
+  // Merchant first, then the cleaned title — never the raw SMS text, whose "via ICICI Bank"
+  // tail would put the bank's logo on a supermarket payment.
+  const brand = isTransfer ? null : (brandFromTxnText(merchant) || brandFromTxnText(display.title, categoryName))
+  const baseTitle = isTransfer || isAutopay || isSavings
     ? (description || categoryName || t('Transaction'))
     : display.title
+  const title = merchant && !isTransfer ? merchant : baseTitle
+  // User's own note ("acko activa insurance") when it differs from the merchant name
+  const note = merchant && !isTransfer && display.title
+    && display.title.toLowerCase() !== merchant.toLowerCase() ? display.title : null
   const timeLabel = typeof formatTime === 'function' ? formatTime(createdAt) : null
   const meta = [
     timeLabel,
     accountName,
+    note,
     ...(isTransfer || isAutopay || isSavings ? [] : display.details),
-    brand?.name && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
+    brand?.name && brand.name.toLowerCase() !== String(title).toLowerCase()
+      && !new RegExp(`\\b${brand.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(desc)
       ? brand.name
       : null,
     isTransfer && t('Transfer · own accounts'),
     isAutopay && t('Autopay · SMS'),
     isSavings && t('Savings · SMS'),
     categoryName && description && !isAutopay && !isSavings && !isTransfer ? categoryName : null,
-  ].filter(Boolean).join(' · ')
+  ].filter(Boolean)
+    .filter((v, i, all) => all.findIndex((x) => String(x).toLowerCase() === String(v).toLowerCase()) === i)
+    .join(' · ')
 
   return {
     title,
@@ -208,5 +220,8 @@ export function buildTxnRowDisplay({
     isSavings,
     isTransfer,
     iconText: brand ? undefined : `${description || ''} ${categoryName || ''}`.trim(),
+    // Installed-app icon lookup: merchant first, then the user's note
+    appName: isTransfer ? '' : title,
+    appAltName: note || '',
   }
 }

@@ -7,6 +7,7 @@ import DayOfMonthSelect from '../components/DayOfMonthSelect.jsx'
 import Field from '../components/Field.jsx'
 import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import CategoryPicker from '../components/CategoryPicker.jsx'
+import MerchantIcon from '../components/MerchantIcon.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import {
@@ -244,7 +245,7 @@ export default function Recurring() {
                 return (
                   <MoneyRow
                     key={r.id}
-                    icon={<SubscriptionLogo brand={brand} size={40} />}
+                    icon={<MerchantIcon brand={brand} name={r.description} size={40} fallback={<SubscriptionLogo brand={null} size={40} />} />}
                     title={(
                       <span className="inline-flex items-center flex-wrap gap-2">
                         {titleName}
@@ -428,6 +429,7 @@ export default function Recurring() {
               income={r.type === 'INCOME'}
               type={r.type}
               iconText={`${r.description || ''} ${r.categoryName || ''}`}
+              appName={r.description}
               actions={(
                 <>
                   {canPay && (

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import Field from './Field.jsx'
-import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { brandFromTxnText } from '../utils/subscriptionBrands.jsx'
+import MerchantIcon from './MerchantIcon.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
 import CategoryPicker from './CategoryPicker.jsx'
@@ -14,6 +15,18 @@ const EXPENSE_DEFAULTS = [
   'Dining Out', 'Groceries', 'Rent', 'Transport', 'Shopping', 'Entertainment',
   'Utilities', 'EMI', 'Insurance', 'Healthcare', 'Education', 'Travel', 'Subscriptions', 'Snacks', 'Drinks',
 ]
+
+/**
+ * Merchant (from SMS/QR) and the user's own note as two fields. Older rows have no
+ * merchantName — their cleaned description title becomes the merchant. The note stays
+ * empty when it would just repeat the merchant (auto-built "Bank SMS: X · UPI …" text).
+ */
+function splitMerchantAndNote(txn) {
+  const cleanDesc = txn.description ? formatTxnDisplay(txn.description, txn.categoryName).title : ''
+  const merchantName = txn.merchantName || cleanDesc
+  const note = cleanDesc.toLowerCase() === String(merchantName).toLowerCase() ? '' : cleanDesc
+  return { merchantName, description: note }
+}
 
 function findCategoryByName(categories, name) {
   const n = String(name || '').trim().toLowerCase()
@@ -58,9 +71,7 @@ export default function TransactionEditSheet({
       categoryId: txn.categoryId != null && txn.categoryId !== '' ? String(txn.categoryId) : '',
       type: txn.type,
       amount: String(txn.amount),
-      // Edit the clean merchant name the list shows, not the raw stored string
-      // ("Bank SMS: PAYAL SUPER MAR · UPI 6278… · A/c …043" → "PAYAL SUPER MAR").
-      description: txn.description ? formatTxnDisplay(txn.description, txn.categoryName).title : '',
+      ...splitMerchantAndNote(txn),
       txnDate: txn.txnDate,
     })
     setAddingCategory(false)
@@ -96,7 +107,8 @@ export default function TransactionEditSheet({
 
   if (!open || !form || !txn) return null
 
-  const brand = brandFromTxnText(
+  // Merchant first, then the user's description (e.g. merchant blank, note "acko activa insurance").
+  const brand = brandFromTxnText(form.merchantName) || brandFromTxnText(
     form.description,
     localCategories.find((c) => String(c.id) === form.categoryId)?.name,
   )
@@ -174,7 +186,9 @@ export default function TransactionEditSheet({
         categoryId,
         type: form.type,
         amount: Number(form.amount),
-        description: form.description,
+        // Description stays filled for older screens that only read description.
+        description: form.description.trim() || form.merchantName.trim(),
+        merchantName: form.merchantName.trim(),
         txnDate: form.txnDate,
       })
       onClose?.()
@@ -198,7 +212,7 @@ export default function TransactionEditSheet({
       <div className="app-modal-panel">
         <div className="app-modal-body">
         <div className="flex items-center gap-2 mb-1 min-w-0">
-          {brand && <MerchantLogo brand={brand} size={36} />}
+          <MerchantIcon brand={brand} name={form.merchantName} altName={form.description} size={36} />
           <h2 className="font-bold text-lg min-w-0 break-words">{t('Edit transaction')}</h2>
         </div>
         <p className="text-sm text-slate-500 mb-4">
@@ -315,16 +329,25 @@ export default function TransactionEditSheet({
             />
           </Field>
 
-          <Field label={t('Merchant / description')}>
+          <Field label={t('Merchant')}>
             <div className="flex items-center gap-2">
-              {brand && <MerchantLogo brand={brand} size={32} />}
+              <MerchantIcon brand={brand} name={form.merchantName} altName={form.description} size={32} />
               <input
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                value={form.merchantName}
+                onChange={(e) => setForm({ ...form, merchantName: e.target.value })}
                 className="w-full"
-                placeholder={t('e.g. Payal Super Market, Idli sambhar')}
+                placeholder={t('e.g. Payal Super Market, ACKO')}
               />
             </div>
+          </Field>
+
+          <Field label={t('Description')}>
+            <input
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full"
+              placeholder={t('e.g. Activa insurance, Idli sambhar')}
+            />
           </Field>
 
           <Field label={t('Date')}>

@@ -1,6 +1,7 @@
 package com.moneymanager.app;
 
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
@@ -14,6 +15,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -43,19 +46,25 @@ public class AppIconPlugin extends Plugin {
             }
 
             String name = call.getString("name");
-            if (target == null && name != null) {
-                String want = norm(name);
-                if (want.length() >= 4) {
-                    Intent launcher = new Intent(Intent.ACTION_MAIN);
-                    launcher.addCategory(Intent.CATEGORY_LAUNCHER);
-                    String self = getContext().getPackageName();
-                    for (ResolveInfo ri : pm.queryIntentActivities(launcher, 0)) {
-                        String p = ri.activityInfo.packageName;
-                        if (p.equals(self)) continue;
-                        if (want.equals(norm(String.valueOf(ri.loadLabel(pm))))) {
-                            target = p;
-                            break;
-                        }
+            if (target == null && name != null && norm(name).length() >= 4) {
+                // "acko activa insurance" → ACKO. App label must appear in the text as whole
+                // word(s); longest label wins ("Amazon Shopping" over "Amazon"). Only apps the
+                // user installed — built-ins like Phone/Camera/Messages would match "phone bill".
+                List<String> words = words(name);
+                Intent launcher = new Intent(Intent.ACTION_MAIN);
+                launcher.addCategory(Intent.CATEGORY_LAUNCHER);
+                String self = getContext().getPackageName();
+                int bestLen = 0;
+                for (ResolveInfo ri : pm.queryIntentActivities(launcher, 0)) {
+                    ApplicationInfo ai = ri.activityInfo.applicationInfo;
+                    if (ai.packageName.equals(self)) continue;
+                    if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
+                    String label = String.valueOf(ri.loadLabel(pm));
+                    int len = norm(label).length();
+                    if (len < 4 || len <= bestLen) continue;
+                    if (containsRun(words, words(label))) {
+                        target = ai.packageName;
+                        bestLen = len;
                     }
                 }
             }
@@ -71,6 +80,23 @@ public class AppIconPlugin extends Plugin {
 
     private static String norm(String s) {
         return s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private static List<String> words(String s) {
+        List<String> out = new ArrayList<>();
+        for (String w : s.toLowerCase(Locale.ROOT).split("[^a-z0-9]+")) {
+            if (!w.isEmpty()) out.add(w);
+        }
+        return out;
+    }
+
+    /** True if `run` appears in `words` as consecutive whole words. */
+    private static boolean containsRun(List<String> words, List<String> run) {
+        if (run.isEmpty() || run.size() > words.size()) return false;
+        for (int i = 0; i + run.size() <= words.size(); i++) {
+            if (words.subList(i, i + run.size()).equals(run)) return true;
+        }
+        return false;
     }
 
     private static String toPngBase64(Drawable d) {

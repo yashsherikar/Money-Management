@@ -1,5 +1,6 @@
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import { brandFromTxnText } from '../utils/subscriptionBrands.jsx'
+import MerchantIcon from './MerchantIcon.jsx'
 import { formatTxnDisplay } from '../utils/txnDisplay.js'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
@@ -41,16 +42,22 @@ export default function TransactionDetailSheet({
   if (!open || !txn) return null
 
   const isIncome = txn.type === 'INCOME'
-  const brand = brandFromTxnText(txn.description, txn.categoryName)
+  const merchant = String(txn.merchantName || '').trim()
+  const brand = brandFromTxnText(merchant)
+    || brandFromTxnText(formatTxnDisplay(txn.description, txn.categoryName).title, txn.categoryName)
   const desc = String(txn.description || '')
   const isAutopay = /^Autopay:/i.test(desc)
   const isSavings = /^Savings/i.test(desc)
   const isSubscription = /^Subscription:/i.test(desc)
   const isTransfer = /^Transfer\s*:/i.test(desc)
   const display = formatTxnDisplay(txn.description, txn.categoryName)
-  const headline = isTransfer || isAutopay || isSavings
+  const baseHeadline = isTransfer || isAutopay || isSavings
     ? (txn.description || txn.categoryName || t('Transaction'))
     : display.title
+  const headline = merchant && !isTransfer ? merchant : baseHeadline
+  // User's own note when it differs from the merchant ("acko activa insurance")
+  const note = merchant && display.title && display.title.toLowerCase() !== merchant.toLowerCase()
+    ? display.title : ''
   const detailLine = display.details.join(' · ')
 
   return (
@@ -60,13 +67,17 @@ export default function TransactionDetailSheet({
       <div className="app-modal-panel">
         <div className="app-modal-body">
           <div className="flex items-start gap-3 mb-4 min-w-0">
-            {brand ? (
-              <MerchantLogo brand={brand} size={48} />
-            ) : (
-              <span className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 ${isIncome ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                {isIncome ? '💰' : '🧾'}
-              </span>
-            )}
+            <MerchantIcon
+              brand={brand}
+              name={isTransfer ? '' : headline}
+              altName={note}
+              size={48}
+              fallback={(
+                <span className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 ${isIncome ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  {isIncome ? '💰' : '🧾'}
+                </span>
+              )}
+            />
             <div className="min-w-0 flex-1 overflow-hidden">
               <h2 id="txn-detail-title" className="font-bold text-lg leading-snug break-words" style={{ overflowWrap: 'anywhere' }}>
                 {headline}
@@ -90,8 +101,8 @@ export default function TransactionDetailSheet({
             <Row label={t('Date')} value={txn.txnDate} />
             <Row label={t('Account')} value={txn.accountName} />
             <Row label={t('Category')} value={txn.categoryName || t('No category')} />
-            <Row label={t('Name')} value={headline} />
-            <Row label={t('Description')} value={txn.description || detailLine || '—'} />
+            <Row label={merchant ? t('Merchant') : t('Name')} value={headline} />
+            <Row label={t('Description')} value={merchant ? (note || '—') : (txn.description || detailLine || '—')} />
             <Row
               label={t('Payment ID')}
               value={txn.paymentId || legacyPaymentId(txn.description) || ''}

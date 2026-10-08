@@ -72,7 +72,8 @@ public class TransactionService {
         txn.setType(request.type());
         txn.setAmount(request.amount());
         txn.setDescription(request.description());
-        txn.setPaymentId(trimPaymentId(request.paymentId()));
+        txn.setPaymentId(trim120(request.paymentId()));
+        txn.setMerchantName(trim120(request.merchantName()));
         txn.setTxnDate(request.txnDate());
         transactionRepository.save(txn);
 
@@ -99,7 +100,11 @@ public class TransactionService {
         txn.setDescription(request.description());
         // Preserve existing Payment ID when client omits the field (null)
         if (request.paymentId() != null) {
-            txn.setPaymentId(trimPaymentId(request.paymentId()));
+            txn.setPaymentId(trim120(request.paymentId()));
+        }
+        // Same for merchant: older clients don't send it — don't wipe the stored one.
+        if (request.merchantName() != null) {
+            txn.setMerchantName(trim120(request.merchantName()));
         }
         txn.setTxnDate(request.txnDate());
         transactionRepository.save(txn);
@@ -153,13 +158,14 @@ public class TransactionService {
                 t.getTxnDate(),
                 t.getCreatedAt(),
                 canSplit,
-                splitBillId
+                splitBillId,
+                t.getMerchantName()
         );
     }
 
-    private static String trimPaymentId(String paymentId) {
-        if (paymentId == null) return null;
-        String s = paymentId.trim();
+    private static String trim120(String value) {
+        if (value == null) return null;
+        String s = value.trim();
         if (s.isEmpty()) return null;
         return s.length() > 120 ? s.substring(0, 120) : s;
     }

@@ -493,6 +493,7 @@ export default function ScanPay() {
         type: 'EXPENSE',
         amount: Number(amount),
         description: form.description || form.pn || form.pa,
+        merchantName: form.pn || null,
         txnDate: new Date().toISOString().slice(0, 10),
       })
       await saveUpiHint().catch(() => {})

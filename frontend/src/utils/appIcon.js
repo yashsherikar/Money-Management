@@ -3,9 +3,10 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 
 const AppIcon = registerPlugin('AppIcon')
 
-const CACHE_KEY = 'mm_app_icon_v1'
+// v2: matching now finds an app name inside longer text — drop v1's cached misses.
+const CACHE_KEY = 'mm_app_icon_v2'
 const MISS_RETRY_MS = 7 * 24 * 60 * 60_000
-const MAX_ENTRIES = 150
+const MAX_ENTRIES = 300
 
 /** Bank SMS shows legal names, not app names — map the known ones to the app's package. */
 const LEGAL_NAME_TO_PACKAGE = [
@@ -87,10 +88,18 @@ export async function findInstalledAppIcon(name) {
 export function useInstalledAppIcon(name) {
   const [icon, setIcon] = useState(() => readCache()[norm(name)]?.icon || '')
   useEffect(() => {
+    const cached = readCache()[norm(name)]?.icon || ''
+    setIcon(cached)
+    if (!name || cached) return undefined
     let alive = true
-    if (!name) return undefined
-    findInstalledAppIcon(name).then((i) => { if (alive) setIcon(i) })
-    return () => { alive = false }
+    // Debounced: in edit/add forms the name changes per keystroke — look up once typing pauses.
+    const timer = setTimeout(() => {
+      findInstalledAppIcon(name).then((i) => { if (alive) setIcon(i) })
+    }, 400)
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
   }, [name])
   return icon
 }

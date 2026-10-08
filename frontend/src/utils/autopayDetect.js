@@ -529,6 +529,7 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
         type: parsed.direction === 'CREDIT' ? 'INCOME' : 'EXPENSE',
         amount: Number(parsed.amount),
         description: buildDescription(parsed, account.name, brand),
+        merchantName: brand?.name || parsed.merchant || null,
         txnDate,
       })
       results.push({

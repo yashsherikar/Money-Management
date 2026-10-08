@@ -1,5 +1,5 @@
 import { categoryIcon } from '../utils/categoryIcon.js'
-import { useInstalledAppIcon } from '../utils/appIcon.js'
+import MerchantIcon from './MerchantIcon.jsx'
 
 /**
  * Shared list row matching the Transactions screen layout:
@@ -12,8 +12,9 @@ export default function MoneyRow({
   income = false,
   iconText = '',
   icon = null,
-  /** Merchant name to look up an installed app's icon for, when `icon` is null. */
+  /** Merchant name, then description, to look up an installed app's icon for when `icon` is null. */
   appName = '',
+  appAltName = '',
   type = 'EXPENSE',
   hideAmount = false,
   trailing = null,
@@ -22,7 +23,16 @@ export default function MoneyRow({
 }) {
   const isIncome = income || type === 'INCOME'
   const showIcon = icon != null || iconText != null
-  const appIcon = useInstalledAppIcon(icon == null ? appName : '')
+  const categoryBadge = showIcon ? (
+    <span
+      className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+        isIncome ? 'bg-emerald-50' : 'bg-red-50'
+      }`}
+      aria-hidden="true"
+    >
+      {categoryIcon(iconText || title || '', isIncome ? 'INCOME' : type)}
+    </span>
+  ) : null
   return (
     <li
       className={`px-4 py-3.5 sm:px-5 sm:py-4 ${onClick ? 'cursor-pointer active:bg-slate-50/50' : ''}`}
@@ -39,18 +49,9 @@ export default function MoneyRow({
       <div className="flex items-start gap-3 min-w-0">
         {icon != null ? (
           <span className="shrink-0" aria-hidden="true">{icon}</span>
-        ) : appIcon ? (
-          <img src={appIcon} alt="" aria-hidden="true" className="shrink-0 w-10 h-10 rounded-full object-cover" />
-        ) : showIcon ? (
-          <span
-            className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
-              isIncome ? 'bg-emerald-50' : 'bg-red-50'
-            }`}
-            aria-hidden="true"
-          >
-            {categoryIcon(iconText || title || '', isIncome ? 'INCOME' : type)}
-          </span>
-        ) : null}
+        ) : (
+          <MerchantIcon name={appName} altName={appAltName} size={40} fallback={categoryBadge} />
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">

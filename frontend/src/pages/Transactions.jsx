@@ -12,6 +12,7 @@ import { useLanguage } from '../context/LanguageContext.jsx'
 import { waitingP2pPays, countWaitingP2pPays, listPendingP2pPays } from '../utils/pendingP2pPays.js'
 import { syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
+import MerchantIcon from '../components/MerchantIcon.jsx'
 import { buildTxnRowDisplay } from '../utils/txnDisplay.js'
 import { localDateYmd } from '../utils/localDate.js'
 import {
@@ -409,7 +410,7 @@ export default function Transactions() {
             )
             return (
               <div className="flex items-center gap-2">
-                {liveBrand && <MerchantLogo brand={liveBrand} size={36} />}
+                <MerchantIcon brand={liveBrand} name={form.description} size={36} />
                 <input
                   placeholder={t('Description')}
                   required={false}
@@ -447,6 +448,7 @@ export default function Transactions() {
           ...group.items.map((txn) => {
             const row = buildTxnRowDisplay({
               description: txn.description,
+              merchantName: txn.merchantName,
               categoryName: txn.categoryName,
               accountName: txn.accountName,
               createdAt: txn.createdAt,
@@ -463,7 +465,8 @@ export default function Transactions() {
                 income={row.isIncome}
                 type={txn.type}
                 icon={row.brand ? <MerchantLogo brand={row.brand} size={40} /> : null}
-                appName={row.title}
+                appName={row.appName}
+                appAltName={row.appAltName}
                 iconText={row.iconText}
                 onClick={() => openTxnDetail(txn)}
                 actions={(
