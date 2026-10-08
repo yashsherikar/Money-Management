@@ -3,10 +3,13 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 
 const AppIcon = registerPlugin('AppIcon')
 
-// v2: matching now finds an app name inside longer text — drop v1's cached misses.
-const CACHE_KEY = 'mm_app_icon_v2'
+// v5: in-memory cache + smaller icons. v1–v4 could grow to several MB and fill the
+// WebView's ~5MB localStorage, breaking every other save in the app.
+const CACHE_KEY = 'mm_app_icon_v5'
+const OLD_KEYS = ['mm_app_icon_v1', 'mm_app_icon_v2', 'mm_app_icon_v3', 'mm_app_icon_v4']
 const MISS_RETRY_MS = 7 * 24 * 60 * 60_000
-const MAX_ENTRIES = 300
+const MAX_ICONS = 80
+const MAX_MISSES = 300
 
 /** Bank SMS shows legal names, not app names — map the known ones to the app's package. */
 const LEGAL_NAME_TO_PACKAGE = [
@@ -41,25 +44,34 @@ function norm(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
-function readCache() {
+// Parsed once per app start; rows read from memory, never re-parse localStorage per render.
+let memo = null
+function cache() {
+  if (memo) return memo
+  memo = {}
   try {
-    return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
-  } catch {
-    return {}
-  }
+    OLD_KEYS.forEach((k) => localStorage.removeItem(k))
+    memo = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}
+  } catch { /* corrupt or blocked — start empty */ }
+  return memo
 }
 
-function writeCache(key, icon) {
-  try {
-    const cache = readCache()
-    cache[key] = { icon, at: Date.now() }
-    const keys = Object.keys(cache)
-    if (keys.length > MAX_ENTRIES) {
-      keys.sort((a, b) => cache[a].at - cache[b].at).slice(0, keys.length - MAX_ENTRIES)
-        .forEach((k) => delete cache[k])
+let saveTimer = null
+function persistSoon() {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    const c = cache()
+    const byAge = (a, b) => c[b].at - c[a].at
+    const hits = Object.keys(c).filter((k) => c[k].icon).sort(byAge)
+    const misses = Object.keys(c).filter((k) => !c[k].icon).sort(byAge)
+    hits.slice(MAX_ICONS).concat(misses.slice(MAX_MISSES)).forEach((k) => delete c[k])
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(c))
+    } catch {
+      // Storage full — drop our cache rather than starve the rest of the app.
+      try { localStorage.removeItem(CACHE_KEY) } catch { /* ignore */ }
     }
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
-  } catch { /* storage full — just don't cache */ }
+  }, 1500)
 }
 
 const inflight = new Map()
@@ -67,8 +79,8 @@ const inflight = new Map()
 /** Data-URL icon of the installed app matching this merchant name, or '' if none. */
 export async function findInstalledAppIcon(name) {
   const key = norm(name)
-  if (!key || key.length < 4 || !Capacitor.isNativePlatform()) return ''
-  const hit = readCache()[key]
+  if (!key || key.length < 3 || !Capacitor.isNativePlatform()) return ''
+  const hit = cache()[key]
   if (hit && (hit.icon || Date.now() - hit.at < MISS_RETRY_MS)) return hit.icon
   if (inflight.has(key)) return inflight.get(key)
 
@@ -77,7 +89,8 @@ export async function findInstalledAppIcon(name) {
     .then((r) => r?.icon || '')
     .catch(() => '')
     .then((icon) => {
-      writeCache(key, icon)
+      cache()[key] = { icon, at: Date.now() }
+      persistSoon()
       inflight.delete(key)
       return icon
     })
@@ -86,9 +99,9 @@ export async function findInstalledAppIcon(name) {
 }
 
 export function useInstalledAppIcon(name) {
-  const [icon, setIcon] = useState(() => readCache()[norm(name)]?.icon || '')
+  const [icon, setIcon] = useState(() => cache()[norm(name)]?.icon || '')
   useEffect(() => {
-    const cached = readCache()[norm(name)]?.icon || ''
+    const cached = cache()[norm(name)]?.icon || ''
     setIcon(cached)
     if (!name || cached) return undefined
     let alive = true

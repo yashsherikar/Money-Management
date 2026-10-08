@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { listenForNotificationTaps } from './nativePush.js'
 import { bootstrapNotifications } from './utils/notificationBootstrap.js'
 import { startSmsPayWatcher } from './utils/smsPayWatch.js'
@@ -39,9 +40,12 @@ import SmsMoneyReviewPrompt from './components/SmsMoneyReviewPrompt.jsx'
 import SmsBackgroundAsk from './components/SmsBackgroundAsk.jsx'
 
 function Protected({ children }) {
+  const { pathname } = useLocation()
   return (
     <ProtectedRoute>
-      <Layout>{children}</Layout>
+      <Layout>
+        <ErrorBoundary name={pathname} resetKey={pathname}>{children}</ErrorBoundary>
+      </Layout>
     </ProtectedRoute>
   )
 }
@@ -108,14 +112,16 @@ export default function App() {
   }, [])
 
   return (
+    <ErrorBoundary name="app">
     <BiometricGate>
     <ConnectingScreen />
     <LoadingBar />
-    <DueReminders />
-    <PendingPayConfirm />
-    <PaymentCategoryPrompt />
-    <SmsMoneyReviewPrompt />
-    <SmsBackgroundAsk />
+    {/* Background popups: if one breaks it just disappears, never takes the app down */}
+    <ErrorBoundary silent name="DueReminders"><DueReminders /></ErrorBoundary>
+    <ErrorBoundary silent name="PendingPayConfirm"><PendingPayConfirm /></ErrorBoundary>
+    <ErrorBoundary silent name="PaymentCategoryPrompt"><PaymentCategoryPrompt /></ErrorBoundary>
+    <ErrorBoundary silent name="SmsMoneyReviewPrompt"><SmsMoneyReviewPrompt /></ErrorBoundary>
+    <ErrorBoundary silent name="SmsBackgroundAsk"><SmsBackgroundAsk /></ErrorBoundary>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
@@ -138,5 +144,6 @@ export default function App() {
       <Route path="/settings" element={<Protected><Settings /></Protected>} />
     </Routes>
     </BiometricGate>
+    </ErrorBoundary>
   )
 }

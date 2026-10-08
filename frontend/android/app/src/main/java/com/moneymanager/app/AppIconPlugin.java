@@ -28,7 +28,8 @@ import java.util.Locale;
 @CapacitorPlugin(name = "AppIcon")
 public class AppIconPlugin extends Plugin {
 
-    private static final int ICON_PX = 96;
+    // Shown at ≤48dp; 64px keeps each cached icon a few KB in the WebView's small storage.
+    private static final int ICON_PX = 64;
 
     @PluginMethod
     public void find(PluginCall call) {
@@ -46,11 +47,12 @@ public class AppIconPlugin extends Plugin {
             }
 
             String name = call.getString("name");
-            if (target == null && name != null && norm(name).length() >= 4) {
+            if (target == null && name != null && norm(name).length() >= 3) {
                 // "acko activa insurance" → ACKO. App label must appear in the text as whole
                 // word(s); longest label wins ("Amazon Shopping" over "Amazon"). Only apps the
                 // user installed — built-ins like Phone/Camera/Messages would match "phone bill".
                 List<String> words = words(name);
+                String whole = norm(name);
                 Intent launcher = new Intent(Intent.ACTION_MAIN);
                 launcher.addCategory(Intent.CATEGORY_LAUNCHER);
                 String self = getContext().getPackageName();
@@ -60,11 +62,15 @@ public class AppIconPlugin extends Plugin {
                     if (ai.packageName.equals(self)) continue;
                     if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
                     String label = String.valueOf(ri.loadLabel(pm));
-                    int len = norm(label).length();
-                    if (len < 4 || len <= bestLen) continue;
-                    if (containsRun(words, words(label))) {
-                        target = ai.packageName;
-                        bestLen = len;
+                    // "Jar: Save Money in Gold" / "Swiggy - Food" → also try the brand part.
+                    String brandPart = label.split("\\s*[:|\\u2013\\u2014]\\s*|\\s+-\\s+", 2)[0];
+                    for (String candidate : new String[]{label, brandPart}) {
+                        int len = norm(candidate).length();
+                        if (len < 3 || len <= bestLen) continue;
+                        if (labelMatches(words, whole, candidate)) {
+                            target = ai.packageName;
+                            bestLen = len;
+                        }
                     }
                 }
             }
@@ -88,6 +94,19 @@ public class AppIconPlugin extends Plugin {
             if (!w.isEmpty()) out.add(w);
         }
         return out;
+    }
+
+    /**
+     * App name appears in the text as whole word(s). 3-letter names ("Jar", "Jio") only in
+     * short text (≤ 3 words: "Money jar", "SAFE JAR") — in a sentence they're usually an
+     * ordinary word ("a jar of pickle").
+     */
+    static boolean labelMatches(List<String> words, String whole, String label) {
+        String normLabel = norm(label);
+        if (normLabel.length() < 3) return false;
+        if (normLabel.equals(whole)) return true;
+        if (normLabel.length() < 4 && words.size() > 3) return false;
+        return containsRun(words, words(label));
     }
 
     /** True if `run` appears in `words` as consecutive whole words. */

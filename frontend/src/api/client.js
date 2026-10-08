@@ -98,4 +98,20 @@ client.interceptors.response.use(
   },
 )
 
+// Whole-app double-submit guard: a rapid second tap on Add/Save/Paid fires the exact same
+// write while the first is still in flight → duplicate rows. Identical concurrent writes
+// (same method + url + body) share one request; different writes are untouched.
+const inflightWrites = new Map()
+for (const method of ['post', 'put', 'patch', 'delete']) {
+  const original = client[method].bind(client)
+  client[method] = (url, ...args) => {
+    const body = method === 'delete' ? '' : JSON.stringify(args[0] ?? null)
+    const key = `${method} ${url} ${body}`
+    if (inflightWrites.has(key)) return inflightWrites.get(key)
+    const request = original(url, ...args).finally(() => inflightWrites.delete(key))
+    inflightWrites.set(key, request)
+    return request
+  }
+}
+
 export default client

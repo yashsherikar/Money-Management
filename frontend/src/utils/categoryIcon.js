@@ -46,7 +46,7 @@ const ICONS = [
   { keywords: ['electricity', 'electric', 'power bill'], icon: '💡' },
   { keywords: ['water bill'], icon: '🚰' },
   { keywords: ['gas cylinder', 'lpg'], icon: '🔥' },
-  { keywords: ['utilit', 'bill'], icon: '💡' },
+  { keywords: ['utility', 'utilities', 'bill'], icon: '💡' },
 
   // Shopping
   { keywords: ['clothes', 'clothing', 'fashion', 'apparel', 'shirt', 'jeans', 'dress'], icon: '👕' },
@@ -107,9 +107,20 @@ const ICONS = [
   { keywords: ['office', 'work'], icon: '💼' },
 ]
 
+// Whole words only (plural s/es allowed): substring matching put "auto" 🛺 on "Autopay",
+// "bus" on "business", "rd" 🏦 on "card", "tea" on "steam".
+const MATCHERS = ICONS.map((entry) => ({
+  icon: entry.icon,
+  re: new RegExp(
+    `(?:^|[^a-z0-9])(?:${entry.keywords
+      .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|')})(?:s|es)?(?:[^a-z0-9]|$)`,
+    'i',
+  ),
+}))
+
 export function categoryIcon(text, transactionType) {
-  const lower = (text || '').toLowerCase()
-  const match = ICONS.find((entry) => entry.keywords.some((k) => lower.includes(k)))
+  const match = MATCHERS.find((m) => m.re.test(text || ''))
   if (match) return match.icon
   return transactionType === 'INCOME' ? '💰' : '🧾'
 }

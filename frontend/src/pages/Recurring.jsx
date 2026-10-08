@@ -37,6 +37,7 @@ export default function Recurring() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [confirmingId, setConfirmingId] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const [okMsg, setOkMsg] = useState('')
   const [pauseTick, setPauseTick] = useState(0)
 
@@ -96,6 +97,9 @@ export default function Recurring() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    // Rapid taps used to fire several POSTs → duplicate recurring entries
+    if (submitting) return
+    setSubmitting(true)
     setError('')
     setOkMsg('')
     try {
@@ -127,6 +131,8 @@ export default function Recurring() {
       }
     } catch (err) {
       setError(networkErrorMessage(err, t('Save failed')))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -377,7 +383,7 @@ export default function Recurring() {
         )}
 
         <div className="flex gap-2">
-          <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold">
+          <button type="submit" disabled={submitting} className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-md py-3 font-bold disabled:opacity-60">
             {editingId ? t('Update recurring transaction') : t('Add recurring transaction')}
           </button>
           <button type="button" onClick={resetForm} className="px-4 py-2 rounded-md border border-slate-300">{t('Cancel')}</button>
