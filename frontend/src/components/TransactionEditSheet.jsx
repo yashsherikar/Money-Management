@@ -5,6 +5,7 @@ import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
 import CategoryPicker from './CategoryPicker.jsx'
+import { formatTxnDisplay } from '../utils/txnDisplay.js'
 
 /** Income picker — "Other" is a real category, not "add new". */
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market', 'Cashback', 'Refund', 'Interest', 'Other']
@@ -57,7 +58,9 @@ export default function TransactionEditSheet({
       categoryId: txn.categoryId != null && txn.categoryId !== '' ? String(txn.categoryId) : '',
       type: txn.type,
       amount: String(txn.amount),
-      description: txn.description || '',
+      // Edit the clean merchant name the list shows, not the raw stored string
+      // ("Bank SMS: PAYAL SUPER MAR · UPI 6278… · A/c …043" → "PAYAL SUPER MAR").
+      description: txn.description ? formatTxnDisplay(txn.description, txn.categoryName).title : '',
       txnDate: txn.txnDate,
     })
     setAddingCategory(false)
@@ -312,14 +315,14 @@ export default function TransactionEditSheet({
             />
           </Field>
 
-          <Field label={t('Description')}>
+          <Field label={t('Merchant / description')}>
             <div className="flex items-center gap-2">
               {brand && <MerchantLogo brand={brand} size={32} />}
               <input
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 className="w-full"
-                placeholder={t('Description')}
+                placeholder={t('e.g. Payal Super Market, Idli sambhar')}
               />
             </div>
           </Field>

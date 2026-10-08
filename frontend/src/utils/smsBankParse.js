@@ -111,6 +111,11 @@ export function parseBankMoneySms({ body = '', address = '', date = 0, includeUp
   let merchant =
     capture(text, /\bfrom\s+([A-Za-z0-9][A-Za-z0-9 ._'&@-]{1,47}?)(?:\s*\.|,\s*UPI|\s+UPI\b|\s+on\b|\s+via\b|\s+Ref\b|$)/i)
     || capture(text, /(?:to|towards|paid to|sent to|for)\s+([A-Za-z0-9 ._'&@-]{2,48}?)(?:\s+on\b|\s+via\b|\s+using\b|\s+upi\b|\s+ref\b|[.,]|$)/i)
+    // NACH/mandate/UPI AutoPay wording often doesn't use the connectors above:
+    // "e-mandate towards NETFLIX", "requested by NETFLIX", "in favour of NETFLIX"
+    || capture(text, /\bmandate\b.{0,20}?(?:for|towards)\s+([A-Za-z0-9][A-Za-z0-9 ._'&-]{1,47}?)(?:\s+on\b|\s+via\b|\s+ref\b|[.,]|$)/i)
+    || capture(text, /\brequested by\s+([A-Za-z0-9][A-Za-z0-9 ._'&-]{1,47}?)(?:\s+on\b|\s+via\b|\s+ref\b|[.,]|$)/i)
+    || capture(text, /\bin favou?r of\s+([A-Za-z0-9][A-Za-z0-9 ._'&-]{1,47}?)(?:\s+on\b|\s+via\b|\s+ref\b|[.,]|$)/i)
     || ''
   merchant = cleanMerchant(merchant)
 

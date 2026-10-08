@@ -463,6 +463,7 @@ export default function Transactions() {
                 income={row.isIncome}
                 type={txn.type}
                 icon={row.brand ? <MerchantLogo brand={row.brand} size={40} /> : null}
+                appName={row.title}
                 iconText={row.iconText}
                 onClick={() => openTxnDetail(txn)}
                 actions={(

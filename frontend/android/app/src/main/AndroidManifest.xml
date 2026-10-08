@@ -93,6 +93,12 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="upi" android:host="pay" />
         </intent>
+        <!-- Launcher apps only (not QUERY_ALL_PACKAGES): lets AppIconPlugin show an installed
+             app's icon for a merchant we have no bundled logo for. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <!-- Popular UPI apps (chooser still includes any other app that handles upi://) -->
         <package android:name="com.google.android.apps.nbu.paisa.user" />
         <package android:name="com.phonepe.app" />

@@ -5,8 +5,14 @@ name: Morning Render wake
 
 on:
   schedule:
-    # 07:45 Asia/Kolkata = 02:15 UTC (IST is UTC+5:30) — first wake of the day
-    - cron: '15 2 * * *'
+    # GitHub runs schedules "best effort" — the single 07:45 IST slot was being dropped or
+    # run hours late, so mornings started cold. Several early, off-the-hour slots
+    # (05:47 / 06:23 / 06:53 / 07:17 IST) so at least one lands before you open the app.
+    # A run on an already-awake server takes ~10s.
+    - cron: '17 0 * * *'
+    - cron: '53 0 * * *'
+    - cron: '23 1 * * *'
+    - cron: '47 1 * * *'
     # Midday IST ~13:00 = 07:30 UTC — backup if daytime cron-job.org stopped
     - cron: '30 7 * * *'
     # Evening IST ~20:00 = 14:30 UTC

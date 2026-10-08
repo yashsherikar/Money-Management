@@ -1,4 +1,5 @@
 import { categoryIcon } from '../utils/categoryIcon.js'
+import { useInstalledAppIcon } from '../utils/appIcon.js'
 
 /**
  * Shared list row matching the Transactions screen layout:
@@ -11,6 +12,8 @@ export default function MoneyRow({
   income = false,
   iconText = '',
   icon = null,
+  /** Merchant name to look up an installed app's icon for, when `icon` is null. */
+  appName = '',
   type = 'EXPENSE',
   hideAmount = false,
   trailing = null,
@@ -19,6 +22,7 @@ export default function MoneyRow({
 }) {
   const isIncome = income || type === 'INCOME'
   const showIcon = icon != null || iconText != null
+  const appIcon = useInstalledAppIcon(icon == null ? appName : '')
   return (
     <li
       className={`px-4 py-3.5 sm:px-5 sm:py-4 ${onClick ? 'cursor-pointer active:bg-slate-50/50' : ''}`}
@@ -35,6 +39,8 @@ export default function MoneyRow({
       <div className="flex items-start gap-3 min-w-0">
         {icon != null ? (
           <span className="shrink-0" aria-hidden="true">{icon}</span>
+        ) : appIcon ? (
+          <img src={appIcon} alt="" aria-hidden="true" className="shrink-0 w-10 h-10 rounded-full object-cover" />
         ) : showIcon ? (
           <span
             className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${

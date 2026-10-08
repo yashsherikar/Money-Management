@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import client, { networkErrorMessage } from '../api/client'
 import { confirmDuePaid, clearPaidReminders, RELATED } from '../utils/confirmDuePaid.js'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
@@ -9,7 +9,6 @@ import CollapsibleSection from '../components/CollapsibleSection.jsx'
 import CategoryPicker from '../components/CategoryPicker.jsx'
 import MoneyRow, { MoneyList, RowAction } from '../components/MoneyRow.jsx'
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { listAutopayHistory } from '../utils/autopayDetect.js'
 import {
   isSubscriptionRecurring,
   brandFromRecurringDescription,
@@ -21,12 +20,8 @@ import {
   clearSubscriptionPauseMeta,
 } from '../utils/autopayStopDetect.js'
 
-function money(n) {
-  return `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-}
-
 const today = new Date().toISOString().slice(0, 10)
-const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', recurrenceType: 'MONTHLY', dayOfMonth: '1', lastDoneDate: today, nextDueDate: '' }
+const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', recurrenceType: 'MONTHLY', dayOfMonth: '1', lastDoneDate: today, intervalDays: '1' }
 
 export default function Recurring() {
   const { t } = useLanguage()
@@ -42,7 +37,6 @@ export default function Recurring() {
   const [formOpen, setFormOpen] = useState(false)
   const [confirmingId, setConfirmingId] = useState(null)
   const [okMsg, setOkMsg] = useState('')
-  const [autopayHistory, setAutopayHistory] = useState(() => listAutopayHistory())
   const [pauseTick, setPauseTick] = useState(0)
 
   async function loadAll() {
@@ -61,18 +55,13 @@ export default function Recurring() {
 
   useEffect(() => {
     loadAll()
-    const refreshAp = () => setAutopayHistory(listAutopayHistory())
     const onStopped = () => {
       setPauseTick((n) => n + 1)
       loadAll()
     }
-    window.addEventListener('mm-autopay-changed', refreshAp)
-    window.addEventListener('mm-transactions-changed', refreshAp)
     window.addEventListener('mm-autopay-stopped', onStopped)
     window.addEventListener('mm-subscription-pause-changed', onStopped)
     return () => {
-      window.removeEventListener('mm-autopay-changed', refreshAp)
-      window.removeEventListener('mm-transactions-changed', refreshAp)
       window.removeEventListener('mm-autopay-stopped', onStopped)
       window.removeEventListener('mm-subscription-pause-changed', onStopped)
     }
@@ -118,7 +107,9 @@ export default function Recurring() {
         recurrenceType: form.recurrenceType,
         dayOfMonth: form.recurrenceType === 'MONTHLY' ? Number(form.dayOfMonth) : null,
         lastDoneDate: form.recurrenceType === 'INTERVAL_DAYS' ? form.lastDoneDate : null,
-        nextDueDate: form.recurrenceType === 'INTERVAL_DAYS' ? form.nextDueDate : null,
+        nextDueDate: form.recurrenceType === 'INTERVAL_DAYS'
+          ? new Date(new Date(form.lastDoneDate).getTime() + Number(form.intervalDays) * 86400000).toISOString().slice(0, 10)
+          : null,
       }
       const wasEdit = !!editingId
       if (wasEdit) {
@@ -161,7 +152,7 @@ export default function Recurring() {
       recurrenceType: item.recurrenceType,
       dayOfMonth: item.dayOfMonth ? String(item.dayOfMonth) : '1',
       lastDoneDate,
-      nextDueDate: item.nextDueDate || '',
+      intervalDays: item.intervalDays ? String(item.intervalDays) : '1',
     })
   }
 
@@ -216,35 +207,6 @@ export default function Recurring() {
       </p>
       {error && !formOpen && <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
       {okMsg && !formOpen && <div className="mb-4 text-sm text-emerald-700 bg-emerald-50 p-2 rounded">{okMsg}</div>}
-
-      {autopayHistory.length > 0 && (
-        <section className="mb-6">
-          <h2 className="font-semibold mb-2 text-sm text-slate-500 uppercase tracking-wide">
-            {t('Detected from bank SMS')} ({autopayHistory.length})
-          </h2>
-          <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
-            {autopayHistory.slice(0, 12).map((h) => (
-              <div key={h.id} className="p-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-medium text-sm truncate">
-                    {h.kind === 'savings' ? t('Savings') : h.kind === 'autopay' ? t('Autopay') : t('Transfer')}
-                    {h.merchant ? `: ${h.merchant}` : ''}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5 break-words">
-                    {[h.info, h.accountName, new Date(h.createdAt).toLocaleString()].filter(Boolean).join(' · ')}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className={`text-sm font-bold tabular-nums ${h.direction === 'CREDIT' ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {h.direction === 'CREDIT' ? '+' : '−'}{money(h.amount)}
-                  </div>
-                  <Link to="/transactions" className="text-[11px] text-brand-600 font-medium">{t('View')}</Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {(() => {
         const subscriptions = items.filter(isSubscriptionRecurring)
@@ -385,7 +347,7 @@ export default function Recurring() {
         <Field label={t('Repeats')}>
           <select value={form.recurrenceType} onChange={(e) => setForm({ ...form, recurrenceType: e.target.value })} className="w-full">
             <option value="MONTHLY">{t('Same day every month')}</option>
-            <option value="INTERVAL_DAYS">{t('Every N days (e.g. 28-day recharge)')}</option>
+            <option value="INTERVAL_DAYS">{t('Every N days (1 = daily, 28 = recharge, etc.)')}</option>
           </select>
         </Field>
 
@@ -395,11 +357,20 @@ export default function Recurring() {
           </Field>
         ) : (
           <>
-            <Field label={t('Last done on')}>
-              <input required type="date" value={form.lastDoneDate} onChange={(e) => setForm({ ...form, lastDoneDate: e.target.value })} className="w-full" />
+            <Field label={t('Repeat every (days)')}>
+              <input
+                required
+                type="number"
+                min="1"
+                step="1"
+                placeholder={t('e.g. 1 for daily, 28 for a 28-day recharge')}
+                value={form.intervalDays}
+                onChange={(e) => setForm({ ...form, intervalDays: e.target.value })}
+                className="w-full"
+              />
             </Field>
-            <Field label={t('Next due date')}>
-              <input required type="date" min={form.lastDoneDate} value={form.nextDueDate} onChange={(e) => setForm({ ...form, nextDueDate: e.target.value })} className="w-full" />
+            <Field label={t('Starting from')}>
+              <input required type="date" value={form.lastDoneDate} onChange={(e) => setForm({ ...form, lastDoneDate: e.target.value })} className="w-full" />
             </Field>
           </>
         )}

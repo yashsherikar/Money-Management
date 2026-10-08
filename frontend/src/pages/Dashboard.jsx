@@ -208,6 +208,7 @@ export default function Dashboard() {
                     amount={u.amount}
                     type="EXPENSE"
                     icon={row.brand ? <MerchantLogo brand={row.brand} size={40} /> : null}
+                    appName={row.title}
                     iconText={row.iconText}
                   />
                 )

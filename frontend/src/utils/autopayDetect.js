@@ -105,10 +105,6 @@ export function markSmsConsumedByPayConfirm({
   })
 }
 
-export function listAutopayHistory() {
-  return loadHistory()
-}
-
 function historyHasDedupe(dedupeKey) {
   return loadHistory().some((h) => h.dedupeKey === dedupeKey)
 }
