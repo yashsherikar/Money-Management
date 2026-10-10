@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { EditIcon, DeleteIcon } from '../components/icons.jsx'
@@ -14,6 +14,7 @@ import { syncUnloggedConfirmedPays } from '../utils/paymentNotify.js'
 import { brandFromTxnText, MerchantLogo } from '../utils/subscriptionBrands.jsx'
 import MerchantIcon from '../components/MerchantIcon.jsx'
 import { buildTxnRowDisplay } from '../utils/txnDisplay.js'
+import { filterTransactions, sumTransactions } from '../utils/txnFilter.js'
 import { localDateYmd } from '../utils/localDate.js'
 import {
   groupTransactionsByDate,
@@ -24,6 +25,16 @@ import {
 const emptyForm = { accountId: '', categoryId: '', type: 'EXPENSE', amount: '', description: '', txnDate: localDateYmd() }
 /** Income picker options — "Other" is a real category, not "add new". */
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market', 'Cashback', 'Refund', 'Interest', 'Other']
+
+function monthRange() {
+  const now = new Date()
+  return {
+    from: localDateYmd(new Date(now.getFullYear(), now.getMonth(), 1)),
+    to: localDateYmd(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  }
+}
+
+const emptyFilters = { q: '', categoryName: '', type: '', min: '', max: '' }
 
 function findCategoryByName(categories, name) {
   const n = String(name || '').trim().toLowerCase()
@@ -47,10 +58,17 @@ export default function Transactions() {
   const [formOpen, setFormOpen] = useState(false)
   const [waitingPays, setWaitingPays] = useState(() => waitingP2pPays())
   const [unloggedPays, setUnloggedPays] = useState([])
+  const [range, setRange] = useState(monthRange)
+  const [filters, setFilters] = useState(emptyFilters)
+  const [showFilters, setShowFilters] = useState(false)
+  // Event listeners are registered once — read the current range through a ref, not a stale closure.
+  const rangeRef = useRef(range)
+  rangeRef.current = range
 
   async function loadAll() {
+    const { from, to } = rangeRef.current
     const [txnRes, accRes, catRes] = await Promise.all([
-      client.get('/transactions'),
+      client.get('/transactions', { params: { from, to } }),
       client.get('/accounts'),
       client.get('/categories'),
     ])
@@ -81,7 +99,22 @@ export default function Transactions() {
     }
   }, [])
 
-  const txnGroups = useMemo(() => groupTransactionsByDate(transactions), [transactions])
+  // Refetch when the date range changes (first load is handled above)
+  const firstRange = useRef(true)
+  useEffect(() => {
+    if (firstRange.current) {
+      firstRange.current = false
+      return
+    }
+    if (range.from && range.to && range.from <= range.to) loadAll().catch(() => {})
+  }, [range.from, range.to])
+
+  const shown = useMemo(() => filterTransactions(transactions, filters), [transactions, filters])
+  const totals = useMemo(() => sumTransactions(shown), [shown])
+  const txnGroups = useMemo(() => groupTransactionsByDate(shown), [shown])
+  const thisMonth = monthRange()
+  const isThisMonth = range.from === thisMonth.from && range.to === thisMonth.to
+  const filtersActive = !isThisMonth || Object.keys(emptyFilters).some((k) => filters[k] !== emptyFilters[k])
 
   function resetForm() {
     setForm(emptyForm)
@@ -204,7 +237,9 @@ export default function Transactions() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-5 sm:mb-6">{t('Transactions (this month)')}</h1>
+      <h1 className="text-2xl font-bold mb-5 sm:mb-6">
+        {isThisMonth ? t('Transactions (this month)') : t('Transactions')}
+      </h1>
 
       <TransactionDetailSheet
         open={!!viewingTxn}
@@ -437,7 +472,77 @@ export default function Transactions() {
       </form>
       </CollapsibleSection>
 
-      <MoneyList empty={t('No transactions this month.')}>
+      <div className="mb-3 flex gap-2">
+        <input
+          type="search"
+          value={filters.q}
+          onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+          placeholder={t('Search merchant, category, amount…')}
+          className="flex-1 min-w-0"
+        />
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className={`shrink-0 px-3 py-2 rounded-md border text-sm font-medium ${
+            filtersActive ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-slate-300'
+          }`}
+        >
+          {t('Filters')}{filtersActive ? ' •' : ''}
+        </button>
+      </div>
+
+      {showFilters && (
+        <div className="mb-3 p-3 rounded-xl border border-slate-200 bg-white flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Field label={t('From')}>
+              <input type="date" value={range.from} max={range.to} onChange={(e) => setRange({ ...range, from: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('To')}>
+              <input type="date" value={range.to} min={range.from} onChange={(e) => setRange({ ...range, to: e.target.value })} className="w-full" />
+            </Field>
+          </div>
+          <Field label={t('Category')}>
+            <CategoryPicker
+              categories={categories}
+              value={findCategoryByName(categories, filters.categoryName)?.id ?? ''}
+              onChange={(id, c) => setFilters({ ...filters, categoryName: c?.name || '' })}
+              placeholder={t('All categories')}
+            />
+          </Field>
+          <div className="grid grid-cols-3 gap-2">
+            <Field label={t('Type')}>
+              <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })} className="w-full">
+                <option value="">{t('All')}</option>
+                <option value="EXPENSE">{t('Spent')}</option>
+                <option value="INCOME">{t('Received')}</option>
+              </select>
+            </Field>
+            <Field label={t('Min ₹')}>
+              <input type="number" min="0" inputMode="decimal" value={filters.min} onChange={(e) => setFilters({ ...filters, min: e.target.value })} className="w-full" />
+            </Field>
+            <Field label={t('Max ₹')}>
+              <input type="number" min="0" inputMode="decimal" value={filters.max} onChange={(e) => setFilters({ ...filters, max: e.target.value })} className="w-full" />
+            </Field>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setFilters(emptyFilters); setRange(monthRange()) }}
+            className="self-start text-sm text-brand-600 font-medium"
+          >
+            {t('Clear filters')}
+          </button>
+        </div>
+      )}
+
+      {filtersActive && (
+        <div className="mb-2 text-xs text-slate-500">
+          {shown.length} {t('transactions')} · {t('Spent')} ₹{totals.spent.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+          {totals.received > 0 ? ` · ${t('Received')} ₹${totals.received.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : ''}
+          {!isThisMonth ? ` · ${range.from} → ${range.to}` : ''}
+        </div>
+      )}
+
+      <MoneyList empty={filtersActive ? t('No transactions match these filters.') : t('No transactions this month.')}>
         {txnGroups.flatMap((group) => [
           <li
             key={`day-${group.date || 'unknown'}`}

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { startSpendWidgetSync } from './utils/spendWidget.js'
 import { listenForNotificationTaps } from './nativePush.js'
 import { bootstrapNotifications } from './utils/notificationBootstrap.js'
 import { startSmsPayWatcher } from './utils/smsPayWatch.js'
@@ -77,6 +78,8 @@ export default function App() {
   useEffect(() => {
     return startPendingPayReminderWatcher()
   }, [])
+
+  useEffect(() => startSpendWidgetSync(), [])
 
   // Retry any Paid (SMS/manual) pays that never reached Transactions + reschedule subscription alerts
   useEffect(() => {

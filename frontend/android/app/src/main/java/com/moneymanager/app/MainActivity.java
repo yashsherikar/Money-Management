@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SmsReaderPlugin.class);
         registerPlugin(BillOcrPlugin.class);
         registerPlugin(AppIconPlugin.class);
+        registerPlugin(SpendWidgetPlugin.class);
         super.onCreate(savedInstanceState);
         deliverNotificationTap(getIntent());
     }

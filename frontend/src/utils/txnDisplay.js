@@ -9,7 +9,7 @@
  *  "UPI SMS: uberindia@ybl" / no name but "uber" in text → title Uber
  */
 
-import { brandFromTxnText } from './subscriptionBrands'
+import { brandFromTxnText, GENERIC_BRAND_IDS, BANK_BRAND_IDS } from './subscriptionBrands'
 
 function stripUpiPrefix(s) {
   return String(s || '')
@@ -164,6 +164,19 @@ export function splitTitleFromTxnDescription(description, fallback = 'Split bill
 }
 
 /**
+ * Older SMS rows saved the account's own bank as the merchant ("ICICI Bank" on a Jar
+ * payment from ICICI). That's the sender, not who was paid — ignore it so the
+ * description decides title and logo.
+ */
+export function effectiveMerchantName(merchantName, accountName) {
+  const merchant = String(merchantName || '').trim()
+  if (!merchant) return ''
+  const bank = brandFromTxnText(merchant)
+  if (bank && BANK_BRAND_IDS.has(bank.id) && brandFromTxnText(accountName)?.id === bank.id) return ''
+  return merchant
+}
+
+/**
  * Shared MoneyRow title / meta / brand — keep Home and Transactions identical.
  * @param {{ description?: string, categoryName?: string, accountName?: string, createdAt?: string|number|Date, type?: string, t?: (s:string)=>string, formatTime?: (v:any)=>string|null }} opts
  */
@@ -178,7 +191,7 @@ export function buildTxnRowDisplay({
   formatTime,
 } = {}) {
   const desc = String(description || '')
-  const merchant = String(merchantName || '').trim()
+  const merchant = effectiveMerchantName(merchantName, accountName)
   const isAutopay = /^Autopay:/i.test(desc)
   const isSavings = /^Savings/i.test(desc)
   const isTransfer = /^Transfer\s*:/i.test(desc)
@@ -189,7 +202,10 @@ export function buildTxnRowDisplay({
   const baseTitle = isTransfer || isAutopay || isSavings
     ? (description || categoryName || t('Transaction'))
     : display.title
-  const title = merchant && !isTransfer ? merchant : baseTitle
+  // Merchant that is a known company's legal name ("KIRANAKART TECHNOLOGIES") → app name ("Zepto").
+  const merchantBrand = merchant ? brandFromTxnText(merchant) : null
+  const merchantTitle = merchantBrand && !GENERIC_BRAND_IDS.has(merchantBrand.id) ? merchantBrand.name : merchant
+  const title = merchant && !isTransfer ? merchantTitle : baseTitle
   // User's own note ("acko activa insurance") when it differs from the merchant name
   const note = merchant && !isTransfer && display.title
     && display.title.toLowerCase() !== merchant.toLowerCase() ? display.title : null

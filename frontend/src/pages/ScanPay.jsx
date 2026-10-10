@@ -464,7 +464,8 @@ export default function ScanPay() {
 
   async function saveUpiHint() {
     const cat = categories.find((c) => String(c.id) === String(form.categoryId))
-    if (!cat) return
+    // Only shops are shared with other users — a person's UPI ID stays private
+    if (!cat || form.personal) return
     await client.put('/upi-hints', {
       upiId: form.pa,
       categoryName: cat.name,

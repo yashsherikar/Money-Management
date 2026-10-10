@@ -13,7 +13,7 @@ import { confirmSelfTransferFromReview } from '../utils/selfTransferDetect.js'
 import { findCategoryByMerchantName, rememberMerchantCategory } from '../utils/savedPayees.js'
 import CategoryPicker from './CategoryPicker.jsx'
 import { confirmDuePaid } from '../utils/confirmDuePaid.js'
-import { detectMerchantBrand } from '../utils/subscriptionBrands.jsx'
+import { detectSmsMerchantBrand } from '../utils/subscriptionBrands.jsx'
 import MerchantIcon from './MerchantIcon.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
@@ -63,7 +63,7 @@ export default function SmsMoneyReviewPrompt() {
     setToAccountId(next.suggestedToAccountId ? String(next.suggestedToAccountId) : '')
     const remembered = findCategoryByMerchantName(next.merchant)
     setCategoryId(remembered?.categoryId || (next.suggestedCategoryId ? String(next.suggestedCategoryId) : ''))
-    const liveBrand = detectMerchantBrand(next.merchant, next.raw)
+    const liveBrand = detectSmsMerchantBrand(next.merchant, next.raw)
     let desc = next.suggestedDescription || next.merchant || ''
     if (/^cred$/i.test(String(desc).trim()) && !liveBrand) {
       desc = next.merchant || ''
@@ -133,7 +133,7 @@ export default function SmsMoneyReviewPrompt() {
   }, [item, accounts, accountId, toAccountId])
 
   const brand = item
-    ? detectMerchantBrand(description, item.merchant, item.raw)
+    ? detectSmsMerchantBrand(description, item.merchant, item.raw)
     : null
 
   const isCredit = item?.direction === 'CREDIT'

@@ -4,6 +4,12 @@
  */
 import { BRAND_LOGO_COMPONENTS, LogoLetter } from './brandLogos.jsx'
 
+/** Food/drink *types*, not companies — never rename a merchant ("Sharma Tea Stall") to these. */
+export const GENERIC_BRAND_IDS = new Set([
+  'limbupani', 'coffee', 'tea', 'juice', 'softdrink', 'dosa', 'idli', 'chinese',
+  'panipuri', 'biryani', 'pizzafood', 'burgerfood', 'icecream', 'samosa',
+])
+
 export const SUBSCRIPTION_BRANDS = [
   // Streaming / music / subscriptions
   { id: 'netflix', name: 'Netflix', color: '#E50914', letter: 'N', keywords: ['netflix'] },
@@ -64,12 +70,15 @@ export const SUBSCRIPTION_BRANDS = [
   { id: 'samosa', name: 'Samosa', color: '#D4A017', letter: '🥟', keywords: ['\\bsamosa\\b', 'samosas', 'kachori', 'pakora', 'pakoda'] },
 
   // Food / quick commerce
-  { id: 'zomato', name: 'Zomato', color: '#E23744', letter: 'Z', keywords: ['zomato gold', 'zomato'] },
+  // Bank SMS often shows the company's legal name, not the app: Blink Commerce = Blinkit,
+  // KiranaKart = Zepto, Bundl = Swiggy, Eternal (ex-Zomato Ltd) = Zomato, Supermarket Grocery
+  // Supplies = BigBasket.
+  { id: 'zomato', name: 'Zomato', color: '#E23744', letter: 'Z', keywords: ['zomato gold', 'zomato', 'eternal limited', 'eternal ltd'] },
   { id: 'instamart', name: 'Instamart', color: '#FC8019', letter: 'IM', keywords: ['swiggy instamart', 'instamart'] },
-  { id: 'swiggy', name: 'Swiggy', color: '#FC8019', letter: 'S', keywords: ['swiggy one', 'swiggy'] },
-  { id: 'blinkit', name: 'Blinkit', color: '#F8C51B', letter: 'B', keywords: ['blinkit', 'grofers'] },
-  { id: 'zepto', name: 'Zepto', color: '#FF2E63', letter: 'Z', keywords: ['zepto'] },
-  { id: 'bigbasket', name: 'BigBasket', color: '#84C225', letter: 'bb', keywords: ['bigbasket', 'big basket'] },
+  { id: 'swiggy', name: 'Swiggy', color: '#FC8019', letter: 'S', keywords: ['swiggy one', 'swiggy', 'bundl'] },
+  { id: 'blinkit', name: 'Blinkit', color: '#F8C51B', letter: 'B', keywords: ['blinkit', 'grofers', 'blink commerce', 'blinkcommerce'] },
+  { id: 'zepto', name: 'Zepto', color: '#FF2E63', letter: 'Z', keywords: ['zepto', 'kiranakart', 'kirana kart'] },
+  { id: 'bigbasket', name: 'BigBasket', color: '#84C225', letter: 'bb', keywords: ['bigbasket', 'big basket', 'supermarket grocery'] },
   { id: 'dunzo', name: 'Dunzo', color: '#00D26A', letter: 'D', keywords: ['dunzo'] },
   { id: 'dmart', name: 'DMart', color: '#0078C1', letter: 'DM', keywords: ['dmart', 'd-mart', 'avenue supermarts'] },
   { id: 'reliancefresh', name: 'Reliance Fresh', color: '#E31837', letter: 'RF', keywords: ['reliance fresh', 'reliancefresh'] },
@@ -216,10 +225,14 @@ export function isCredAppText(...texts) {
   return /(?:^|[^a-z0-9])cred(?:[^a-z0-9]|$)/.test(stripped)
 }
 
-export function detectSubscriptionBrand(...texts) {
+/** Banks appear in every bank SMS as the sender ("…via ICICI Bank") — never the merchant. */
+export const BANK_BRAND_IDS = new Set(['hdfc', 'sbi', 'icici', 'axis', 'kotak'])
+
+function findBrand(texts, skipBanks) {
   const hay = texts.filter(Boolean).join(' ').toLowerCase()
   if (!hay) return null
   for (const brand of SUBSCRIPTION_BRANDS) {
+    if (skipBanks && BANK_BRAND_IDS.has(brand.id)) continue
     if (brand.id === 'cred') {
       if (isCredAppText(...texts)) return brand
       continue
@@ -231,7 +244,20 @@ export function detectSubscriptionBrand(...texts) {
   return null
 }
 
+export function detectSubscriptionBrand(...texts) {
+  return findBrand(texts, false)
+}
+
 export const detectMerchantBrand = detectSubscriptionBrand
+
+/**
+ * Brand of a bank-SMS payment: the parsed merchant name decides first; the rest of the SMS
+ * text (sender, "via ICICI Bank", A/c line) may only add a non-bank brand. Without this an
+ * ICICI debit to Jar became merchant "ICICI Bank" + autopay.
+ */
+export function detectSmsMerchantBrand(merchant, ...smsTexts) {
+  return findBrand([merchant], false) || findBrand(smsTexts, true)
+}
 
 export function brandFromRecurringDescription(description) {
   return detectSubscriptionBrand(description)

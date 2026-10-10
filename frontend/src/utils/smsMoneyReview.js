@@ -5,7 +5,7 @@
 import { Capacitor } from '@capacitor/core'
 import { addLocalAppNotification } from './localAppNotifications.js'
 import { blockSmsSender } from './smsScamFilter.js'
-import { detectMerchantBrand } from './subscriptionBrands.jsx'
+import { detectSmsMerchantBrand } from './subscriptionBrands.jsx'
 import {
   currentUserId,
   isLoggedIn,
@@ -91,7 +91,7 @@ async function notifyForgotExpense(item) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-  const brand = detectMerchantBrand(item.merchant, item.raw)
+  const brand = detectSmsMerchantBrand(item.merchant, item.raw)
   const who = brand?.name || item.merchant || 'merchant'
   const when = new Date(item.date || Date.now())
   const dateStr = Number.isNaN(when.getTime())
@@ -179,7 +179,7 @@ export function enqueueSmsMoneyReview({
     return null
   }
   // Detect brand from merchant + raw only — not from info ("Credit"/"Debit" labels).
-  const brand = detectMerchantBrand(merchant, raw)
+  const brand = detectSmsMerchantBrand(merchant, raw)
   const upiRef = captureUpiRef(raw)
   const isCashback = kind === 'cashback'
     || /\bcash\s*back\b|\bone97\b/i.test(String(raw || ''))
