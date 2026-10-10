@@ -1,7 +1,7 @@
 import { useLanguage } from '../context/LanguageContext.jsx'
-import { brandFromTxnText } from '../utils/subscriptionBrands.jsx'
+import { brandFromTxnText, GENERIC_BRAND_IDS } from '../utils/subscriptionBrands.jsx'
 import MerchantIcon from './MerchantIcon.jsx'
-import { formatTxnDisplay } from '../utils/txnDisplay.js'
+import { formatTxnDisplay, effectiveMerchantName } from '../utils/txnDisplay.js'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
 
@@ -42,7 +42,7 @@ export default function TransactionDetailSheet({
   if (!open || !txn) return null
 
   const isIncome = txn.type === 'INCOME'
-  const merchant = String(txn.merchantName || '').trim()
+  const merchant = effectiveMerchantName(txn.merchantName, txn.accountName)
   const brand = brandFromTxnText(merchant)
     || brandFromTxnText(formatTxnDisplay(txn.description, txn.categoryName).title, txn.categoryName)
   const desc = String(txn.description || '')
@@ -54,7 +54,10 @@ export default function TransactionDetailSheet({
   const baseHeadline = isTransfer || isAutopay || isSavings
     ? (txn.description || txn.categoryName || t('Transaction'))
     : display.title
-  const headline = merchant && !isTransfer ? merchant : baseHeadline
+  // Legal name of a known app ("KIRANAKART TECHNOLOGIES") → app name ("Zepto")
+  const merchantBrand = merchant ? brandFromTxnText(merchant) : null
+  const merchantTitle = merchantBrand && !GENERIC_BRAND_IDS.has(merchantBrand.id) ? merchantBrand.name : merchant
+  const headline = merchant && !isTransfer ? merchantTitle : baseHeadline
   // User's own note when it differs from the merchant ("acko activa insurance")
   const note = merchant && display.title && display.title.toLowerCase() !== merchant.toLowerCase()
     ? display.title : ''

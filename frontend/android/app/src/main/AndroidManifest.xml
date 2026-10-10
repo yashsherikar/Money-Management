@@ -55,6 +55,13 @@
         </service>
         <receiver android:name=".NotificationActionReceiver" android:exported="false" />
 
+        <receiver android:name=".SpendWidgetProvider" android:exported="false" android:label="Money Manager spend">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/spend_widget_info" />
+        </receiver>
+
         <!-- Live bank SMS even when app is killed (no inbox history read). -->
         <receiver
             android:name=".SmsReceivedReceiver"

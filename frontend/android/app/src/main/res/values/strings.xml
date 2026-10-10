@@ -4,4 +4,5 @@
     <string name="title_activity_main">Money Manager</string>
     <string name="package_name">com.moneymanager.app</string>
     <string name="custom_url_scheme">com.moneymanager.app</string>
+    <string name="widget_description">Today\'s and this month\'s spend</string>
 </resources>

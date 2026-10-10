@@ -21,6 +21,7 @@ import {
 } from './smsListenGate.js'
 import client from '../api/client'
 import { isLoggedIn } from './userStorage.js'
+import { wakeBackend } from './wakeBackend.js'
 
 const SmsReader = registerPlugin('SmsReader')
 
@@ -404,6 +405,30 @@ async function confirmPendingFromSms(msg, parsed, match, key, { accounts, catego
   return { pending: updated, parsed, logResult }
 }
 
+const INBOX_CHECKED_KEY = 'mm_sms_inbox_checked_at'
+const INBOX_OVERLAP_MS = 15 * 60_000
+
+/**
+ * Bank SMS in the inbox since the last check (oldest first). First run only arms the
+ * checkpoint at "now" — never imports older history.
+ */
+async function readInboxSinceLastCheck() {
+  const now = Date.now()
+  let last = 0
+  try { last = Number(localStorage.getItem(INBOX_CHECKED_KEY) || 0) } catch { /* ignore */ }
+  try { localStorage.setItem(INBOX_CHECKED_KEY, String(now)) } catch { /* ignore */ }
+  if (!last) return []
+  const sinceMs = Math.max(last - INBOX_OVERLAP_MS, getSmsListenFrom())
+  try {
+    const { messages } = await SmsReader.readRecent({ sinceMs, limit: 80 })
+    return (Array.isArray(messages) ? messages : [])
+      .sort((x, y) => Number(x?.date || 0) - Number(y?.date || 0))
+  } catch {
+    try { localStorage.setItem(INBOX_CHECKED_KEY, String(last)) } catch { /* retry next time */ }
+    return []
+  }
+}
+
 /**
  * Process live SMS that arrived while the app was killed/backgrounded.
  * Uses the native RECEIVE_SMS queue only — never reads SMS inbox history.
@@ -429,6 +454,9 @@ export async function drainLiveSmsQueue() {
     try {
       let accounts
       let categories
+      // After a day closed Render is asleep: wake it first, or /accounts fails and every
+      // SMS lands in "no account" review instead of being saved.
+      await wakeBackend().catch(() => {})
       try {
         const [a, c] = await Promise.all([
           client.get('/accounts').catch(() => ({ data: [] })),
@@ -453,6 +481,16 @@ export async function drainLiveSmsQueue() {
           } catch { /* ignore one bad SMS — keep going through the burst */ }
         }
       } while (drainAgain)
+
+      // Catch-up: some phones (Xiaomi/Oppo/Vivo/Samsung battery savers) never wake the SMS
+      // receiver while the app is closed, so the live queue stays empty. Re-check the inbox
+      // since the last check; already-handled SMS are skipped by the dedupe keys.
+      for (const msg of await readInboxSinceLastCheck()) {
+        try {
+          const hit = await processIncomingSms(msg, { accounts, categories })
+          if (hit) results.push(hit)
+        } catch { /* keep going */ }
+      }
     } catch { /* ignore */ } finally {
       drainBusy = false
       if (drainAgain) {

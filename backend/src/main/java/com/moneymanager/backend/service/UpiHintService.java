@@ -38,6 +38,13 @@ public class UpiHintService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "category name required");
         }
 
+        // Person-to-person UPI IDs are private: never share a person's name/category with other
+        // users. Also drop anything stored for this ID before.
+        if (request.personal()) {
+            repository.findByUpiId(key).ifPresent(repository::delete);
+            return new UpiHintResponse(key, categoryName, true, null);
+        }
+
         UpiPayeeHint hint = repository.findByUpiId(key).orElseGet(UpiPayeeHint::new);
         hint.setUpiId(key);
         hint.setCategoryName(categoryName);

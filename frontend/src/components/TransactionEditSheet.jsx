@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useLanguage } from '../context/LanguageContext.jsx'
+import client from '../api/client'
 import Field from './Field.jsx'
 import { brandFromTxnText } from '../utils/subscriptionBrands.jsx'
 import MerchantIcon from './MerchantIcon.jsx'
 import { useBodyScrollLock } from '../utils/useBodyScrollLock.js'
 import ModalPortal from '../utils/ModalPortal.jsx'
 import CategoryPicker from './CategoryPicker.jsx'
-import { formatTxnDisplay } from '../utils/txnDisplay.js'
+import { formatTxnDisplay, effectiveMerchantName } from '../utils/txnDisplay.js'
 
 /** Income picker — "Other" is a real category, not "add new". */
 const INCOME_SOURCES = ['Salary', 'Freelance', 'Share Market', 'Cashback', 'Refund', 'Interest', 'Other']
@@ -23,7 +24,7 @@ const EXPENSE_DEFAULTS = [
  */
 function splitMerchantAndNote(txn) {
   const cleanDesc = txn.description ? formatTxnDisplay(txn.description, txn.categoryName).title : ''
-  const merchantName = txn.merchantName || cleanDesc
+  const merchantName = effectiveMerchantName(txn.merchantName, txn.accountName) || cleanDesc
   const note = cleanDesc.toLowerCase() === String(merchantName).toLowerCase() ? '' : cleanDesc
   return { merchantName, description: note }
 }
@@ -163,6 +164,21 @@ export default function TransactionEditSheet({
     setForm((f) => ({ ...f, categoryId: match ? String(match.id) : '' }))
   }
 
+  /** Category changed on a paid-by-QR shop → update the shared hint so the next person who
+   *  scans it gets this category. Only updates UPI IDs already known as shops (personal
+   *  UPI IDs are never in the shared table). Background, never blocks the save. */
+  function shareShopCategory(categoryId) {
+    const upiId = String(txn?.paymentId || '').trim()
+    const cat = localCategories.find((c) => String(c.id) === String(categoryId))
+    if (!upiId.includes('@') || !cat || String(categoryId) === String(txn?.categoryId ?? '')) return
+    client.get('/upi-hints', { params: { upiId } })
+      .then(({ data }) => {
+        if (data?.personal || data?.categoryName === cat.name) return null
+        return client.put('/upi-hints', { upiId, categoryName: cat.name, personal: false, displayName: data?.displayName || null })
+      })
+      .catch(() => {})
+  }
+
   async function submit(e) {
     e.preventDefault()
     if (!form.accountId || !form.amount || busy) return
@@ -191,6 +207,7 @@ export default function TransactionEditSheet({
         merchantName: form.merchantName.trim(),
         txnDate: form.txnDate,
       })
+      shareShopCategory(categoryId)
       onClose?.()
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || t('Save failed'))

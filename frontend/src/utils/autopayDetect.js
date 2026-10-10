@@ -12,7 +12,7 @@ import {
   dismissSmsMoneyReviewsForSms,
 } from './smsMoneyReview.js'
 import { listPendingP2pPays } from './pendingP2pPays.js'
-import { detectSubscriptionBrand } from './subscriptionBrands.jsx'
+import { detectSmsMerchantBrand } from './subscriptionBrands.jsx'
 import { currentUserId, isLoggedIn, userGetItem, userSetItem } from './userStorage.js'
 import { isSmsFromPresent } from './smsListenGate.js'
 import { shouldIgnoreMoneySms } from './smsScamFilter.js'
@@ -336,7 +336,7 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
   })
   if (!parsed) return null
 
-  const brand = detectSubscriptionBrand(parsed.raw, parsed.merchant, body, address)
+  const brand = detectSmsMerchantBrand(parsed.merchant, parsed.raw, body, address)
 
   const dedupeKey = smsDedupeKey({
     amount: parsed.amount,
@@ -574,11 +574,6 @@ export async function processAutopaySms(msg, { accounts, categories } = {}) {
       createdAt: Date.now(),
       raw: parsed.raw,
     }
-
-    try {
-      const rec = await findRecurringFor(parsed.merchant || 'Autopay', parsed.amount)
-      if (rec) entry.recurringId = rec.id
-    } catch { /* ignore */ }
 
     const hist = loadHistory()
     hist.unshift(entry)
